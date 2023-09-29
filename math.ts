@@ -20,6 +20,17 @@ export function isHalf(n: number) {
     return ((n + 0.5) | 0) === n + 0.5
 }
 
+/** Sine-waves between x and y over time
+ * @param time_s Monotonically increasing time, in seconds
+ * @param hz Cycles per second
+ */
+export function oscillate(x: number, y: number, time_s: number, hz: number = 1) {
+    // Apparently this works out to the same thing! I don't understand why
+    // const t = Math.cos(Math.PI * time_s * hz) * Math.sin(Math.PI * time_s * hz) + 0.5
+    return ((y - x) * ((Math.sin(time_s * hz * 2 * Math.PI) + 1) / 2)) + x
+}
+
+
 const vr_a = 12.9898,
     vr_b = 78.233,
     vr_c = 43758.5453
