@@ -1,4 +1,5 @@
-import { Vector2 as TVec2, Vector3 as TVec3 } from 'three'
+import { Vector2 as TVec2, Vector3 as TVec3, Quaternion, Euler } from 'three'
+import { roundToPlaces } from './math'
 
 // This is solely so other code doesn't have to depend on three.js directly
 export type ZVec2 = TVec2
@@ -50,3 +51,27 @@ export function roundDirection(dir: GVec2, increments: number): void {
     dir.x = c
     dir.y = s
 }
+
+
+
+export function formatSize2D({ x, y }: Readonly<GVec2>, places = 3) {
+    return '(' + [x, y].map(n => roundToPlaces(n, places)).join(' × ') + ')'
+}
+
+export function formatSize3D({ x, y, z }: Readonly<GVec3>, places = 3) {
+    return '(' + [x, y, z].map(n => roundToPlaces(n, places)).join(' × ') + ')'
+}
+
+export function formatVec3({ x, y, z }: Readonly<GVec3>, places = 3) {
+    return '{' + [x, y, z].map(n => roundToPlaces(n, places)).join(', ') + '}'
+}
+
+const formatRotationTempQ = new Quaternion()
+const formatRotationTempEu = new Euler()
+export function formatRotation(rotation: Readonly<GQuat>, places = 1) {
+    const { x, y, z } = formatRotationTempEu.setFromQuaternion(
+        formatRotationTempQ.copy(rotation as Quaternion)
+    )
+    return '[' + [x, y, z].map(n => `${roundToPlaces(radToDeg(n), places)}°`).join(', ') + ']'
+}
+
