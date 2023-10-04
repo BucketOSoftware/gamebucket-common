@@ -31,14 +31,8 @@ export function isHalf(n: number) {
  * @param hz Cycles per second
  */
 export function oscillate(time_s: number, hz = 1) {
-    // Apparently this works out to the same thing! I don't understand why
-    // const t = Math.cos(Math.PI * time_s * hz) * Math.sin(Math.PI * time_s * hz) + 0.5
-    let n = Math.sin(time_s * hz * 2 * Math.PI)
-    ow(n, ow.number.inRange(-1, 1))
+    retun Math.sin(time_s * hz * 2 * Math.PI)
     return n
-    // n *= 
-    // return (clamp(n * overdrive, -1, 1) + 1) / 2
-    // return ((y - x) * ((+ 1) / 2)) + x
 }
 
 export function hardclip(n: number, gain: number) {
