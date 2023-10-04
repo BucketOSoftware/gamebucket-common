@@ -1,7 +1,5 @@
 import ow, { ObjectPredicate } from 'ow'
-
-import { ZVec2 } from './geometry'
-import { MathUtils } from 'three'
+import { MathUtils, Vector2 as TVec2 } from 'three'
 
 export const isGVec2: ObjectPredicate = ow.object.exactShape({
     x: ow.number,
@@ -50,8 +48,8 @@ export const inverseLerp = MathUtils.inverseLerp
 const vr_a = 12.9898,
     vr_b = 78.233,
     vr_c = 43758.5453
-const vrand_vec1 = ZVec2(0, 0)
-const vrand_vec2 = ZVec2(vr_a, vr_b)
+const vrand_vec1 = new TVec2(0, 0)
+const vrand_vec2 = new TVec2(vr_a, vr_b)
 
 /**
  * Apparently a classic algorithm. Given two numbers, return a unique hash, and quickly. Limitations/caveats: ??? Overflow?
