@@ -31,8 +31,7 @@ export function isHalf(n: number) {
  * @param hz Cycles per second
  */
 export function oscillate(time_s: number, hz = 1) {
-    retun Math.sin(time_s * hz * 2 * Math.PI)
-    return n
+    return Math.sin(time_s * hz * 2 * Math.PI)
 }
 
 export function hardclip(n: number, gain: number) {
@@ -42,10 +41,11 @@ export function hardclip(n: number, gain: number) {
 
 export function oscillerp(x: number, y: number, time_s: number, hz = 1, gain = 1, softClip = false) {
     // TODO: softclip
-    return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) /2)
+    return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) / 2)
 }
 
 export const lerp = MathUtils.lerp
+export const inverseLerp = MathUtils.inverseLerp
 
 const vr_a = 12.9898,
     vr_b = 78.233,
