@@ -11,6 +11,7 @@ export const ZVec3 = (x: number, y: number, z: number) =>
 // For parameter types when we don't care whether the object has a prototype
 export type GVec2 = { x: number; y: number }
 export type GVec3 = { x: number; y: number; z: number }
+export type GQuat = { w: number, x: number; y: number; z: number }
 
 export function degToRad(degrees: number) {
     return (degrees * Math.PI) / 180
