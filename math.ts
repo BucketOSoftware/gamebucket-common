@@ -1,6 +1,7 @@
 import ow, { ObjectPredicate } from 'ow'
 
 import { ZVec2 } from './geometry'
+import { MathUtils } from 'three'
 
 export const isGVec2: ObjectPredicate = ow.object.exactShape({
     x: ow.number,
@@ -16,20 +17,41 @@ export function roundTo(i: number, places: number) {
     return Math.round(i * places) / places
 }
 
+export function roundToPlaces(i: number, places: number) {
+    places = 10 ** places
+    return Math.round(i * places) / places
+}
+
 export function isHalf(n: number) {
     return ((n + 0.5) | 0) === n + 0.5
 }
 
-/** Sine-waves between x and y over time
+/** Sine-waves between -1 and 1 over time
  * @param time_s Monotonically increasing time, in seconds
  * @param hz Cycles per second
  */
-export function oscillate(x: number, y: number, time_s: number, hz: number = 1) {
+export function oscillate(time_s: number, hz = 1) {
     // Apparently this works out to the same thing! I don't understand why
     // const t = Math.cos(Math.PI * time_s * hz) * Math.sin(Math.PI * time_s * hz) + 0.5
-    return ((y - x) * ((Math.sin(time_s * hz * 2 * Math.PI) + 1) / 2)) + x
+    let n = Math.sin(time_s * hz * 2 * Math.PI)
+    ow(n, ow.number.inRange(-1, 1))
+    return n
+    // n *= 
+    // return (clamp(n * overdrive, -1, 1) + 1) / 2
+    // return ((y - x) * ((+ 1) / 2)) + x
 }
 
+export function hardclip(n: number, gain: number) {
+    ow(n, ow.number.inRange(-1, 1))
+    return MathUtils.clamp(n * gain, -1, 1)
+}
+
+export function oscillerp(x: number, y: number, time_s: number, hz = 1, gain = 1, softClip = false) {
+    // TODO: softclip
+    return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) /2)
+}
+
+export const lerp = MathUtils.lerp
 
 const vr_a = 12.9898,
     vr_b = 78.233,
