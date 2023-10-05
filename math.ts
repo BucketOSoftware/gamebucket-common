@@ -37,6 +37,31 @@ export function hardclip(n: number, gain: number) {
     return MathUtils.clamp(n * gain, -1, 1)
 }
 
+export function ema(prev: number, current: number, smoothing: number) {
+    // const P =
+    ow(smoothing, ow.number.inRange(0, 1))
+
+    return (smoothing * current) + (1 - smoothing) * prev
+    return prev + (0.1 * (current - prev))
+}
+
+export class SmoothValue {
+    private currentAverage: number
+    constructor(initial: number, public smoothing: number) {
+
+        ow(smoothing, ow.number.inRange(0, 1))
+        this.currentAverage = initial
+    }
+
+    get average() {
+        return this.currentAverage
+    }
+    update(newValue: number) {
+        this.currentAverage = (this.smoothing * newValue) + (1 - this.smoothing) * this.currentAverage
+        return this.currentAverage
+    }
+}
+
 export function oscillerp(x: number, y: number, time_s: number, hz = 1, gain = 1, softClip = false) {
     // TODO: softclip
     return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) / 2)
