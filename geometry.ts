@@ -90,6 +90,14 @@ export function roundDirection(dir: GVec2, increments: number): void {
     dir.y = s
 }
 
+/**
+ * @param a An object
+ * @param b Another object
+ * @returns The position of `a` in `b`'s local space
+ */
+export function relativePosition(a: THREE.Object3D, b: THREE.Object3D, output: THREE.Vector3) {
+    return b.worldToLocal(a.getWorldPosition(output))
+}
 
 
 export function formatSize2D({ x, y }: Readonly<GVec2>, places = 3) {
