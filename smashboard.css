@@ -28,7 +28,7 @@
     }
 }
 
-#overlay {
+.smashboard {
     display: grid;
     gap: var(--dashboard-gutter);
 
@@ -49,30 +49,30 @@
     visibility: hidden;
 }
 
-#overlay * {
+.smashboard * {
     box-sizing: border-box;
 }
 
-#overlay .shadow {
+.smashboard .shadow {
     border-radius: 5px;
     /* for clarity against the background, a little "hugging" line */
     box-shadow:
         1px 1px 0 1px var(--smashboard-shadow-color);
 }
 
-#overlay .charts-section {
+.smashboard .charts-section {
     display: flex;
     flex-wrap: wrap;
     gap: var(--dashboard-gutter);
 }
 
-#overlay .console-section {
+.smashboard .console-section {
     padding: calc(var(--smashboard-console-font-size) * .75);
     background-color: var(--smashboard-console-background);
 
 }
 
-#overlay .crt:not(hr) {
+.smashboard .crt:not(hr) {
     font-family: "Overpass Mono", monospace;
     font-size: var(--smashboard-console-font-size);
     line-height: calc(var(--smashboard-console-font-size) * 1.25);
@@ -81,7 +81,7 @@
     text-shadow: var(--smashboard-console-crt-shadows);
 }
 
-#overlay hr.crt {
+.smashboard hr.crt {
     color: var(--smashboard-console-text-color);
     border: 0.75px solid;
     box-shadow: var(--smashboard-console-crt-shadows);
@@ -89,13 +89,13 @@
 
 /* TODO: this doesn't work, but in Chromium the scroll bar is essentially
     invisible. What the hell, man? */
-#overlay .console::-webkit-scrollbar-thumb {
+.smashboard .console::-webkit-scrollbar-thumb {
     border-color: var(--smashboard-console-text-color);
     background-color: var(--smashboard-console-text-color);
 }
 
 
-#overlay .console {
+.smashboard .console {
     width: 100%;
     margin: 0;
     overflow-x: clip;
@@ -104,6 +104,7 @@
     scrollbar-color: var(--smashboard-console-text-color);
     scrollbar-width: auto;
 
+    font-weight: lighter;
     /* Like a <pre> but wrapped */
     /* try break-spaces? */
     white-space: pre-wrap;
@@ -115,12 +116,12 @@
     max-height: calc(var(--smashboard-console-font-size) * var(--smashboard-console-max-lines) * 1.25);
 }
 
-#overlay .console a {
+.smashboard .console a {
     color: inherit;
     text-decoration: underline;
 }
 
-#overlay input {
+.smashboard input {
     margin: 0;
     width: 100%;
     border: 0;
@@ -128,12 +129,11 @@
     color: white;
     background: inherit;
 
-    font-family: "Overpass Mono", monospace;
-    font-weight: bold;
+    font-weight: normal;
 }
 
 
-#overlay .swatches {
+.smashboard .swatches {
     overflow: scroll;
     display: flex;
     gap: 1px;
@@ -146,7 +146,7 @@
     text-shadow: 1px 1px 2px black;
 }
 
-#overlay .swatches .swatch {
+.smashboard .swatches .swatch {
     width: 32px;
     height: 32px;
 }
@@ -155,9 +155,9 @@
  * 3D stuff
  */
 
-#overlay.threedee {
-    /* TODO: a better way of doing this besides just eyeballing it */
+.smashboard.threedee {
     /* account for the skew in the element's width */
+    /* TODO: a better way of doing this besides just eyeballing it */
     /* at 7.5 degrees this is mostly readable */
     max-width: 896px;
     width: 110%;
@@ -169,11 +169,11 @@
     transition: visibility 0s linear;
 }
 
-#overlay.visible {
+.smashboard.visible {
     visibility: visible;
 }
 
-#overlay.threedee.visible {
+.smashboard.threedee.visible {
     transition:
         visibility 0s,
         transform var(--smashboard-transitions) ease;
@@ -182,7 +182,7 @@
         perspective(500px) rotateY(var(--smashboard-skew)) rotateX(calc(var(--smashboard-skew) * -0.25));
 }
 
-#overlay.threedee.hidden {
+.smashboard.threedee.hidden {
     transition:
         visibility 0s var(--smashboard-transitions),
         transform var(--smashboard-transitions) ease;

@@ -71,6 +71,7 @@ export default class Smashboard<GS, C extends Object = {}> {
     ) {
         // Set up the markup
         container.innerHTML = html
+        container.classList.add('smashboard')
         this.sole = container.querySelector<HTMLElement>('.console')
 
         this.attachEvents(container)
@@ -714,7 +715,7 @@ export class ColorScheme {
     }
 
     pickShadowColor(idx: number, opacity = 1, darken = 1 / 2) {
-        this.shadow = this.colors[idx].darken(darken).opaquer(1 -opacity).round()
+        this.shadow = this.colors[idx].darken(darken).opaquer(1 - opacity).round()
 
         return this
     }
