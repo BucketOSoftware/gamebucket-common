@@ -187,6 +187,13 @@ export default class Smashboard<GS, C extends Object = {}> {
             root.style.setProperty('--smashboard-shadow-color', scheme.shadow.string())
         }
 
+        root.classList.remove('color-crt', 'mono-crt')
+        if (scheme.monochrome) {
+            root.classList.add('mono-crt')
+        } else {
+            root.classList.add('color-crt')
+        }
+
     }
 
     showSwatches(scheme: ColorScheme, which?: keyof ColorScheme) {
@@ -674,17 +681,27 @@ export function colorsFromHexFile(file: string): Color[] {
 }
 
 
-
-
-export class ColorScheme {
-    readonly colors: Color[]
+class SchemeColors {
     graphSeries?: Color[]
     graphBackground?: Color
     consoleText?: Color
     consoleBackground?: Color
     shadow?: Color
+    monochrome: boolean = false
+}
+
+export class ColorScheme extends SchemeColors {
+    readonly colors: Color[]
+    // graphSeries?: Color[]
+    // graphBackground?: Color
+    // consoleText?: Color
+    // consoleBackground?: Color
+    // shadow?: Color
+    // monochrome = false
 
     constructor(hexfile: string) {
+        super()
+
         this.colors = colorsFromHexFile(hexfile)
         // Assume the first color is the background and the rest are main until we hear otherwise
 
@@ -716,6 +733,12 @@ export class ColorScheme {
 
     pickShadowColor(idx: number, opacity = 1, darken = 1 / 2) {
         this.shadow = this.colors[idx].darken(darken).opaquer(1 - opacity).round()
+
+        return this
+    }
+
+    monoTube(mono: boolean) {
+        this.monochrome = mono
 
         return this
     }

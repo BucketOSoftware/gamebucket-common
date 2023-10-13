@@ -1,9 +1,13 @@
 <section class="charts-section"></section>
-<section class="console-section shadow">
-    <pre class="console crt"></pre>
-    <hr class="crt" />
+<section class="console-section crt shadow">
+    <div class="console">
+        <pre class="console console-append-log"></pre>
+        <pre class="console console-momentary hidden"></pre>
+    </div>
+    <hr />
     <!-- todo: stick a > at the front here-->
     <form name="console-input">
-        <input type="text" class="crt" name="cli" placeholder="> gamebucket" />
+        <!-- input specificity stomps on crt styles so we have to specify again -->
+        <input type="text" class="crt" name="cli" placeholder="&gt; gamebucket" />
     </form>
 </section>

@@ -4,10 +4,6 @@
     --smashboard-console-text-color: lightgray;
 
     --smashboard-console-background: rgba(0, 0, 0, 0.75);
-    --smashboard-console-crt-shadows:
-        0.25px 0 1px rgba(0, 30, 255, 0.3),
-        -0.25px 0 1px rgba(255, 0, 80, 0.2),
-        0 0 2px;
     --smashboard-shadow-color: rgba(0, 0, 0, 0.5);
 
     --smashboard-transitions: 0.333s;
@@ -72,16 +68,29 @@
 
 }
 
-.smashboard .crt:not(hr) {
+.smashboard .crt {
     font-family: "Overpass Mono", monospace;
     font-size: var(--smashboard-console-font-size);
     line-height: calc(var(--smashboard-console-font-size) * 1.25);
-
     color: var(--smashboard-console-text-color);
     text-shadow: var(--smashboard-console-crt-shadows);
 }
 
-.smashboard hr.crt {
+.smashboard.color-crt,
+.smashboard .color-crt {
+    --smashboard-console-crt-shadows:
+        0.25px 0 1px rgba(0, 30, 255, 0.3),
+        -0.25px 0 1px rgba(255, 0, 80, 0.2),
+        0 0 2px;
+}
+
+.smashboard.mono-crt,
+.smashboard .mono-crt {
+    --smashboard-console-crt-shadows: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+
+.smashboard .crt hr {
     color: var(--smashboard-console-text-color);
     border: 0.75px solid;
     box-shadow: var(--smashboard-console-crt-shadows);
