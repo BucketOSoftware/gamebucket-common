@@ -1,3 +1,9 @@
+declare global {
+    interface Window {
+        watch?: (path: string, options?: ChartOptions) => Chart<any>
+    }
+}
+
 import Color from 'color'
 import { at, capitalize, cloneDeep, get, isEmpty, throttle, debounce, trim, set } from 'lodash-es'
 import ow from 'ow'
@@ -10,52 +16,13 @@ import {
     ITimeSeriesPresentationOptions,
 } from 'smoothie'
 
-import './dashboard.css'
+import './smashboard.css'
 import html from './smashboard.html?raw'
 import lipsum from './lipsum.txt?raw'
 
-declare global {
-    interface Window {
-        watch?: (path: string, options?: ChartOptions) => Chart<any>
-    }
-}
+export type WatchCallback<GS> = (state: GS) => number
 
-// VK: valid keys
-// can't restrict to primitives, so this gets annoying as shit 
-// type Traversable<AV> = { [k: string | number]: Traversable<AV> | AV }
-type Traversable = { [k: string | number]: any }
-
-// TODO: look up the Extract<> type
-type TraverseFilter = (key: string, value: any) => boolean
-
-// TODO: ensure (somehow?) that these come out in the same order as the prototype. Object.keys()?
-function searchNested(obj: Traversable, filter: TraverseFilter, prefix: string[] = []): [string[], any][] {
-    let acc: [string[], unknown][] = []
-    for (let key in obj) {
-        const fullPath = prefix.concat(key)
-        // console.log(fullPath)
-        const val = obj[key]
-
-        if (val && typeof val === 'object') {
-            // Traverse further
-            acc.push(...searchNested(val, filter, fullPath))
-        } else {
-            // it's a primitive (we hope?)
-            if (filter(fullPath.join('.'), val)) {
-                acc.push([[...prefix, key], val])
-            }
-        }
-    }
-    // console.log("Okay...",acc)
-    return acc
-}
-
-const idleTimeout = { timeout: 1000 }
-
-
-type WatchCallback<GS> = (state: GS) => number
-
-interface ChartOptions {
+export interface ChartOptions {
     min?: number;
     max?: number;
     verticalSections?: number;
@@ -66,7 +33,6 @@ interface RuntimeWatch {
 }
 
 ////////
-
 
 const INITIAL_SETTINGS = {
     visible: false,
@@ -88,16 +54,10 @@ export default class Smashboard<GS, C extends Object = {}> {
     private readonly settings = INITIAL_SETTINGS
     private readonly charts: Record<string, Chart<GS>> = {}
 
-    // TODO: can't we just clear display: 'none' locally
-    private readonly containerOriginalDisplay: string = this.container.style.display;
-
-    private readonly originalConstants
-
+    /// DOM bookmarks
     /** Calling it "console" is asking for autocomplete trouble */
     private sole: HTMLElement | null
     private consoleInput?: HTMLInputElement = undefined
-
-    // textEntry: HTMLInputElement | null
 
     /**
      * @param container The DOM element to display the dashboard in
@@ -109,9 +69,6 @@ export default class Smashboard<GS, C extends Object = {}> {
         private readonly constants: C,
         private readonly storagePrefix = 'smashboard'
     ) {
-        // So we can check for presence of keys, see if there have been changes, etc.
-        this.originalConstants = cloneDeep(constants)
-
         // Set up the markup
         container.innerHTML = html
         this.sole = container.querySelector<HTMLElement>('.console')
@@ -129,7 +86,6 @@ export default class Smashboard<GS, C extends Object = {}> {
         }
         window.watch = this.watch.bind(this)
     }
-
 
     private attachEvents(container: HTMLElement) {
         this.consoleInput = container!.querySelector<HTMLInputElement>('.console-section input[type=text]')!
@@ -205,6 +161,44 @@ export default class Smashboard<GS, C extends Object = {}> {
         this.updateSettings()
         this.saveSettings()
 
+    }
+
+    /** Set the color scheme for charts
+     * @todo and...?
+     */
+    setColors(scheme: ColorScheme) {
+        const { container: root } = this
+        this.chartBackground = scheme.graphBackground ?? this.chartBackground
+        this.chartColors = scheme.graphSeries ?? this.chartColors
+
+        const sole = root.querySelector<HTMLElement>('.console-section')!
+        const charts = root.querySelector<HTMLElement>('.charts-section')!
+
+        if (scheme.consoleText) {
+            root.style.setProperty('--smashboard-console-text-color', scheme.consoleText?.string())
+        }
+
+        if (scheme.consoleBackground) {
+            root.style.setProperty('--smashboard-console-background', scheme.consoleBackground.string())
+        }
+
+        if (scheme.shadow) {
+            root.style.setProperty('--smashboard-shadow-color', scheme.shadow.string())
+        }
+
+    }
+
+    showSwatches(scheme: ColorScheme, which?: keyof ColorScheme) {
+        const swatchBox = document.createElement('span')
+        swatchBox.className = 'swatches'
+
+        let colorsMaybe = which ? scheme[which] : scheme.colors
+        const colors = (Array.isArray(colorsMaybe) ? colorsMaybe : [colorsMaybe]) as Color[]
+
+        scheme.makeSwatches(colors).forEach(c => {
+            swatchBox.appendChild(c)
+        })
+        this.container.appendChild(swatchBox)
     }
 
     restoreSettings() {
@@ -386,42 +380,6 @@ export default class Smashboard<GS, C extends Object = {}> {
     /*
      * #region Charts
      */
-
-    /** Set the color scheme for charts
-     * @todo and...?
-     */
-    setColors(scheme: ColorScheme) {
-        const { container: root } = this
-        this.chartBackground = scheme.graphBackground ?? this.chartBackground
-        this.chartColors = scheme.graphSeries ?? this.chartColors
-
-        const sole = root.querySelector<HTMLElement>('.console-section')!
-        const charts = root.querySelector<HTMLElement>('.charts-section')!
-        charts.style.setProperty('--smashboard-shadow-color', this.chartBackground.darken(0.5).opaquer(0.5).round().string())
-
-        if (scheme.consoleText) {
-            root.style.setProperty('--smashboard-console-text-color', scheme.consoleText?.string())
-        }
-
-        if (scheme.consoleBackground) {
-            root.style.setProperty('--smashboard-console-background', scheme.consoleBackground.darken(1 / 2).round().string())
-            sole.style.setProperty('--smashboard-shadow-color', scheme.consoleBackground.darken(1 / 2).opaquer(0.5).round().string())
-        }
-
-    }
-
-    showSwatches(scheme: ColorScheme, which?: keyof ColorScheme) {
-        const swatchBox = document.createElement('span')
-        swatchBox.className = 'swatches'
-
-        let colorsMaybe = which ? scheme[which] : scheme.colors
-        const colors = (Array.isArray(colorsMaybe) ? colorsMaybe : [colorsMaybe]) as Color[]
-
-        scheme.makeSwatches(colors).forEach(c => {
-            swatchBox.appendChild(c)
-        })
-        this.container.appendChild(swatchBox)
-    }
 
     /**
      * @todo Allow the path to reference arrays and chart one series for each array element
@@ -702,15 +660,6 @@ class Chart<T> {
     }
 }
 
-function dropEmptiesReplacer(_: string, value: any) {
-    if (typeof value === 'object' && isEmpty(value)) {
-        return
-    }
-    return value
-}
-
-
-
 const byHue = (a: Color, b: Color) => a.hue() - b.hue()
 const byLuminosity = (a: Color, b: Color) => a.luminosity() - b.luminosity()
 export function colorsFromHexFile(file: string): Color[] {
@@ -732,6 +681,7 @@ export class ColorScheme {
     graphBackground?: Color
     consoleText?: Color
     consoleBackground?: Color
+    shadow?: Color
 
     constructor(hexfile: string) {
         this.colors = colorsFromHexFile(hexfile)
@@ -756,9 +706,15 @@ export class ColorScheme {
         return this
     }
 
-    pickConsoleColors(foreground: number, background: number, opacity = 2 / 3) {
+    pickConsoleColors(foreground: number, background: number, opacity = 2 / 3, darken = 1 / 2) {
         this.consoleText = this.colors[foreground]
-        this.consoleBackground = this.colors[background].fade(1 - opacity)
+        this.consoleBackground = this.colors[background].darken(darken).fade(1 - opacity)
+
+        return this
+    }
+
+    pickShadowColor(idx: number, opacity = 1, darken = 1 / 2) {
+        this.shadow = this.colors[idx].darken(darken).opaquer(1 -opacity).round()
 
         return this
     }
@@ -773,4 +729,33 @@ export class ColorScheme {
             return swatch
         })
     }
+}
+
+// can't restrict to primitives, so this gets annoying as shit 
+// type Traversable<AV> = { [k: string | number]: Traversable<AV> | AV }
+type Traversable = { [k: string | number]: any }
+
+// TODO: look up the Extract<> type
+type TraverseFilter = (key: string, value: any) => boolean
+
+// TODO: ensure (somehow?) that these come out in the same order as the prototype. Object.keys()?
+function searchNested(obj: Traversable, filter: TraverseFilter, prefix: string[] = []): [string[], any][] {
+    let acc: [string[], unknown][] = []
+    for (let key in obj) {
+        const fullPath = prefix.concat(key)
+        // console.log(fullPath)
+        const val = obj[key]
+
+        if (val && typeof val === 'object') {
+            // Traverse further
+            acc.push(...searchNested(val, filter, fullPath))
+        } else {
+            // it's a primitive (we hope?)
+            if (filter(fullPath.join('.'), val)) {
+                acc.push([[...prefix, key], val])
+            }
+        }
+    }
+    // console.log("Okay...",acc)
+    return acc
 }
