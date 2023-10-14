@@ -810,35 +810,6 @@ export class ColorScheme implements SchemeColors {
 
     }
 
-    /*
-    pickMainColors(...indices: number[]) {
-        this.graphSeries = at(this.colors, indices)
-
-        return this
-    }
-
-    pickBackgroundColor(index: number, opacity = 2 / 3) {
-        ow(index, ow.number.inRange(0, this.colors.length - 1))
-        ow(opacity, ow.number.inRange(0, 1))
-
-        this.graphBackground = this.colors[index].fade(1 - opacity)
-
-        return this
-    }
-
-    pickConsoleColors(foreground: number, background: number, opacity = 2 / 3, darken = 1 / 2) {
-        this.consoleText = this.colors[foreground]
-        this.consoleBackground = this.colors[background].darken(darken).fade(1 - opacity)
-
-        return this
-    }
-
-    pickShadowColor(idx: number, opacity = 1, darken = 1 / 2) {
-        this.shadow = this.colors[idx].darken(darken).opaquer(1 - opacity).round()
-
-        return this
-    }*/
-
     makeSwatches(colors = this.colors) {
         return colors.map((c, idx) => {
             const swatch = document.createElement('span')
