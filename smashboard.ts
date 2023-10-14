@@ -5,7 +5,7 @@ declare global {
 }
 
 import Color from 'color'
-import { at, capitalize, cloneDeep, get, isEmpty, throttle, debounce, trim, set } from 'lodash-es'
+import { at, capitalize, cloneDeep, get, isEmpty, throttle, debounce, trim, set, clone } from 'lodash-es'
 import ow from 'ow'
 import {
     SmoothieChart,
@@ -20,7 +20,8 @@ import './smashboard.css'
 import html from './smashboard.html?raw'
 import lipsum from './lipsum.txt?raw'
 
-export type WatchCallback<GS> = (state: GS) => number
+export type InstrumentationTypes = number
+export type MapStateToInstrument<GS> = (state: GS) => InstrumentationTypes
 
 export interface ChartOptions {
     min?: number;
@@ -36,17 +37,30 @@ interface RuntimeWatch {
 
 const INITIAL_SETTINGS = {
     visible: false,
+    colorScheme: 'default',
     runtimeWatches: [] as RuntimeWatch[]
 }
 
 
 export default class Smashboard<GS, C extends Object = {}> {
-    chartColors = [
-        Color.rgb([0, 255, 0]),
-        Color.rgb([255, 0, 0]),
-        Color.rgb([0, 0, 255]),
-    ]
-    chartBackground = Color.rgb([128, 128, 192]).fade(0.25)
+    colorSchemes: Record<string, ColorScheme> = {
+        default: new ColorScheme([
+            Color.rgb(0, 0, 192),
+            Color.rgb(0, 255, 0),
+            Color.rgb(255, 0, 0),
+            Color.rgb(0, 0, 255)
+        ])
+    }
+
+    chartColors = this.colorSchemes.default.graphSeries
+    chartBackground = this.colorSchemes.default.graphBackground
+
+    // chartColors = [
+    // Color.rgb([0, 255, 0]),
+    // Color.rgb([255, 0, 0]),
+    // Color.rgb([0, 0, 255]),
+    // ]
+    // chartBackground = Color.rgb([128, 128, 192]).fade(0.25)
 
     /** When hiding the dashboard, focus this element */
     focusOnHide?: HTMLElement
@@ -70,22 +84,22 @@ export default class Smashboard<GS, C extends Object = {}> {
         private readonly storagePrefix = 'smashboard'
     ) {
         // Set up the markup
-        container.innerHTML = html
         container.classList.add('smashboard')
+        container.innerHTML = html
         this.sole = container.querySelector<HTMLElement>('.console')
 
-        this.attachEvents(container)
-
-
-        // Copy settings from localStorage
-        // Disabled until we get the ordering right
-        // this.restoreSettings()
-        this.updateSettings()
-        this.updateConsole()
         if (window.watch) {
             console.warn('Smashboard: watch() already exists globally, overwriting', window.watch)
         }
         window.watch = this.watch.bind(this)
+    }
+
+    init() {
+        const { container } = this
+        this.attachEvents(container)
+        this.restoreSettings()
+        this.updateSettings()
+        this.updateConsole()
     }
 
     private attachEvents(container: HTMLElement) {
@@ -164,20 +178,44 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     }
 
-    /** Set the color scheme for charts
-     * @todo and...?
+    setColorSchemeByName(scheme: string) {
+        const schemeFetched = this.colorSchemes[scheme]
+        if (!schemeFetched) {
+            console.warn("No color scheme named", scheme)
+            return
+        }
+        this.setColors(schemeFetched)
+        this.saveSettings()
+    }
+
+    /** Set the dashboard's CSS variables from a color scheme
+     * @todo Graph colors currently can't be changed after they're made
      */
     setColors(scheme: ColorScheme) {
         const { container: root } = this
         this.chartBackground = scheme.graphBackground ?? this.chartBackground
         this.chartColors = scheme.graphSeries ?? this.chartColors
 
-        const sole = root.querySelector<HTMLElement>('.console-section')!
-        const charts = root.querySelector<HTMLElement>('.charts-section')!
 
         if (scheme.consoleText) {
-            root.style.setProperty('--smashboard-console-text-color', scheme.consoleText?.string())
+            root.style.setProperty('--smashboard-console-text-color', scheme.consoleText.string())
+            root.classList.remove('color-crt', 'mono-crt')
+
+            // will this work? we may have to play with this threshold
+            console.debug("Console text saturation:", scheme.consoleText.saturationv())
+            if (scheme.consoleText.saturationv() < 10) {
+                root.classList.add('mono-crt')
+            } else {
+                root.classList.add('color-crt')
+            }
         }
+
+        if (scheme.monochrome) {
+            root.classList.add('mono-crt')
+        } else {
+            root.classList.add('color-crt')
+        }
+
 
         if (scheme.consoleBackground) {
             root.style.setProperty('--smashboard-console-background', scheme.consoleBackground.string())
@@ -187,12 +225,7 @@ export default class Smashboard<GS, C extends Object = {}> {
             root.style.setProperty('--smashboard-shadow-color', scheme.shadow.string())
         }
 
-        root.classList.remove('color-crt', 'mono-crt')
-        if (scheme.monochrome) {
-            root.classList.add('mono-crt')
-        } else {
-            root.classList.add('color-crt')
-        }
+
 
     }
 
@@ -232,25 +265,23 @@ export default class Smashboard<GS, C extends Object = {}> {
     }
 
     private updateSettings() {
-        const { visible, runtimeWatches = [] } = this.settings
+        const { visible, colorScheme, runtimeWatches = [] } = this.settings
+
         const klasses = this.container.classList
+        // TODO: only do the non-idempotent stuff if the visibility has actually changed
+        klasses.remove('hidden', 'visible')
         if (visible) {
             klasses.add('visible')
-            klasses.remove('hidden')
-        } else {
-            klasses.add('hidden')
-            klasses.remove('visible')
-        }
-
-        // TODO: only if the visibility has actually changed
-        if (this.settings.visible) {
-            // Start console updates
             this.updateConsole()
         } else {
-            // TODO: focus the game again
+            klasses.add('hidden')
             this.focusOnHide?.focus()
         }
 
+        if (colorScheme) {
+            this.setColorSchemeByName(colorScheme)
+            // }
+        }
         runtimeWatches.forEach((watchConfig) => {
             this.watch(watchConfig.path)
         })
@@ -263,6 +294,13 @@ export default class Smashboard<GS, C extends Object = {}> {
         localStorage.setItem(this.storagePrefix + '-settings', JSON.stringify(this.settings))
     }
 
+
+    /** 
+     * Update instruments etc.
+     * @todo Throttle this
+     * 
+     * @param state State that will be used to update instruments
+     */
     update(state: GS) {
         const timestamp = Date.now()
 
@@ -427,7 +465,7 @@ export default class Smashboard<GS, C extends Object = {}> {
     /*
      * @todo Allow watching strings etc. Need to figure out how to usefully display them. Do we include any history? Lowpass filter?
      */
-    private watchWithCallback(label: string, callback: WatchCallback<GS>, dataOptions: ChartOptions = {}) {
+    private watchWithCallback(label: string, callback: MapStateToInstrument<GS>, dataOptions: ChartOptions = {}) {
         if (this.charts[label]) {
             console.warn("Overriding chart for", label)
             this.removeChart(label)
@@ -469,11 +507,11 @@ export default class Smashboard<GS, C extends Object = {}> {
     // watch one path
     chart(path: string, options?: ChartOptions): Chart<GS>;
     // watch result of a callback
-    chart(label: string, callback: WatchCallback<GS>, options?: ChartOptions): Chart<GS>;
+    chart(label: string, callback: MapStateToInstrument<GS>, options?: ChartOptions): Chart<GS>;
     // manually add data
     chart(label: string, value: number, timestamp: number, options?: ChartOptions): Chart<GS>;
     chart(labelOrPath: string,
-        b?: ChartOptions | number | WatchCallback<GS>,
+        b?: ChartOptions | number | MapStateToInstrument<GS>,
         c?: ChartOptions | number,
         d?: ChartOptions
     ): Chart<GS> {
@@ -586,7 +624,7 @@ class Chart<T> {
     chart: SmoothieChart
     series: TimeSeries[]
 
-    dataSources: (WatchCallback<T> | string[] | 'manual')[] = []
+    dataSources: (MapStateToInstrument<T> | string[] | 'manual')[] = []
 
 
     /** Used to re-create a runtime chart. Not needed for callback-based or manual charts */
@@ -681,34 +719,98 @@ export function colorsFromHexFile(file: string): Color[] {
 }
 
 
-class SchemeColors {
+
+/** All the colors that can be customized */
+interface SchemeColors {
+    graphBackground?: Color
+    consoleText?: Color
+    consoleBackground?: Color
+    shadow?: Color
+    graphSeries?: Color[]
+}
+
+type ColorSpec<T = number> = { [Property in keyof SchemeColors]: T }
+
+interface SetColorsParams extends ColorSpec<number | number[]> {
+    opacity?: ColorSpec<number>
+    /** @todo */
+    lightness?: ColorSpec<number>
+}
+
+export class ColorScheme implements SchemeColors {
+    readonly colors: Color[]
+
     graphSeries?: Color[]
     graphBackground?: Color
     consoleText?: Color
     consoleBackground?: Color
     shadow?: Color
     monochrome: boolean = false
-}
 
-export class ColorScheme extends SchemeColors {
-    readonly colors: Color[]
-    // graphSeries?: Color[]
-    // graphBackground?: Color
-    // consoleText?: Color
-    // consoleBackground?: Color
-    // shadow?: Color
-    // monochrome = false
-
-    constructor(hexfile: string) {
-        super()
-
-        this.colors = colorsFromHexFile(hexfile)
+    constructor(hexfileOrColors: string | Color[]) {
+        if (Array.isArray(hexfileOrColors)) {
+            this.colors = clone(hexfileOrColors)
+        } else {
+            this.colors = colorsFromHexFile(hexfileOrColors)
+        }
+        console.warn(this.colors)
         // Assume the first color is the background and the rest are main until we hear otherwise
-
         this.graphSeries = this.colors.slice(1)
         this.graphBackground = this.colors[0].fade(1 - (2 / 3))
     }
 
+
+
+    pickColors(param: SetColorsParams) {
+        const opacity = param.opacity
+        delete param.opacity
+
+        this.walkParams(param, (name, existing, idx) => {
+            // Pick the numbered index from the palette
+            // if (existing) {
+            // console.warn("Overwriting color", name, existing, idx)
+            // }
+            ow(idx, ow.number.inRange(0, this.colors.length - 1))
+            return this.colors[idx]
+        })
+        console.warn('done', this)
+
+        this.walkParams(opacity, (_, color, opac) => {
+            ow(opac, ow.number.inRange(0, 1))
+            ow(color, ow.object.instanceOf(Color))
+
+            // @ts-expect-error: why doesn't object.instanceOf work?
+            return color.fade(1 - opac)
+        })
+
+        return this
+    }
+
+    /** For each key in params, set that color to whatever's returns from the callback */
+    walkParams(param: SetColorsParams | undefined, doSomething: (key: string, existing: Color | Color[], value: number) => Color) {
+        if (!param) {
+            return
+        }
+
+        for (let name in param) {
+            const typed = name as keyof SchemeColors
+            const idxOrArray = param[typed]
+            const existing = this[typed]
+
+            if (Array.isArray(idxOrArray)) {
+                // @ts-expect-error: yeah, we don't know if it's an array or not, go screw
+                this[typed] = idxOrArray.map(idx => doSomething(name, existing, idx))
+            } else if (typeof idxOrArray === 'number') {
+                // @ts-expect-error
+                this[typed] = doSomething(name, existing, idxOrArray)
+            } else {
+                console.warn("No parameter given for", name)
+            }
+        }
+
+    }
+
+    /*
     pickMainColors(...indices: number[]) {
         this.graphSeries = at(this.colors, indices)
 
@@ -735,13 +837,7 @@ export class ColorScheme extends SchemeColors {
         this.shadow = this.colors[idx].darken(darken).opaquer(1 - opacity).round()
 
         return this
-    }
-
-    monoTube(mono: boolean) {
-        this.monochrome = mono
-
-        return this
-    }
+    }*/
 
     makeSwatches(colors = this.colors) {
         return colors.map((c, idx) => {
