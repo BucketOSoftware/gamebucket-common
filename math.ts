@@ -1,5 +1,5 @@
 import ow, { ObjectPredicate } from 'ow'
-import { MathUtils, Vector2 as TVec2 } from 'three'
+import { MathUtils } from 'three'
 
 export const isGVec2: ObjectPredicate = ow.object.exactShape({
     x: ow.number,
@@ -73,8 +73,6 @@ export const inverseLerp = MathUtils.inverseLerp
 const vr_a = 12.9898,
     vr_b = 78.233,
     vr_c = 43758.5453
-const vrand_vec1 = new TVec2(0, 0)
-const vrand_vec2 = new TVec2(vr_a, vr_b)
 
 /**
  * Apparently a classic algorithm. Given two numbers, return a unique hash, and quickly. Limitations/caveats: ??? Overflow?
@@ -83,12 +81,8 @@ const vrand_vec2 = new TVec2(vr_a, vr_b)
  * @returns A hash based on the inputs
  */
 export function vhash(x: number, y: number) {
-    vrand_vec1.set(x, y)
-
-    // TODO: unroll this. we can do a dot product by hand, dammit
-    const dt = vrand_vec1.dot(vrand_vec2)
+    const dt = x * vr_a + y * vr_b
     const sn = dt % Math.PI
-
     const result = Math.sin(sn) * vr_c
     return result - (result | 0)
 }
