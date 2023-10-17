@@ -52,8 +52,8 @@ export default class Smashboard<GS, C extends Object = {}> {
         ])
     }
 
-    chartColors = this.colorSchemes.default.graphSeries
-    chartBackground = this.colorSchemes.default.graphBackground
+    chartColors = this.colorSchemes.default.graphSeries!
+    chartBackground = this.colorSchemes.default.graphBackground!
 
     // chartColors = [
     // Color.rgb([0, 255, 0]),
@@ -179,39 +179,43 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     }
 
-    setColorSchemeByName(scheme: string) {
-        this.settings.colorScheme = scheme
-        this.updateSettings()
+    setColorSchemeByName(scheme: string): Error | void {
+        if (scheme in this.colorSchemes) {
+            this.settings.colorScheme = scheme
+            this.updateSettings()
+            this.saveSettings()
+            return
+        }
+
+        return new Error("No color scheme named " + scheme)
     }
 
     /** Set the dashboard's CSS variables from a color scheme
      * @todo Graph colors currently can't be changed after they're made
      */
-    setColors(scheme: ColorScheme) {
+    private setColors(scheme: ColorScheme) {
         const { container: root } = this
         this.chartBackground = scheme.graphBackground ?? this.chartBackground
         this.chartColors = scheme.graphSeries ?? this.chartColors
 
+        for (let [id, chart] of Object.entries(this.charts)) {
+            chart.backgroundColor = this.chartBackground
+            // chart.
+            chart.seriesColors = this.chartColors
+        }
 
         if (scheme.consoleText) {
             root.style.setProperty('--smashboard-console-text-color', scheme.consoleText.string())
-            root.classList.remove('color-crt', 'mono-crt')
 
             // will this work? we may have to play with this threshold
-            console.debug("Console text saturation:", scheme.consoleText.saturationv())
+            root.classList.remove('color-crt', 'mono-crt')
             if (scheme.consoleText.saturationv() < 10) {
                 root.classList.add('mono-crt')
             } else {
                 root.classList.add('color-crt')
             }
+            console.debug("Console text saturation:", scheme.consoleText.saturationv(), root.className)
         }
-
-        if (scheme.monochrome) {
-            root.classList.add('mono-crt')
-        } else {
-            root.classList.add('color-crt')
-        }
-
 
         if (scheme.consoleBackground) {
             root.style.setProperty('--smashboard-console-background', scheme.consoleBackground.string())
@@ -220,9 +224,6 @@ export default class Smashboard<GS, C extends Object = {}> {
         if (scheme.shadow) {
             root.style.setProperty('--smashboard-shadow-color', scheme.shadow.string())
         }
-
-
-
     }
 
     showSwatches(scheme: ColorScheme, which?: keyof ColorScheme) {
@@ -276,7 +277,6 @@ export default class Smashboard<GS, C extends Object = {}> {
 
         if (colorScheme) {
             const schemeFetched = this.colorSchemes[colorScheme]
-            console.log(colorScheme, schemeFetched)
             if (schemeFetched) {
                 this.setColors(schemeFetched)
             } else {
@@ -324,7 +324,7 @@ export default class Smashboard<GS, C extends Object = {}> {
 
             let value: number | undefined
             try {
-                value = chart.getData(state)
+                value = chart.retrieveData(state)
             } catch (e) {
                 console.warn("Couldn't get data for chart, disabling:", id, value, e)
             }
@@ -340,6 +340,7 @@ export default class Smashboard<GS, C extends Object = {}> {
                     series[0].append(timestamp, value)
                     break
                 default:
+                    // TODO: display error state but keep chart
                     console.warn('Chart returned a non-number, disabling:', id, value)
                     this.removeChart(id)
             }
@@ -406,8 +407,32 @@ export default class Smashboard<GS, C extends Object = {}> {
         }, this.idleTimeout)
     }
 
+    private info(item: { toString: () => string }) {
+        // TODO: actually log
+        console.log(item.toString())
+    }
+
+    private error(item: { toString: () => string }) {
+        // TODO: log
+        console.error(item.toString())
+    }
+
     private handleCommand(rawCommand: string) {
-        console.warn('TODO:', rawCommand)
+        const [cmd, ...args] = rawCommand.trim().toLowerCase().split(/\s+/)
+
+        switch (cmd) {
+            case 'colors': {
+                const [scheme] = args
+                let err = this.setColorSchemeByName(scheme)
+                if (err) {
+                    this.error(err)
+                } else {
+                    this.info(`Color scheme set to ${scheme}`)
+                }
+                return
+            }
+
+        }
     }
 
     private handleConsoleInput(value: string) {
@@ -549,8 +574,8 @@ export default class Smashboard<GS, C extends Object = {}> {
     private appendChart(id: string, chart: Chart<GS>) {
         const { charts, container } = this
 
-        this.charts[id] = chart
-        this.container.querySelector('.charts-section')!.appendChild(chart.domElement)
+        charts[id] = chart
+        container.querySelector('.charts-section')!.appendChild(chart.domElement)
         chart.domElement.addEventListener('click', this.handleChartClick)
         chart.domElement.addEventListener('contextmenu', this.handleChartClick)
 
@@ -597,10 +622,10 @@ export default class Smashboard<GS, C extends Object = {}> {
     }
 }
 
-class Chart<T> {
+class Chart<State> {
     static readonly DELAY_FR = 1
     static readonly SIZE = [192, 64]
-    static serial = 0
+    static lastSerial = 0
 
     static defaultChartOptions: IChartOptions = {
         responsive: false,
@@ -626,20 +651,23 @@ class Chart<T> {
     chart: SmoothieChart
     series: TimeSeries[]
 
-    dataSources: (MapStateToInstrument<T> | string[] | 'manual')[] = []
+    dataSources: (MapStateToInstrument<State> | string[] | 'manual')[] = []
 
+    private positiveOnly = false
 
     /** Used to re-create a runtime chart. Not needed for callback-based or manual charts */
     runtimeWatchConfig?: RuntimeWatch
 
+    private serial = Chart.lastSerial++
+
     constructor(
         public readonly label: string,
         options: ChartOptions,
-        private readonly chartColors: Color[] = [Color('red')],
-        private readonly backgroundColor: Color = Color('black')
+        private _chartColors: Color[] = [Color('red')],
+        private _backgroundColor: Color = Color('black')
     ) {
         // obvs
-        const positiveOnly = options.min === 0
+        this.positiveOnly = options.min === 0
         // Reset bounds if we didn't provide both
         const resetBounds = options.min === undefined && options.max === undefined
 
@@ -653,7 +681,7 @@ class Chart<T> {
                 ...Chart.defaultLabelOptions,
                 text: label,
             },
-            maxValueScale: positiveOnly ? 1.05 : 1
+            maxValueScale: this.positiveOnly ? 1.05 : 1
 
         });
         this.setNoData(true)
@@ -670,26 +698,50 @@ class Chart<T> {
 
         this.series = [series]
 
-        const seriesColor = Color.rgb(chartColors[Chart.serial++ % chartColors.length])
+        const seriesColor = _chartColors[this.serial % _chartColors.length]
+
         this.chart.addTimeSeries(series, {
             ...Chart.defaultSeriesOptions,
             strokeStyle: seriesColor.string(),
-            fillStyle: positiveOnly ? seriesColor.fade(2 / 3).string() : undefined,
+            fillStyle: this.positiveOnly ? seriesColor.fade(2 / 3).string() : undefined,
             tooltipLabel: label,
+        })
+        this.chart.streamTo(canvas, Chart.DELAY_FR * 1 / 60 * 1000)
+    }
 
-        });
-        this.chart.streamTo(canvas, Chart.DELAY_FR * 1 / 60 * 1000);
+    get backgroundColor() {
+        return this._backgroundColor
+    }
+
+    set backgroundColor(color: Color) {
+        this._backgroundColor = color
+        this.setNoData(false)
+    }
+
+    get seriesColors() {
+        return this._chartColors
+    }
+
+    set seriesColors(colors: Color[]) {
+        this._chartColors = colors
+
+        const seriesColor = this.seriesColors[this.serial % this._chartColors.length]
+
+        const seriesOpts = this.chart.getTimeSeriesOptions(this.series[0])
+        seriesOpts.strokeStyle = seriesColor.string()
+        seriesOpts.fillStyle = this.positiveOnly ? seriesColor.fade(2 / 3).string() : undefined
     }
 
     setNoData(noData: boolean) {
         /** @todo Is it okay to do all this on every update? */
-        let bgColor = this.backgroundColor
-        let lineColor = bgColor.darken(1 / 2).opaquer(1 / 4)
-        this.chart.options.grid!.fillStyle = (noData ? bgColor.desaturate(1) : bgColor).string()
-        this.chart.options.grid!.strokeStyle = (noData ? lineColor.desaturate(1) : lineColor).string()
+        let lineColor = this.backgroundColor.darken(1 / 2).opaquer(1 / 4)
+        this.chart.options.grid!.fillStyle =
+            (noData ? this.backgroundColor.desaturate(1) : this.backgroundColor).string()
+        this.chart.options.grid!.strokeStyle =
+            (noData ? lineColor.desaturate(1) : lineColor).string()
     }
 
-    getData(state: T) {
+    retrieveData(state: State): number | undefined {
         const { dataSources } = this
 
         // TODO: multiple series/datasources
@@ -747,7 +799,6 @@ export class ColorScheme implements SchemeColors {
     consoleText?: Color
     consoleBackground?: Color
     shadow?: Color
-    monochrome: boolean = false
 
     constructor(hexfileOrColors: string | Color[]) {
         if (Array.isArray(hexfileOrColors)) {
@@ -768,9 +819,6 @@ export class ColorScheme implements SchemeColors {
 
         this.walkParams(param, (name, existing, idx) => {
             // Pick the numbered index from the palette
-            // if (existing) {
-            // console.warn("Overwriting color", name, existing, idx)
-            // }
             ow(idx, ow.number.inRange(0, this.colors.length - 1))
             return this.colors[idx]
         })
@@ -847,6 +895,6 @@ function searchNested(obj: Traversable, filter: TraverseFilter, prefix: string[]
             }
         }
     }
-    // console.log("Okay...",acc)
+
     return acc
 }
