@@ -63,6 +63,7 @@ export default class Smashboard<GS, C extends Object = {}> {
     /** Calling it "console" is asking for autocomplete trouble */
     private sole: HTMLElement | null
     private consoleInput?: HTMLInputElement = undefined
+    private appendLog: HTMLElement | null
 
     /**
      * @param container The DOM element to display the dashboard in
@@ -77,8 +78,9 @@ export default class Smashboard<GS, C extends Object = {}> {
         // Set up the markup
         container.classList.add('smashboard')
         container.innerHTML = html
-        this.sole = container.querySelector<HTMLElement>('.console')
+        this.sole = container.querySelector<HTMLElement>('section.console-section')
 
+        this.appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')
         if (window.watch) {
             console.warn('Smashboard: watch() already exists globally, overwriting', window.watch)
         }
@@ -90,7 +92,6 @@ export default class Smashboard<GS, C extends Object = {}> {
 
         this.restoreSettings()
         this.updateSettings()
-        this.updateConsole()
         this.attachEvents(container)
     }
 
@@ -115,14 +116,16 @@ export default class Smashboard<GS, C extends Object = {}> {
         })
 
         // User hits "enter" in the console
-        container.querySelector('form')!.addEventListener('submit', (ev: SubmitEvent) => {
-            ev.preventDefault()
-            this.handleCommand(consoleInput.value)
-        })
+        container.querySelector('form')!.addEventListener('submit', this.handleCommand)
 
         // User types something in the console
         consoleInput.addEventListener('input', (ev) => {
-            this.handleConsoleInput(consoleInput.value)
+            this.inputLastEvent = (ev as InputEvent)
+            if (!this.typeHandlerPending) {
+                console.time('typeHandler')
+                this.typeHandlerPending = true
+                requestIdleCallback(this.handleConsoleInput, this.typeHandlerTimeout)
+            }
             ev.preventDefault()
         }, { capture: true })
 
@@ -144,7 +147,7 @@ export default class Smashboard<GS, C extends Object = {}> {
                 if (!this.settings.visible) {
                     // Going to show the console, so focus the input field
                     // const inputs = this.container.getElementsByTagName('input')
-                    this.consoleInput?.focus()
+                    consoleInput.focus()
                 }
                 this.setVisible(!this.settings.visible)
                 held = {}
@@ -267,7 +270,7 @@ export default class Smashboard<GS, C extends Object = {}> {
         klasses.remove('hidden', 'visible')
         if (visible) {
             klasses.add('visible')
-            this.updateConsole()
+            this.setConsoleMomentary()
         } else {
             klasses.add('hidden')
             this.focusOnHide?.focus()
@@ -309,7 +312,7 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     refreshConsoleVars() {
         console.debug('Smashboard: refreshing constants')
-        this.updateConsole()
+        this.setConsoleMomentary()
     }
 
     private updateCharts(timestamp: number, state: GS) {
@@ -352,7 +355,7 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     private idleTimeout: IdleRequestOptions = { timeout: 1000 }
     private consoleAwaitingUpdate = false
-    private updateConsole() {
+    private setConsoleMomentary() {
         /*
         if (this.consoleAwaitingUpdate) {
             console.warn('HOLD YOUR HORSES')
@@ -369,14 +372,22 @@ export default class Smashboard<GS, C extends Object = {}> {
             }
             this.consoleAwaitingUpdate = false
 
+            const momentary = this.sole!.querySelector<HTMLElement>('.console-momentary')!
+            const appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')!
+
+            momentary.classList.remove('hidden')
+            appendLog.classList.remove('hidden')
+            const shouldShowMomentary = false
+            if (shouldShowMomentary) {
+                appendLog.classList.add('hidden')
+            } else {
+                momentary.classList.add('hidden')
+            }
+
             // console.debug('Idle deadline: ', deadline.didTimeout ? 'timed out' : deadline.timeRemaining())
             // console.time('idleWork')
 
             const searchTerm = trim(this.consoleInput?.value ?? '')
-            if (searchTerm === 'lipsum') {
-                this.sole!.innerText = lipsum
-                return
-            }
 
             // TODO: more sophisticated search with fuzzy matching, etc.
             const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
@@ -393,7 +404,7 @@ export default class Smashboard<GS, C extends Object = {}> {
                 return 0
             })
 
-            this.sole!.innerHTML = results.map(([keypath, value]) => {
+            momentary.innerHTML = results.map(([keypath, value]) => {
                 const path = keypath.join('.')
                 if (typeof value === 'boolean') {
                     return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
@@ -405,38 +416,74 @@ export default class Smashboard<GS, C extends Object = {}> {
         }, this.idleTimeout)
     }
 
-    private info(item: { toString: () => string }) {
-        // TODO: actually log
+    private log(item: { toString: () => string }, level = 'loglevel-info') {
         console.log(item.toString())
+        const node = document.createElement('span')
+        node.innerText = item.toString() + "\n"
+        node.className = level
+        this.appendLog?.appendChild(node)
+        return node
     }
 
     private error(item: { toString: () => string }) {
-        // TODO: log
-        console.error(item.toString())
+        return this.log(item, 'loglevel-error')
+        // console.error(item.toString())
+        // this.info(item)
     }
 
-    private handleCommand(rawCommand: string) {
-        const [cmd, ...args] = rawCommand.trim().toLowerCase().split(/\s+/)
+    private handleCommand = (ev: SubmitEvent) => {
+        ev.preventDefault()
+        const form = ev.target as HTMLFormElement
+        const input = form.elements[0] as HTMLInputElement
+        const rawCommand = input.value.trim()
+        const [cmd, ...args] = rawCommand.toLowerCase().split(/\s+/)
+        input.value = ''
 
+        let output: HTMLElement | undefined
         switch (cmd) {
             case 'colors': {
                 const [scheme] = args
                 let err = this.setColorSchemeByName(scheme)
                 if (err) {
-                    this.error(err)
+                    output = this.error(err)
                 } else {
-                    this.info(`Color scheme set to ${scheme}`)
+                   output = this.log(`Color scheme set to ${scheme}`, 'INFO')
                 }
-                return
+                break
             }
+            case 'lipsum': {
+                output = this.log(lipsum)
+                break
+            }
+            default:
+                // output = this.error(`What the hell? ${rawCommand}`)
 
         }
+
+        output ??= this.error('No output from command')
+
+        // since it's a direct response to user input, make sure they can see the output
+        output?.scrollIntoView({
+            behavior: 'smooth',
+            block: "start",
+            inline: "nearest"
+        })
+
     }
 
-    private handleConsoleInput(value: string) {
-        this.updateConsole()
-    }
+    /** @todo figure out how fast this needs to be to feel responsive */
+    private typeHandlerTimeout: IdleRequestOptions = { timeout: 250 }
+    private typeHandlerPending = false
+    private inputLastEvent?: InputEvent = undefined
 
+    private handleConsoleInput = (deadline: IdleDeadline) => {
+        console.timeEnd('typeHandler')
+        ow(this.typeHandlerPending, ow.boolean.true)
+
+        this.typeHandlerPending = false
+        this.setConsoleMomentary()
+
+    }
 
     private toggleConstant(path: string) {
         const existingValue = get(this.constants, path)

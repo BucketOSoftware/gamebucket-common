@@ -68,6 +68,10 @@
 
 }
 
+.smashboard .console-section .hidden {
+    display: none;
+}
+
 .smashboard .crt {
     font-family: "Overpass Mono", monospace;
     font-size: var(--smashboard-console-font-size);
@@ -121,8 +125,12 @@
     overflow-wrap: break-word;
     word-break: normal;
 
-    min-height: calc(var(--smashboard-console-font-size) * 5 * 1.25);
+    min-height: calc(var(--smashboard-console-font-size) * 3 * 1.25);
     max-height: calc(var(--smashboard-console-font-size) * var(--smashboard-console-max-lines) * 1.25);
+}
+
+.smashboard .console .loglevel-error {
+    color: red;
 }
 
 .smashboard .console a {
@@ -164,6 +172,8 @@
  * 3D stuff
  */
 
+/* TODO: when the dashboard gets cut off at the bottom it looks weird because of the 3D transform */
+
 .smashboard.threedee {
     /* account for the skew in the element's width */
     /* TODO: a better way of doing this besides just eyeballing it */
@@ -180,6 +190,10 @@
 
 .smashboard.visible {
     visibility: visible;
+}
+
+.smashboard.hidden {
+    visibility: none;
 }
 
 .smashboard.threedee.visible {
