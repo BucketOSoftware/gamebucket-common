@@ -96,10 +96,11 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     init() {
         const { container } = this
-        this.attachEvents(container)
+
         this.restoreSettings()
         this.updateSettings()
         this.updateConsole()
+        this.attachEvents(container)
     }
 
     private attachEvents(container: HTMLElement) {
@@ -179,13 +180,8 @@ export default class Smashboard<GS, C extends Object = {}> {
     }
 
     setColorSchemeByName(scheme: string) {
-        const schemeFetched = this.colorSchemes[scheme]
-        if (!schemeFetched) {
-            console.warn("No color scheme named", scheme)
-            return
-        }
-        this.setColors(schemeFetched)
-        this.saveSettings()
+        this.settings.colorScheme = scheme
+        this.updateSettings()
     }
 
     /** Set the dashboard's CSS variables from a color scheme
@@ -279,9 +275,16 @@ export default class Smashboard<GS, C extends Object = {}> {
         }
 
         if (colorScheme) {
-            this.setColorSchemeByName(colorScheme)
-            // }
+            const schemeFetched = this.colorSchemes[colorScheme]
+            console.log(colorScheme, schemeFetched)
+            if (schemeFetched) {
+                this.setColors(schemeFetched)
+            } else {
+                console.warn("No color scheme named", colorScheme)
+                return
+            }
         }
+
         runtimeWatches.forEach((watchConfig) => {
             this.watch(watchConfig.path)
         })
@@ -290,7 +293,6 @@ export default class Smashboard<GS, C extends Object = {}> {
     private saveSettings() {
         /** @todo debounce maybe */
 
-        const t = this.constants
         localStorage.setItem(this.storagePrefix + '-settings', JSON.stringify(this.settings))
     }
 
@@ -753,12 +755,11 @@ export class ColorScheme implements SchemeColors {
         } else {
             this.colors = colorsFromHexFile(hexfileOrColors)
         }
-        console.warn(this.colors)
+
         // Assume the first color is the background and the rest are main until we hear otherwise
         this.graphSeries = this.colors.slice(1)
         this.graphBackground = this.colors[0].fade(1 - (2 / 3))
     }
-
 
 
     pickColors(param: SetColorsParams) {
@@ -773,7 +774,6 @@ export class ColorScheme implements SchemeColors {
             ow(idx, ow.number.inRange(0, this.colors.length - 1))
             return this.colors[idx]
         })
-        console.warn('done', this)
 
         this.walkParams(opacity, (_, color, opac) => {
             ow(opac, ow.number.inRange(0, 1))
