@@ -52,15 +52,6 @@ export default class Smashboard<GS, C extends Object = {}> {
         ])
     }
 
-    chartColors = this.colorSchemes.default.graphSeries!
-    chartBackground = this.colorSchemes.default.graphBackground!
-
-    // chartColors = [
-    // Color.rgb([0, 255, 0]),
-    // Color.rgb([255, 0, 0]),
-    // Color.rgb([0, 0, 255]),
-    // ]
-    // chartBackground = Color.rgb([128, 128, 192]).fade(0.25)
 
     /** When hiding the dashboard, focus this element */
     focusOnHide?: HTMLElement
@@ -190,18 +181,25 @@ export default class Smashboard<GS, C extends Object = {}> {
         return new Error("No color scheme named " + scheme)
     }
 
+
+    get colors() {
+        return this.colorSchemes[this.settings.colorScheme ?? 'default']
+    }
+
     /** Set the dashboard's CSS variables from a color scheme
-     * @todo Graph colors currently can't be changed after they're made
+     * @todo Might as well have fallbacks / a true default for undefined colors
      */
-    private setColors(scheme: ColorScheme) {
+    private setColorScheme(scheme: ColorScheme) {
         const { container: root } = this
-        this.chartBackground = scheme.graphBackground ?? this.chartBackground
-        this.chartColors = scheme.graphSeries ?? this.chartColors
 
         for (let [id, chart] of Object.entries(this.charts)) {
-            chart.backgroundColor = this.chartBackground
-            // chart.
-            chart.seriesColors = this.chartColors
+            if (scheme.graphBackground) {
+                chart.backgroundColor = scheme.graphBackground
+            }
+
+            if (scheme.graphSeries) {
+                chart.seriesColors = scheme.graphSeries
+            }
         }
 
         if (scheme.consoleText) {
@@ -278,7 +276,7 @@ export default class Smashboard<GS, C extends Object = {}> {
         if (colorScheme) {
             const schemeFetched = this.colorSchemes[colorScheme]
             if (schemeFetched) {
-                this.setColors(schemeFetched)
+                this.setColorScheme(schemeFetched)
             } else {
                 console.warn("No color scheme named", colorScheme)
                 return
@@ -460,7 +458,7 @@ export default class Smashboard<GS, C extends Object = {}> {
      * @param path 
      * @returns 
      */
-    private watch(path: string, options?: ChartOptions) {
+    private watch(path: string) {
         const existing = this.charts[path]
         if (existing) {
             console.warn("Already a watch for this path, ignoring. But what if there's a new config?", path)
@@ -471,7 +469,12 @@ export default class Smashboard<GS, C extends Object = {}> {
         // validate the path at all (although I guess we don't allow . in keys)
         const keys = path.split('.')
         // TODO: what about options that can only be set when creating the chart? Are there any? How do we change them later
-        const chart = new Chart<GS>(capitalize(keys.at(-1)!), { verticalSections: 2 }, this.chartColors, this.chartBackground)
+        const chart = new Chart<GS>(
+            capitalize(keys.at(-1)!),
+            { verticalSections: 2 },
+            this.colors.graphSeries,
+            this.colors.graphBackground,
+        )
         chart.dataSources = [keys]
         chart.runtimeWatchConfig = { path }
 
@@ -486,6 +489,7 @@ export default class Smashboard<GS, C extends Object = {}> {
             this.saveSettings()
         }
         this.appendChart(path, chart)
+        // TODO: add methods on chart so a console user can customize
         return chart
     }
 
@@ -500,7 +504,12 @@ export default class Smashboard<GS, C extends Object = {}> {
 
         // TODO: call the callback right now and note the return type
 
-        const chart = new Chart<GS>(label, dataOptions, this.chartColors, this.chartBackground)
+        const chart = new Chart<GS>(
+            label,
+            dataOptions,
+            this.colors.graphSeries,
+            this.colors.graphBackground
+        )
         chart.dataSources = [callback]
 
         return this.appendChart(label, chart)
@@ -521,7 +530,12 @@ export default class Smashboard<GS, C extends Object = {}> {
         let chart = this.charts[label]
 
         if (!chart) {
-            chart = new Chart(label, options, this.chartColors, this.chartBackground)
+            chart = new Chart(
+                label,
+                options,
+                this.colors.graphSeries,
+                this.colors.graphBackground
+            )
             chart.dataSources = ['manual']
             this.appendChart(label, chart)
         }
