@@ -129,8 +129,13 @@
     max-height: calc(var(--smashboard-console-font-size) * var(--smashboard-console-max-lines) * 1.25);
 }
 
+.smashboard .console-append-log > * {
+    margin-bottom: calc(var(--smashboard-console-font-size) / 4);
+}
+
 .smashboard .console .loglevel-error {
-    color: red;
+    color: hsl(0, 75%, 50%);
+    font-weight: bold;
 }
 
 .smashboard .console a {

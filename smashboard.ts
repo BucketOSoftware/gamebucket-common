@@ -33,6 +33,8 @@ interface RuntimeWatch {
     path: string
 }
 
+type CommandHandler<STATE, CVARS extends object> = (this: Smashboard<STATE, CVARS>, ...args: any) => HTMLElement
+
 ////////
 
 const INITIAL_SETTINGS = {
@@ -42,7 +44,7 @@ const INITIAL_SETTINGS = {
 }
 
 
-export default class Smashboard<GS, C extends Object = {}> {
+export default class Smashboard<STATE, CVARS extends Object = {}> {
     colorSchemes: Record<string, ColorScheme> = {
         default: new ColorScheme([
             Color.rgb(0, 0, 192),
@@ -57,13 +59,16 @@ export default class Smashboard<GS, C extends Object = {}> {
     focusOnHide?: HTMLElement
 
     private readonly settings = INITIAL_SETTINGS
-    private readonly charts: Record<string, Chart<GS>> = {}
+    private readonly charts: Record<string, Chart<STATE>> = {}
 
     /// DOM bookmarks
     /** Calling it "console" is asking for autocomplete trouble */
     private sole: HTMLElement | null
     private consoleInput?: HTMLInputElement = undefined
-    private appendLog: HTMLElement | null
+    // private appendLog: HTMLElement | null
+
+    private momentary: HTMLElement
+    private appendLog: HTMLElement
 
     /**
      * @param container The DOM element to display the dashboard in
@@ -72,7 +77,7 @@ export default class Smashboard<GS, C extends Object = {}> {
      */
     constructor(
         private container: HTMLElement,
-        private readonly constants: C,
+        private readonly constants: CVARS,
         private readonly storagePrefix = 'smashboard'
     ) {
         // Set up the markup
@@ -80,11 +85,16 @@ export default class Smashboard<GS, C extends Object = {}> {
         container.innerHTML = html
         this.sole = container.querySelector<HTMLElement>('section.console-section')
 
-        this.appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')
+        this.momentary = this.sole!.querySelector<HTMLElement>('.console-momentary')!
+        this.appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')!
+
         if (window.watch) {
             console.warn('Smashboard: watch() already exists globally, overwriting', window.watch)
         }
         window.watch = this.watch.bind(this)
+
+        this.addDefaultCommands()
+
     }
 
     init() {
@@ -122,7 +132,8 @@ export default class Smashboard<GS, C extends Object = {}> {
         consoleInput.addEventListener('input', (ev) => {
             this.inputLastEvent = (ev as InputEvent)
             if (!this.typeHandlerPending) {
-                console.time('typeHandler')
+                // console.time('typeHandlerWait')
+                // TODO: maybe use ev.data to check for actual changes and skip if nothing has changed
                 this.typeHandlerPending = true
                 requestIdleCallback(this.handleConsoleInput, this.typeHandlerTimeout)
             }
@@ -159,7 +170,6 @@ export default class Smashboard<GS, C extends Object = {}> {
             held = {}
         })
 
-
         // TODO: detect loss of focus, but also, maybe find a library for this
         document.addEventListener('keyup', (ev: KeyboardEvent) => {
             held[ev.code] = false
@@ -181,7 +191,7 @@ export default class Smashboard<GS, C extends Object = {}> {
             return
         }
 
-        return new Error("No color scheme named " + scheme)
+        throw new Error("No color scheme named " + scheme)
     }
 
 
@@ -270,7 +280,6 @@ export default class Smashboard<GS, C extends Object = {}> {
         klasses.remove('hidden', 'visible')
         if (visible) {
             klasses.add('visible')
-            this.setConsoleMomentary()
         } else {
             klasses.add('hidden')
             this.focusOnHide?.focus()
@@ -304,7 +313,7 @@ export default class Smashboard<GS, C extends Object = {}> {
      * 
      * @param state State that will be used to update instruments
      */
-    update(state: GS) {
+    update(state: STATE) {
         const timestamp = Date.now()
 
         this.updateCharts(timestamp, state)
@@ -312,10 +321,10 @@ export default class Smashboard<GS, C extends Object = {}> {
 
     refreshConsoleVars() {
         console.debug('Smashboard: refreshing constants')
-        this.setConsoleMomentary()
+        this.updateMomentaryConsole()
     }
 
-    private updateCharts(timestamp: number, state: GS) {
+    private updateCharts(timestamp: number, state: STATE) {
         const { charts } = this
 
         // Add data to charts
@@ -353,122 +362,156 @@ export default class Smashboard<GS, C extends Object = {}> {
      * #region Command line
      */
 
-    private idleTimeout: IdleRequestOptions = { timeout: 1000 }
-    private consoleAwaitingUpdate = false
-    private setConsoleMomentary() {
-        /*
-        if (this.consoleAwaitingUpdate) {
-            console.warn('HOLD YOUR HORSES')
-            return
-        } else {
-            console.warn('Horses up!')
-        }
-        */
-        this.consoleAwaitingUpdate = true
+    private setConsoleMomentary(html?: string) {
+        const { momentary, appendLog } = this
 
-        requestIdleCallback((deadline) => {
-            if (!this.consoleAwaitingUpdate) {
-                return
-            }
-            this.consoleAwaitingUpdate = false
-
-            const momentary = this.sole!.querySelector<HTMLElement>('.console-momentary')!
-            const appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')!
-
-            momentary.classList.remove('hidden')
+        if (!html) {
+            momentary.classList.add('hidden')
             appendLog.classList.remove('hidden')
-            const shouldShowMomentary = false
-            if (shouldShowMomentary) {
-                appendLog.classList.add('hidden')
-            } else {
-                momentary.classList.add('hidden')
-            }
+            return
+        }
 
-            // console.debug('Idle deadline: ', deadline.didTimeout ? 'timed out' : deadline.timeRemaining())
-            // console.time('idleWork')
-
-            const searchTerm = trim(this.consoleInput?.value ?? '')
-
-            // TODO: more sophisticated search with fuzzy matching, etc.
-            const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
-
-            results.sort((a, b) => {
-                let astr = a[0].join('.')
-                let bstr = b[0].join('.')
-                if (astr < bstr) {
-                    return -1
-                }
-                if (astr > bstr) {
-                    return 1
-                }
-                return 0
-            })
-
-            momentary.innerHTML = results.map(([keypath, value]) => {
-                const path = keypath.join('.')
-                if (typeof value === 'boolean') {
-                    return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
-                }
-                return keypath.join('.') + ': ' + value
-            }
-            ).join("\n")
-            // console.timeEnd('idleWork')
-        }, this.idleTimeout)
+        momentary.classList.remove('hidden')
+        appendLog.classList.add('hidden')
+        momentary.innerHTML = html
     }
 
-    private log(item: { toString: () => string }, level = 'loglevel-info') {
-        console.log(item.toString())
-        const node = document.createElement('span')
-        node.innerText = item.toString() + "\n"
+    private findCvars(searchTerm: string = '') {
+        // TODO: more sophisticated search with fuzzy matching, etc.
+        const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
+
+        results.sort((a, b) => {
+            let astr = a[0].join('.')
+            let bstr = b[0].join('.')
+            if (astr < bstr) {
+                return -1
+            }
+            if (astr > bstr) {
+                return 1
+            }
+            return 0
+        })
+
+        return results.map(([keypath, value]) => {
+            const path = keypath.join('.')
+            if (typeof value === 'boolean') {
+                return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
+            }
+            return keypath.join('.') + ': ' + value
+        }
+        ).join("\n")
+    }
+
+    private log(items: { toString: () => string }[], level = 'loglevel-info') {
+        const node = document.createElement('div')
+        node.innerText = items.join(' ')
         node.className = level
         this.appendLog?.appendChild(node)
         return node
     }
 
-    private error(item: { toString: () => string }) {
-        return this.log(item, 'loglevel-error')
-        // console.error(item.toString())
-        // this.info(item)
+    private info(...items: { toString: () => string }[]) {
+        console.log(...items)
+        return this.log(items)
+    }
+
+    private warn(...items: { toString: () => string }[]) {
+        console.warn(...items)
+        return this.log(items, 'loglevel-warning')
+    }
+
+    private error(...items: { toString: () => string }[]) {
+        console.error(...items)
+        return this.log(items, 'loglevel-error')
+    }
+
+    /////
+    // Command handling
+    /////
+
+    private commandHandlers: Record<string, CommandHandler<STATE, CVARS>> = {}
+    // TODO: types
+    private typeHandlers: Record<string, any> = {}
+
+    addCommandHandler(command: string, handler: CommandHandler<STATE, CVARS>, typeHandler?: any) {
+        const { commandHandlers } = this
+        if (command in commandHandlers) {
+            this.warn("Overriding command", command)
+        }
+        commandHandlers[command] = handler.bind(this)
+
+        if (typeHandler) {
+            this.typeHandlers[command] = typeHandler.bind(this)
+        }
+    }
+
+    methodMissing = (...argv: string[]): HTMLElement | string => {
+        return this.error("Unknown command:", argv[0])
+    }
+
+    private addDefaultCommands() {
+        this.addCommandHandler('color', this.cmdColors)
+        this.addCommandHandler('lipsum', this.cmdLipsum)
     }
 
     private handleCommand = (ev: SubmitEvent) => {
         ev.preventDefault()
         const form = ev.target as HTMLFormElement
         const input = form.elements[0] as HTMLInputElement
-        const rawCommand = input.value.trim()
-        const [cmd, ...args] = rawCommand.toLowerCase().split(/\s+/)
+        const argv = parseCommand(input.value)
+        const cmd = this.guessCommand(argv[0])
         input.value = ''
 
+        // TODO: handle strings
         let output: HTMLElement | undefined
-        switch (cmd) {
-            case 'colors': {
-                const [scheme] = args
-                let err = this.setColorSchemeByName(scheme)
-                if (err) {
-                    output = this.error(err)
-                } else {
-                   output = this.log(`Color scheme set to ${scheme}`, 'INFO')
-                }
-                break
-            }
-            case 'lipsum': {
-                output = this.log(lipsum)
-                break
-            }
-            default:
-                // output = this.error(`What the hell? ${rawCommand}`)
 
+        const handler = this.commandHandlers[cmd] ?? this.methodMissing
+
+        try {
+            // @ts-expect-error: I don't know, fuck this
+            output = handler(...argv)
+        } catch (e: any) {
+            output = this.error(e as any)
         }
-
         output ??= this.error('No output from command')
 
         // since it's a direct response to user input, make sure they can see the output
+        const { momentary, appendLog } = this
+        appendLog.classList.remove('hidden')
+        momentary.classList.add('hidden')
         output?.scrollIntoView({
             behavior: 'smooth',
             block: "start",
             inline: "nearest"
         })
+    }
 
+    private guessCommand(cmd: string) {
+        // TODO: maybe memoize
+        const commands = Object.keys(this.commandHandlers)
+        cmd = cmd.toLowerCase()
+        if (cmd in commands) {
+            return cmd
+        }
+
+        // Find out if this string uniquely identifies a command
+        const matches = commands.filter(potentialCmd => potentialCmd.startsWith(cmd))
+        if (matches.length === 1) {
+            return matches[0]
+        }
+
+        // nothing found
+        return cmd
+    }
+
+    private cmdColors(cmd: string, scheme: string = '') {
+        this.setColorSchemeByName(scheme.toLowerCase())
+
+        return this.info(`Color scheme set to ${scheme}`)
+    }
+
+    private cmdLipsum() {
+        return this.info(lipsum)
     }
 
     /** @todo figure out how fast this needs to be to feel responsive */
@@ -477,12 +520,26 @@ export default class Smashboard<GS, C extends Object = {}> {
     private inputLastEvent?: InputEvent = undefined
 
     private handleConsoleInput = (deadline: IdleDeadline) => {
-        console.timeEnd('typeHandler')
+        // console.timeEnd('typeHandlerWait')
         ow(this.typeHandlerPending, ow.boolean.true)
-
         this.typeHandlerPending = false
-        this.setConsoleMomentary()
 
+        // ow(this.consoleInput === this.inputLastEvent?.target, ow.boolean.true)
+        // console.time('updateConsole')
+        this.updateMomentaryConsole()
+        // console.timeEnd('updateConsole')
+    }
+
+    private updateMomentaryConsole() {
+        const argv = parseCommand(this.consoleInput?.value ?? '')
+        // TODO: more commands
+        if (argv[0].toLowerCase() === 'set') {
+            // TODO: should remaining args be used?
+            this.setConsoleMomentary(this.findCvars(argv[1]))
+            return
+        }
+
+        this.setConsoleMomentary()
     }
 
     private toggleConstant(path: string) {
@@ -516,7 +573,7 @@ export default class Smashboard<GS, C extends Object = {}> {
         // validate the path at all (although I guess we don't allow . in keys)
         const keys = path.split('.')
         // TODO: what about options that can only be set when creating the chart? Are there any? How do we change them later
-        const chart = new Chart<GS>(
+        const chart = new Chart<STATE>(
             capitalize(keys.at(-1)!),
             { verticalSections: 2 },
             this.colors.graphSeries,
@@ -543,7 +600,7 @@ export default class Smashboard<GS, C extends Object = {}> {
     /*
      * @todo Allow watching strings etc. Need to figure out how to usefully display them. Do we include any history? Lowpass filter?
      */
-    private watchWithCallback(label: string, callback: MapStateToInstrument<GS>, dataOptions: ChartOptions = {}) {
+    private watchWithCallback(label: string, callback: MapStateToInstrument<STATE>, dataOptions: ChartOptions = {}) {
         if (this.charts[label]) {
             console.warn("Overriding chart for", label)
             this.removeChart(label)
@@ -551,7 +608,7 @@ export default class Smashboard<GS, C extends Object = {}> {
 
         // TODO: call the callback right now and note the return type
 
-        const chart = new Chart<GS>(
+        const chart = new Chart<STATE>(
             label,
             dataOptions,
             this.colors.graphSeries,
@@ -593,16 +650,16 @@ export default class Smashboard<GS, C extends Object = {}> {
     }
 
     // watch one path
-    chart(path: string, options?: ChartOptions): Chart<GS>;
+    chart(path: string, options?: ChartOptions): Chart<STATE>;
     // watch result of a callback
-    chart(label: string, callback: MapStateToInstrument<GS>, options?: ChartOptions): Chart<GS>;
+    chart(label: string, callback: MapStateToInstrument<STATE>, options?: ChartOptions): Chart<STATE>;
     // manually add data
-    chart(label: string, value: number, timestamp: number, options?: ChartOptions): Chart<GS>;
+    chart(label: string, value: number, timestamp: number, options?: ChartOptions): Chart<STATE>;
     chart(labelOrPath: string,
-        b?: ChartOptions | number | MapStateToInstrument<GS>,
+        b?: ChartOptions | number | MapStateToInstrument<STATE>,
         c?: ChartOptions | number,
         d?: ChartOptions
-    ): Chart<GS> {
+    ): Chart<STATE> {
 
         switch (typeof b) {
             case 'undefined':
@@ -632,7 +689,7 @@ export default class Smashboard<GS, C extends Object = {}> {
         throw new Error("WHAT?!")
     }
 
-    private appendChart(id: string, chart: Chart<GS>) {
+    private appendChart(id: string, chart: Chart<STATE>) {
         const { charts, container } = this
 
         charts[id] = chart
@@ -958,4 +1015,9 @@ function searchNested(obj: Traversable, filter: TraverseFilter, prefix: string[]
     }
 
     return acc
+}
+
+
+function parseCommand(input: string) {
+    return input.trim().split(/\s+/)
 }
