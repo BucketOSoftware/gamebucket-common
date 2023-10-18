@@ -359,7 +359,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
     }
 
     /** 
-     * #region Command line
+     * #region Console stuff
      */
 
     private setConsoleMomentary(html?: string) {
@@ -376,30 +376,11 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         momentary.innerHTML = html
     }
 
-    private findCvars(searchTerm: string = '') {
-        // TODO: more sophisticated search with fuzzy matching, etc.
-        const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
+    private switchToAppendLog() {
+        const { momentary, appendLog } = this
 
-        results.sort((a, b) => {
-            let astr = a[0].join('.')
-            let bstr = b[0].join('.')
-            if (astr < bstr) {
-                return -1
-            }
-            if (astr > bstr) {
-                return 1
-            }
-            return 0
-        })
-
-        return results.map(([keypath, value]) => {
-            const path = keypath.join('.')
-            if (typeof value === 'boolean') {
-                return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
-            }
-            return keypath.join('.') + ': ' + value
-        }
-        ).join("\n")
+        appendLog.classList.remove('hidden')
+        momentary.classList.add('hidden')
     }
 
     private log(items: { toString: () => string }[], level = 'loglevel-info') {
@@ -429,30 +410,33 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
     // Command handling
     /////
 
+
+    /** @todo figure out how fast this needs to be to feel responsive */
+    private typeHandlerTimeout: IdleRequestOptions = { timeout: 250 }
+    private typeHandlerPending = false
+    private inputLastEvent?: InputEvent = undefined
     private commandHandlers: Record<string, CommandHandler<STATE, CVARS>> = {}
     // TODO: types
     private typeHandlers: Record<string, any> = {}
 
-    addCommandHandler(command: string, handler: CommandHandler<STATE, CVARS>, typeHandler?: any) {
+    addCommandHandler(command: string, submitHandler: CommandHandler<STATE, CVARS>, typeHandler?: any) {
         const { commandHandlers } = this
         if (command in commandHandlers) {
             this.warn("Overriding command", command)
         }
-        commandHandlers[command] = handler.bind(this)
+        commandHandlers[command] = submitHandler.bind(this)
 
         if (typeHandler) {
             this.typeHandlers[command] = typeHandler.bind(this)
         }
     }
 
-    methodMissing = (...argv: string[]): HTMLElement | string => {
-        return this.error("Unknown command:", argv[0])
-    }
 
     private addDefaultCommands() {
         this.addCommandHandler('color', this.cmdColors)
         this.addCommandHandler('lipsum', this.cmdLipsum)
     }
+
 
     private handleCommand = (ev: SubmitEvent) => {
         ev.preventDefault()
@@ -477,13 +461,40 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
         // since it's a direct response to user input, make sure they can see the output
         const { momentary, appendLog } = this
-        appendLog.classList.remove('hidden')
-        momentary.classList.add('hidden')
+        this.switchToAppendLog()
         output?.scrollIntoView({
             behavior: 'smooth',
             block: "start",
             inline: "nearest"
         })
+    }
+
+    private handleConsoleInput = (deadline: IdleDeadline) => {
+        // console.timeEnd('typeHandlerWait')
+        ow(this.typeHandlerPending, ow.boolean.true)
+        this.typeHandlerPending = false
+
+        // ow(this.consoleInput === this.inputLastEvent?.target, ow.boolean.true)
+        // console.time('updateConsole')
+        this.updateMomentaryConsole()
+        // console.timeEnd('updateConsole')
+    }
+
+    private updateMomentaryConsole() {
+        const argv = parseCommand(this.consoleInput?.value ?? '')
+        // TODO: more commands
+        if (argv[0].toLowerCase() === 'set') {
+            // TODO: should remaining args be used?
+            this.setConsoleMomentary(this.findCvars(argv[1]))
+            return
+        }
+
+        this.setConsoleMomentary()
+    }
+
+
+    private methodMissing = (...argv: string[]): HTMLElement | string => {
+        return this.error("Unknown command:", argv[0])
     }
 
     private guessCommand(cmd: string) {
@@ -514,33 +525,43 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         return this.info(lipsum)
     }
 
-    /** @todo figure out how fast this needs to be to feel responsive */
-    private typeHandlerTimeout: IdleRequestOptions = { timeout: 250 }
-    private typeHandlerPending = false
-    private inputLastEvent?: InputEvent = undefined
+    private cmdSetCvar() {
 
-    private handleConsoleInput = (deadline: IdleDeadline) => {
-        // console.timeEnd('typeHandlerWait')
-        ow(this.typeHandlerPending, ow.boolean.true)
-        this.typeHandlerPending = false
-
-        // ow(this.consoleInput === this.inputLastEvent?.target, ow.boolean.true)
-        // console.time('updateConsole')
-        this.updateMomentaryConsole()
-        // console.timeEnd('updateConsole')
     }
 
-    private updateMomentaryConsole() {
-        const argv = parseCommand(this.consoleInput?.value ?? '')
-        // TODO: more commands
-        if (argv[0].toLowerCase() === 'set') {
-            // TODO: should remaining args be used?
-            this.setConsoleMomentary(this.findCvars(argv[1]))
-            return
+    private findCvars(searchTerm: string = '') {
+        // TODO: more sophisticated search with fuzzy matching, etc.
+        const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
+
+        results.sort((a, b) => {
+            let astr = a[0].join('.')
+            let bstr = b[0].join('.')
+            if (astr < bstr) {
+                return -1
+            }
+            if (astr > bstr) {
+                return 1
+            }
+            return 0
+        })
+
+        return results.map(([keypath, value]) => {
+            const path = keypath.join('.')
+            if (typeof value === 'boolean') {
+                return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
+            }
+            return keypath.join('.') + ': ' + value
         }
-
-        this.setConsoleMomentary()
+        ).join("\n")
     }
+
+
+
+
+    /** 
+     * #region Cvars
+    */
+
 
     private toggleConstant(path: string) {
         const existingValue = get(this.constants, path)
