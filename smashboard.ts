@@ -543,7 +543,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
     }
 
 
-
     private readonly consoleCommands: [
         aliasese: string | string[],
         onCommit?: CommandHandler<STATE, CVARS>,
@@ -564,28 +563,49 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
             // Set a cvar
             [
                 ['set', 'cv'],
-                undefined,
-                (c, cmd, name, value) => {
-                    return findCvars(c.dashboard.constants, name)
+                (c, _cmd, path, value) => {
+                    let newValue: string | number = value
+                    // TODO: more types
+                    const existingType = typeof get(c.cvars, path)
+                    switch (existingType) {
+                        case 'number':
+                            newValue = Number.parseFloat(newValue)
+                            if (Number.isNaN(newValue)) {
+                                return c.error("Couldn't parse number:", value)
+                            }
+                            break
+                        case 'string':
+                            break
+                        default:
+                            return c.error("Can't set a value of type", existingType)
+                    }
+                    set(c.cvars, path, newValue)
+                },
+                (c, _cmd, name, _value) => {
+                    return findCvars(c.cvars, name)
                 }
             ],
             // Toggle a boolean cvar
             ['toggle', (c, _, path) => {
                 // TODO: error on extra params
-                const existingValue = get(this.constants, path)
+                const existingValue = get(c.cvars, path)
                 if (typeof existingValue === 'boolean') {
-                    set(this.constants, path, !existingValue)
+                    set(c.cvars, path, !existingValue)
                     return c.info(`Set ${path} to ${!existingValue}`)
                 } else {
                     return c.warn("Can't toggle because it's not a boolean:", path)
                 }
                 // don't need to update the console because modifying the constants should notify us
 
-            }, (c, cmd, name) => {
+            }, (c, _cmd, name) => {
                 // TODO: find only booleans
+                return findCvars(c.cvars, name)
             }],
         ]
 }
+
+
+
 
 class Chart<State> {
     static readonly DELAY_FR = 1

@@ -6,6 +6,14 @@
     <!-- todo: stick a > at the front here-->
     <form name="console-input">
         <!-- input specificity stomps on crt styles so we have to specify again -->
-        <input type="text" class="crt" name="cli" placeholder="〛gamebucket" />
+        <input
+            list="console-autocomplete"
+            type="text"
+            class="crt"
+            name="cli"
+            placeholder="〛gamebucket"
+            autocomplete="off"
+        />
     </form>
+    <datalist id="console-autocomplete"></datalist>
 </section>

@@ -8,16 +8,22 @@ export type CommandHandler<S, CV extends object> =
 export const MethodMissing: symbol = Symbol.for('METHOD_MISSING')
 
 export class ConsoleController<S, CV extends object> {
+    public readonly cvars: CV
 
     // Bookmarks
     private input: HTMLInputElement
     private momentary: HTMLElement
     private appendLog: HTMLElement
+    private autocompleteList: HTMLDataListElement
+
+    private readonly recentCommands: string[] = []
+    private readonly maxRecentCommands = 10
 
     /** @todo figure out how fast this needs to be to feel responsive */
     private typeHandlerTimeout: IdleRequestOptions = { timeout: 250 }
     private typeHandlerPending = false
     private inputLastEvent?: InputEvent = undefined
+
     private commandHandlers: Record<string | typeof MethodMissing, CommandHandler<S, CV>> = {
         [MethodMissing]: (c, cmd) => c.error("Unrecognized command", cmd),
     }
@@ -26,16 +32,17 @@ export class ConsoleController<S, CV extends object> {
         [MethodMissing]: () => { }
     }
 
-
     constructor(
         public readonly domElement: HTMLElement,
         public readonly dashboard: Smashboard<S, CV>
     ) {
+        this.cvars = dashboard.constants
+
         this.input = domElement.querySelector<HTMLInputElement>('.console-section input[type=text]')!
 
         this.momentary = domElement.querySelector<HTMLElement>('.console-momentary')!
         this.appendLog = domElement.querySelector<HTMLElement>('.console-append-log')!
-
+        this.autocompleteList = domElement.querySelector<HTMLDataListElement>('#console-autocomplete')!
     }
 
     init() {
@@ -52,8 +59,10 @@ export class ConsoleController<S, CV extends object> {
             const cmd = a.dataset.clickCommand
 
             if (cmd) {
-                console.debug("Clicked:", cmd)
                 this.handleCommand(cmd)
+                // We don't setConsoleMomentary because this command wasn't
+                // issued by keyboard 
+
                 ev.preventDefault()
                 return
             }
@@ -70,6 +79,8 @@ export class ConsoleController<S, CV extends object> {
             const inputString = this.input.value.trim()
             this.echo(inputString)
             this.handleCommand(inputString)
+            // Ensure that the output from the above is visible
+            this.setConsoleMomentary()
             this.input.value = ''
         })
 
@@ -82,9 +93,21 @@ export class ConsoleController<S, CV extends object> {
                 this.typeHandlerPending = true
                 requestIdleCallback(this.handleConsoleInput, this.typeHandlerTimeout)
             }
+
             ev.preventDefault()
         }, { capture: true })
 
+        input.addEventListener('keydown', (ev) => {
+            // TODO: we would like this to select the highlighted option if
+            // there is one, but still autocomplete if there isn't. Is that
+            // possible? Right now this closes the dropdown even if that doesn't
+            // add any text
+            if (ev.code === 'Tab') {
+                ev.preventDefault()
+                input.blur()
+                input.focus()
+            }
+        })
     }
 
     refresh() {
@@ -145,7 +168,6 @@ export class ConsoleController<S, CV extends object> {
         return this.log(items, 'loglevel-error')
     }
 
-
     /////
     // Command handling
     /////
@@ -172,13 +194,36 @@ export class ConsoleController<S, CV extends object> {
         this.addCommandHandler('lipsum', (c) => c.info(lipsum))
     }
 
+    private addToRecentCommands(cmd: string) {
+        const { commandHandlers, recentCommands, maxRecentCommands } = this
+
+        // TODO: move to the top
+        if (recentCommands.includes(cmd)) {
+            return
+        }
+
+        if (cmd in commandHandlers) {
+            return
+        }
+
+        console.debug("Logging:", cmd)
+        recentCommands.unshift(cmd)
+        if (recentCommands.length > maxRecentCommands) {
+            recentCommands.pop()
+        }
+    }
+
     private handleCommand(inputString: string) {
+        const { commandHandlers, recentCommands, maxRecentCommands } = this
+
         const argv = parseCommand(inputString)
         const cmd = this.guessCommand(argv[0])
 
+        this.addToRecentCommands(inputString)
+
         let output: HTMLElement | string | void
 
-        const handler = this.commandHandlers[cmd] ?? this.commandHandlers[MethodMissing]
+        const handler = commandHandlers[cmd] ?? commandHandlers[MethodMissing]
         ow(handler, ow.function)
 
         try {
@@ -194,12 +239,13 @@ export class ConsoleController<S, CV extends object> {
         output ??= this.error('No output from command')
 
         // since it's a direct response to user input, make sure they can see the output
-        this.setConsoleMomentary()
         output.scrollIntoView({
             behavior: 'smooth',
             block: "start",
             inline: "nearest"
         })
+
+        this.refreshAutocompleteList()
     }
 
     private handleConsoleInput = (_deadline: IdleDeadline) => {
@@ -210,19 +256,33 @@ export class ConsoleController<S, CV extends object> {
         // ow(this.consoleInput === this.inputLastEvent?.target, ow.boolean.true)
         // console.time('updateConsole')
         this.updateMomentaryConsole()
+        this.refreshAutocompleteList()
+
         // console.timeEnd('updateConsole')
     }
 
     private updateMomentaryConsole() {
-        const { input } = this
+        const { input, typeHandlers } = this
         const argv = parseCommand(input.value)
         const cmd = this.guessCommand(argv[0])
 
-        const handler = this.typeHandlers[cmd] ?? this.typeHandlers[MethodMissing]
+        const handler = typeHandlers[cmd] ?? typeHandlers[MethodMissing]
         ow(handler, ow.function)
         this.setConsoleMomentary(handler(this, ...argv))
     }
 
+    private refreshAutocompleteList() {
+        const { autocompleteList, commandHandlers, recentCommands } = this
+        autocompleteList.textContent = ''
+
+        for (let cmd of recentCommands) {
+            autocompleteList.appendChild(option(cmd))
+        }
+
+        for (let cmd in commandHandlers) {
+            autocompleteList.appendChild(option(cmd))
+        }
+    }
 
     private guessCommand(cmd: string) {
         // TODO: maybe memoize
@@ -246,4 +306,11 @@ export class ConsoleController<S, CV extends object> {
 
 function parseCommand(input: string = '') {
     return input.trim().split(/\s+/)
+}
+
+function option(text: string) {
+    const opt = document.createElement('option')
+    const txt = document.createTextNode(text)
+    opt.appendChild(txt)
+    return opt
 }
