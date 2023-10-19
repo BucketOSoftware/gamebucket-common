@@ -2,6 +2,7 @@
     --smashboard-console-max-lines: 15;
     --smashboard-console-font-size: 1rem;
     --smashboard-console-text-color: lightgray;
+    --smashboard-console-error-color: hsl(0, 95%, 60%);
 
     --smashboard-console-background: rgba(0, 0, 0, 0.75);
     --smashboard-shadow-color: rgba(0, 0, 0, 0.5);
@@ -83,14 +84,14 @@
 .smashboard.color-crt,
 .smashboard .color-crt {
     --smashboard-console-crt-shadows:
-        0.25px 0 1px rgba(0, 30, 255, 0.3),
-        -0.25px 0 1px rgba(255, 0, 80, 0.2),
+        /* 0.25px 0 1px rgba(0, 30, 255, 0.3), */
+        /* -0.25px 0 1px rgba(255, 0, 80, 0.2), */
         0 0 1px;
 }
 
 .smashboard.mono-crt,
 .smashboard .mono-crt {
-    --smashboard-console-crt-shadows: 0 0 2px rgba(0, 0, 0, 0.6);
+    --smashboard-console-crt-shadows: 0 0 2px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -106,7 +107,6 @@
     border-color: var(--smashboard-console-text-color);
     background-color: var(--smashboard-console-text-color);
 }
-
 
 .smashboard .console {
     width: 100%;
@@ -129,13 +129,23 @@
     max-height: calc(var(--smashboard-console-font-size) * var(--smashboard-console-max-lines) * 1.25);
 }
 
-.smashboard .console-append-log > * {
+.smashboard .console-append-log>* {
     margin-bottom: calc(var(--smashboard-console-font-size) / 4);
 }
 
 .smashboard .console .loglevel-error {
-    color: hsl(0, 75%, 50%);
+    color: var(--smashboard-console-error-color);
     font-weight: bold;
+}
+
+.smashboard .console .loglevel-echo {
+    /* color: hsl(0, 75%, 50%); */
+    font-weight: bold;
+    margin-bottom: calc(var(--smashboard-console-font-size) / 1);
+}
+
+.smashboard .loglevel-echo::before {
+    content: "》";
 }
 
 .smashboard .console a {

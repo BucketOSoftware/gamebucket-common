@@ -16,9 +16,11 @@ import {
     ITimeSeriesPresentationOptions,
 } from 'smoothie'
 
-import './smashboard.css'
-import html from './smashboard.html?raw'
-import lipsum from './lipsum.txt?raw'
+import './smashboard/smashboard.css'
+import html from './smashboard/smashboard.html?raw'
+import { CommandHandler, ConsoleController } from './smashboard/console-controller'
+
+import lipsum from './smashboard/lipsum.txt?raw'
 
 export type InstrumentationTypes = number
 export type MapStateToInstrument<GS> = (state: GS) => InstrumentationTypes
@@ -33,7 +35,6 @@ interface RuntimeWatch {
     path: string
 }
 
-type CommandHandler<STATE, CVARS extends object> = (this: Smashboard<STATE, CVARS>, ...args: any) => HTMLElement
 
 ////////
 
@@ -54,7 +55,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         ])
     }
 
-
     /** When hiding the dashboard, focus this element */
     focusOnHide?: HTMLElement
 
@@ -63,12 +63,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
     /// DOM bookmarks
     /** Calling it "console" is asking for autocomplete trouble */
-    private sole: HTMLElement | null
-    private consoleInput?: HTMLInputElement = undefined
-    // private appendLog: HTMLElement | null
-
-    private momentary: HTMLElement
-    private appendLog: HTMLElement
+    private sole: ConsoleController<STATE, CVARS>
 
     /**
      * @param container The DOM element to display the dashboard in
@@ -77,70 +72,40 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
      */
     constructor(
         private container: HTMLElement,
-        private readonly constants: CVARS,
+        public readonly constants: CVARS,
         private readonly storagePrefix = 'smashboard'
     ) {
         // Set up the markup
         container.classList.add('smashboard')
         container.innerHTML = html
-        this.sole = container.querySelector<HTMLElement>('section.console-section')
 
-        this.momentary = this.sole!.querySelector<HTMLElement>('.console-momentary')!
-        this.appendLog = this.sole!.querySelector<HTMLElement>('.console-append-log')!
 
+        this.sole = new ConsoleController(
+            container.querySelector<HTMLElement>('section.console-section')!,
+            this
+        )
         if (window.watch) {
             console.warn('Smashboard: watch() already exists globally, overwriting', window.watch)
         }
         window.watch = this.watch.bind(this)
 
-        this.addDefaultCommands()
 
     }
 
     init() {
         const { container } = this
 
+
         this.restoreSettings()
         this.updateSettings()
+
+        this.sole.init()
+        this.addDefaultHandlers()
+
         this.attachEvents(container)
     }
 
     private attachEvents(container: HTMLElement) {
-        this.consoleInput = container!.querySelector<HTMLInputElement>('.console-section input[type=text]')!
-        const { consoleInput, sole } = this
-
-        // Listen for clicks in the console display
-        sole!.addEventListener('click', (ev: MouseEvent) => {
-            const a = ev.target! as HTMLElement
-            if (!('action' in a.dataset)) {
-                return
-            }
-
-            switch (a.dataset['action']) {
-                case 'toggle':
-                    this.toggleConstant(a.dataset['path']!)
-                    ev.preventDefault()
-                    break
-                default:
-            }
-        })
-
-        // User hits "enter" in the console
-        container.querySelector('form')!.addEventListener('submit', this.handleCommand)
-
-        // User types something in the console
-        consoleInput.addEventListener('input', (ev) => {
-            this.inputLastEvent = (ev as InputEvent)
-            if (!this.typeHandlerPending) {
-                // console.time('typeHandlerWait')
-                // TODO: maybe use ev.data to check for actual changes and skip if nothing has changed
-                this.typeHandlerPending = true
-                requestIdleCallback(this.handleConsoleInput, this.typeHandlerTimeout)
-            }
-            ev.preventDefault()
-        }, { capture: true })
-
-
         // Listen for the keys to open the panel
         // TODO: probably just let the user figure this out and call a function on us
         let held: Record<string, boolean> = {}
@@ -157,8 +122,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
                 if (!this.settings.visible) {
                     // Going to show the console, so focus the input field
-                    // const inputs = this.container.getElementsByTagName('input')
-                    consoleInput.focus()
+                    this.sole.focusInput()
                 }
                 this.setVisible(!this.settings.visible)
                 held = {}
@@ -180,10 +144,14 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         this.settings.visible = visible
         this.updateSettings()
         this.saveSettings()
-
     }
 
-    setColorSchemeByName(scheme: string): Error | void {
+
+    /** 
+     * #region Color scheme/theme
+     */
+
+    setColorSchemeByName(scheme: string) {
         if (scheme in this.colorSchemes) {
             this.settings.colorScheme = scheme
             this.updateSettings()
@@ -193,7 +161,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
         throw new Error("No color scheme named " + scheme)
     }
-
 
     get colors() {
         return this.colorSchemes[this.settings.colorScheme ?? 'default']
@@ -250,6 +217,9 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         this.container.appendChild(swatchBox)
     }
 
+    /**
+     * #region settings
+     */
     restoreSettings() {
         const serialized = localStorage.getItem(this.storagePrefix + '-settings')
 
@@ -272,7 +242,11 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         this.updateSettings()
     }
 
-    private updateSettings() {
+    /**
+     * Set the dashboard as per the current settings 
+     * @todo check what's actually changed
+     */
+    private updateSettings(): void {
         const { visible, colorScheme, runtimeWatches = [] } = this.settings
 
         const klasses = this.container.classList
@@ -321,7 +295,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
     refreshConsoleVars() {
         console.debug('Smashboard: refreshing constants')
-        this.updateMomentaryConsole()
+        this.sole.refresh()
     }
 
     private updateCharts(timestamp: number, state: STATE) {
@@ -358,220 +332,28 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
     }
 
-    /** 
-     * #region Console stuff
+    /**
+     * #region Console
      */
 
-    private setConsoleMomentary(html?: string) {
-        const { momentary, appendLog } = this
+    private addDefaultHandlers() {
+        const { sole } = this
 
-        if (!html) {
-            momentary.classList.add('hidden')
-            appendLog.classList.remove('hidden')
-            return
-        }
-
-        momentary.classList.remove('hidden')
-        appendLog.classList.add('hidden')
-        momentary.innerHTML = html
-    }
-
-    private switchToAppendLog() {
-        const { momentary, appendLog } = this
-
-        appendLog.classList.remove('hidden')
-        momentary.classList.add('hidden')
-    }
-
-    private log(items: { toString: () => string }[], level = 'loglevel-info') {
-        const node = document.createElement('div')
-        node.innerText = items.join(' ')
-        node.className = level
-        this.appendLog?.appendChild(node)
-        return node
-    }
-
-    private info(...items: { toString: () => string }[]) {
-        console.log(...items)
-        return this.log(items)
-    }
-
-    private warn(...items: { toString: () => string }[]) {
-        console.warn(...items)
-        return this.log(items, 'loglevel-warning')
-    }
-
-    private error(...items: { toString: () => string }[]) {
-        console.error(...items)
-        return this.log(items, 'loglevel-error')
-    }
-
-    /////
-    // Command handling
-    /////
-
-
-    /** @todo figure out how fast this needs to be to feel responsive */
-    private typeHandlerTimeout: IdleRequestOptions = { timeout: 250 }
-    private typeHandlerPending = false
-    private inputLastEvent?: InputEvent = undefined
-    private commandHandlers: Record<string, CommandHandler<STATE, CVARS>> = {}
-    // TODO: types
-    private typeHandlers: Record<string, any> = {}
-
-    addCommandHandler(command: string, submitHandler: CommandHandler<STATE, CVARS>, typeHandler?: any) {
-        const { commandHandlers } = this
-        if (command in commandHandlers) {
-            this.warn("Overriding command", command)
-        }
-        commandHandlers[command] = submitHandler.bind(this)
-
-        if (typeHandler) {
-            this.typeHandlers[command] = typeHandler.bind(this)
-        }
-    }
-
-
-    private addDefaultCommands() {
-        this.addCommandHandler('color', this.cmdColors)
-        this.addCommandHandler('lipsum', this.cmdLipsum)
-    }
-
-
-    private handleCommand = (ev: SubmitEvent) => {
-        ev.preventDefault()
-        const form = ev.target as HTMLFormElement
-        const input = form.elements[0] as HTMLInputElement
-        const argv = parseCommand(input.value)
-        const cmd = this.guessCommand(argv[0])
-        input.value = ''
-
-        // TODO: handle strings
-        let output: HTMLElement | undefined
-
-        const handler = this.commandHandlers[cmd] ?? this.methodMissing
-
-        try {
-            // @ts-expect-error: I don't know, fuck this
-            output = handler(...argv)
-        } catch (e: any) {
-            output = this.error(e as any)
-        }
-        output ??= this.error('No output from command')
-
-        // since it's a direct response to user input, make sure they can see the output
-        const { momentary, appendLog } = this
-        this.switchToAppendLog()
-        output?.scrollIntoView({
-            behavior: 'smooth',
-            block: "start",
-            inline: "nearest"
+        this.consoleCommands.forEach(([aliases, submitHandler, typeHandler]) => {
+            console.debug("Adding command:", aliases, submitHandler, typeHandler)
+            if (typeof aliases === 'string') {
+                aliases = [aliases]
+            }
+            ow(aliases, ow.array.minLength(1))
+            aliases.forEach(a => sole.addCommandHandler(a, submitHandler, typeHandler))
         })
     }
-
-    private handleConsoleInput = (deadline: IdleDeadline) => {
-        // console.timeEnd('typeHandlerWait')
-        ow(this.typeHandlerPending, ow.boolean.true)
-        this.typeHandlerPending = false
-
-        // ow(this.consoleInput === this.inputLastEvent?.target, ow.boolean.true)
-        // console.time('updateConsole')
-        this.updateMomentaryConsole()
-        // console.timeEnd('updateConsole')
-    }
-
-    private updateMomentaryConsole() {
-        const argv = parseCommand(this.consoleInput?.value ?? '')
-        // TODO: more commands
-        if (argv[0].toLowerCase() === 'set') {
-            // TODO: should remaining args be used?
-            this.setConsoleMomentary(this.findCvars(argv[1]))
-            return
-        }
-
-        this.setConsoleMomentary()
-    }
-
-
-    private methodMissing = (...argv: string[]): HTMLElement | string => {
-        return this.error("Unknown command:", argv[0])
-    }
-
-    private guessCommand(cmd: string) {
-        // TODO: maybe memoize
-        const commands = Object.keys(this.commandHandlers)
-        cmd = cmd.toLowerCase()
-        if (cmd in commands) {
-            return cmd
-        }
-
-        // Find out if this string uniquely identifies a command
-        const matches = commands.filter(potentialCmd => potentialCmd.startsWith(cmd))
-        if (matches.length === 1) {
-            return matches[0]
-        }
-
-        // nothing found
-        return cmd
-    }
-
-    private cmdColors(cmd: string, scheme: string = '') {
-        this.setColorSchemeByName(scheme.toLowerCase())
-
-        return this.info(`Color scheme set to ${scheme}`)
-    }
-
-    private cmdLipsum() {
-        return this.info(lipsum)
-    }
-
-    private cmdSetCvar() {
-
-    }
-
-    private findCvars(searchTerm: string = '') {
-        // TODO: more sophisticated search with fuzzy matching, etc.
-        const results = searchNested(this.constants, (k, _) => k.includes(searchTerm))
-
-        results.sort((a, b) => {
-            let astr = a[0].join('.')
-            let bstr = b[0].join('.')
-            if (astr < bstr) {
-                return -1
-            }
-            if (astr > bstr) {
-                return 1
-            }
-            return 0
-        })
-
-        return results.map(([keypath, value]) => {
-            const path = keypath.join('.')
-            if (typeof value === 'boolean') {
-                return `<a href="#" data-action="toggle" data-path="${path}">${path}: ${value ? "[✓]" : "[ ]"}`
-            }
-            return keypath.join('.') + ': ' + value
-        }
-        ).join("\n")
-    }
-
-
 
 
     /** 
      * #region Cvars
     */
 
-
-    private toggleConstant(path: string) {
-        const existingValue = get(this.constants, path)
-        if (typeof existingValue === 'boolean') {
-            set(this.constants, path, !existingValue)
-        } else {
-            console.warn("Can't toggle because it's not a boolean:", path)
-        }
-        // don't need to update the console because modifying the constants should notify us
-    }
 
     /*
      * #region Charts
@@ -759,6 +541,50 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
             }
         }
     }
+
+
+
+    private readonly consoleCommands: [
+        aliasese: string | string[],
+        onCommit?: CommandHandler<STATE, CVARS>,
+        onType?: CommandHandler<STATE, CVARS>
+    ][] =
+        [
+            // Set color scheme
+            [
+                ['color', 'theme'],
+                (c, cmd, scheme = '') => {
+                    c.dashboard.setColorSchemeByName(scheme.toLowerCase())
+                    return c.info(`Color scheme set to ${scheme}`)
+                },
+                (c) => {
+                    return "Available color schemes: " + Object.keys(c.dashboard.colorSchemes).join(', ')
+                }
+            ],
+            // Set a cvar
+            [
+                ['set', 'cv'],
+                undefined,
+                (c, cmd, name, value) => {
+                    return findCvars(c.dashboard.constants, name)
+                }
+            ],
+            // Toggle a boolean cvar
+            ['toggle', (c, _, path) => {
+                // TODO: error on extra params
+                const existingValue = get(this.constants, path)
+                if (typeof existingValue === 'boolean') {
+                    set(this.constants, path, !existingValue)
+                    return c.info(`Set ${path} to ${!existingValue}`)
+                } else {
+                    return c.warn("Can't toggle because it's not a boolean:", path)
+                }
+                // don't need to update the console because modifying the constants should notify us
+
+            }, (c, cmd, name) => {
+                // TODO: find only booleans
+            }],
+        ]
 }
 
 class Chart<State> {
@@ -1009,6 +835,8 @@ export class ColorScheme implements SchemeColors {
     }
 }
 
+
+
 // can't restrict to primitives, so this gets annoying as shit 
 // type Traversable<AV> = { [k: string | number]: Traversable<AV> | AV }
 type Traversable = { [k: string | number]: any }
@@ -1039,6 +867,28 @@ function searchNested(obj: Traversable, filter: TraverseFilter, prefix: string[]
 }
 
 
-function parseCommand(input: string) {
-    return input.trim().split(/\s+/)
+function findCvars<CV extends object>(constants: CV, searchTerm: string = '') {
+    // TODO: more sophisticated search with fuzzy matching, etc.
+    const results = searchNested(constants, (k, _) => k.includes(searchTerm))
+
+    results.sort((a, b) => {
+        let astr = a[0].join('.')
+        let bstr = b[0].join('.')
+        if (astr < bstr) {
+            return -1
+        }
+        if (astr > bstr) {
+            return 1
+        }
+        return 0
+    })
+
+    return results.map(([keypath, value]) => {
+        const path = keypath.join('.')
+        if (typeof value === 'boolean') {
+            return `<a href="#" data-click-command="toggle ${path}">${path}: ${value ? "[✓]" : "[ ]"}`
+        }
+        return keypath.join('.') + ': ' + value
+    }
+    ).join("\n")
 }
