@@ -5,22 +5,15 @@ declare global {
 }
 
 import Color from 'color'
-import { at, capitalize, cloneDeep, get, isEmpty, throttle, debounce, trim, set, clone } from 'lodash-es'
+import { capitalize, get, set } from 'lodash-es'
 import ow from 'ow'
-import {
-    SmoothieChart,
-    TimeSeries,
-    IChartOptions,
-    IGridOptions,
-    ILabelOptions,
-    ITimeSeriesPresentationOptions,
-} from 'smoothie'
 
 import './smashboard/smashboard.css'
 import html from './smashboard/smashboard.html?raw'
 import { CommandHandler, ConsoleController } from './smashboard/console-controller'
 
-import lipsum from './smashboard/lipsum.txt?raw'
+import { Chart } from './smashboard/chart'
+import { ColorScheme } from './smashboard/color-scheme'
 
 export type InstrumentationTypes = number
 export type MapStateToInstrument<GS> = (state: GS) => InstrumentationTypes
@@ -31,7 +24,7 @@ export interface ChartOptions {
     verticalSections?: number;
 }
 
-interface RuntimeWatch {
+export interface RuntimeWatch {
     path: string
 }
 
@@ -604,256 +597,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         ]
 }
 
-
-
-
-class Chart<State> {
-    static readonly DELAY_FR = 1
-    static readonly SIZE = [192, 64]
-    static lastSerial = 0
-
-    static defaultChartOptions: IChartOptions = {
-        responsive: false,
-        tooltip: false,
-        interpolation: 'bezier',
-        limitFPS: 30,
-    }
-
-    static defaultGridOptions: IGridOptions = {
-        lineWidth: 1,
-        borderVisible: false,
-        millisPerLine: 1000,
-    }
-
-    static defaultLabelOptions: ILabelOptions = {
-        fontFamily: 'Overpass, system-ui',
-    }
-    static defaultSeriesOptions: ITimeSeriesPresentationOptions = {
-        lineWidth: 2
-    }
-
-    domElement: HTMLCanvasElement
-    chart: SmoothieChart
-    series: TimeSeries[]
-
-    dataSources: (MapStateToInstrument<State> | string[] | 'manual')[] = []
-
-    private positiveOnly = false
-
-    /** Used to re-create a runtime chart. Not needed for callback-based or manual charts */
-    runtimeWatchConfig?: RuntimeWatch
-
-    private serial = Chart.lastSerial++
-
-    constructor(
-        public readonly label: string,
-        options: ChartOptions,
-        private _chartColors: Color[] = [Color('red')],
-        private _backgroundColor: Color = Color('black')
-    ) {
-        // obvs
-        this.positiveOnly = options.min === 0
-        // Reset bounds if we didn't provide both
-        const resetBounds = options.min === undefined && options.max === undefined
-
-        this.chart = new SmoothieChart({
-            ...Chart.defaultChartOptions,
-            grid: {
-                ...Chart.defaultGridOptions,
-                verticalSections: options.verticalSections ?? 2,
-            },
-            title: {
-                ...Chart.defaultLabelOptions,
-                text: label,
-            },
-            maxValueScale: this.positiveOnly ? 1.05 : 1
-
-        });
-        this.setNoData(true)
-
-        const canvas = this.domElement = document.createElement('canvas');
-        canvas.width = Chart.SIZE[0]
-        canvas.height = Chart.SIZE[1]
-        canvas.classList.add('shadow')
-
-        const series = new TimeSeries({ resetBounds });
-
-        if (options.min !== undefined) { series.minValue = options.min; }
-        if (options.max !== undefined) { series.maxValue = options.max; }
-
-        this.series = [series]
-
-        const seriesColor = _chartColors[this.serial % _chartColors.length]
-
-        this.chart.addTimeSeries(series, {
-            ...Chart.defaultSeriesOptions,
-            strokeStyle: seriesColor.string(),
-            fillStyle: this.positiveOnly ? seriesColor.fade(2 / 3).string() : undefined,
-            tooltipLabel: label,
-        })
-        this.chart.streamTo(canvas, Chart.DELAY_FR * 1 / 60 * 1000)
-    }
-
-    get backgroundColor() {
-        return this._backgroundColor
-    }
-
-    set backgroundColor(color: Color) {
-        this._backgroundColor = color
-        this.setNoData(false)
-    }
-
-    get seriesColors() {
-        return this._chartColors
-    }
-
-    set seriesColors(colors: Color[]) {
-        this._chartColors = colors
-
-        const seriesColor = this.seriesColors[this.serial % this._chartColors.length]
-
-        const seriesOpts = this.chart.getTimeSeriesOptions(this.series[0])
-        seriesOpts.strokeStyle = seriesColor.string()
-        seriesOpts.fillStyle = this.positiveOnly ? seriesColor.fade(2 / 3).string() : undefined
-    }
-
-    setNoData(noData: boolean) {
-        /** @todo Is it okay to do all this on every update? */
-        let lineColor = this.backgroundColor.darken(1 / 2).opaquer(1 / 4)
-        this.chart.options.grid!.fillStyle =
-            (noData ? this.backgroundColor.desaturate(1) : this.backgroundColor).string()
-        this.chart.options.grid!.strokeStyle =
-            (noData ? lineColor.desaturate(1) : lineColor).string()
-    }
-
-    retrieveData(state: State): number | undefined {
-        const { dataSources } = this
-
-        // TODO: multiple series/datasources
-        if (typeof dataSources[0] === 'function') {
-            // Data source is a callback
-            return dataSources[0](state)
-        } else if (Array.isArray(dataSources[0])) {
-            // Data source is a path
-            return get(state, dataSources[0])
-        } else if (dataSources[0] === 'manual') {
-            // It's already been done, we hope?
-            return
-        } else {
-            throw new Error("Don't know how to retrieve value for chart: " + this.label)
-        }
-    }
-}
-
-const byHue = (a: Color, b: Color) => a.hue() - b.hue()
-const byLuminosity = (a: Color, b: Color) => a.luminosity() - b.luminosity()
-export function colorsFromHexFile(file: string): Color[] {
-    const colors = file.split('\n')
-        .map(hxstr => Array.from(hxstr.matchAll(/[0-9A-Fa-f]{2}/g)))
-        .filter(matches => matches.length === 3)
-        .map(matches => matches.map((hx) => Number.parseInt(hx[0], 16)))
-        .map(tuple => Color(tuple).hsl())
-    colors.sort(byHue)
-    return colors
-}
-
-
-
-/** All the colors that can be customized */
-interface SchemeColors {
-    graphBackground?: Color
-    consoleText?: Color
-    consoleBackground?: Color
-    shadow?: Color
-    graphSeries?: Color[]
-}
-
-type ColorSpec<T = number> = { [Property in keyof SchemeColors]: T }
-
-interface SetColorsParams extends ColorSpec<number | number[]> {
-    opacity?: ColorSpec<number>
-    /** @todo */
-    lightness?: ColorSpec<number>
-}
-
-export class ColorScheme implements SchemeColors {
-    readonly colors: Color[]
-
-    graphSeries?: Color[]
-    graphBackground?: Color
-    consoleText?: Color
-    consoleBackground?: Color
-    shadow?: Color
-
-    constructor(hexfileOrColors: string | Color[]) {
-        if (Array.isArray(hexfileOrColors)) {
-            this.colors = clone(hexfileOrColors)
-        } else {
-            this.colors = colorsFromHexFile(hexfileOrColors)
-        }
-
-        // Assume the first color is the background and the rest are main until we hear otherwise
-        this.graphSeries = this.colors.slice(1)
-        this.graphBackground = this.colors[0].fade(1 - (2 / 3))
-    }
-
-
-    pickColors(param: SetColorsParams) {
-        const opacity = param.opacity
-        delete param.opacity
-
-        this.walkParams(param, (name, existing, idx) => {
-            // Pick the numbered index from the palette
-            ow(idx, ow.number.inRange(0, this.colors.length - 1))
-            return this.colors[idx]
-        })
-
-        this.walkParams(opacity, (_, color, opac) => {
-            ow(opac, ow.number.inRange(0, 1))
-            ow(color, ow.object.instanceOf(Color))
-
-            // @ts-expect-error: why doesn't object.instanceOf work?
-            return color.fade(1 - opac)
-        })
-
-        return this
-    }
-
-    /** For each key in params, set that color to whatever's returns from the callback */
-    walkParams(param: SetColorsParams | undefined, doSomething: (key: string, existing: Color | Color[], value: number) => Color) {
-        if (!param) {
-            return
-        }
-
-        for (let name in param) {
-            const typed = name as keyof SchemeColors
-            const idxOrArray = param[typed]
-            const existing = this[typed]
-
-            if (Array.isArray(idxOrArray)) {
-                // @ts-expect-error: yeah, we don't know if it's an array or not, go screw
-                this[typed] = idxOrArray.map(idx => doSomething(name, existing, idx))
-            } else if (typeof idxOrArray === 'number') {
-                // @ts-expect-error
-                this[typed] = doSomething(name, existing, idxOrArray)
-            } else {
-                console.warn("No parameter given for", name)
-            }
-        }
-
-    }
-
-    makeSwatches(colors = this.colors) {
-        return colors.map((c, idx) => {
-            const swatch = document.createElement('span')
-            swatch.className = 'swatch'
-            swatch.style.backgroundColor = c.string()
-            swatch.innerText = `${idx}`
-
-            return swatch
-        })
-    }
-}
 
 
 
