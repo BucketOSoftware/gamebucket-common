@@ -86,3 +86,10 @@ export function vhash(x: number, y: number) {
     const result = Math.sin(sn) * vr_c
     return result - (result | 0)
 }
+
+/** Turn on bit number `item` (counting from the right) in `accumulator`. Works
+ * with {@link Array.prototype.reduce}
+ */
+export function setBit(accumulator: number, item: number) {
+    return accumulator | (1 << item);
+}
