@@ -299,6 +299,11 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
             const chart = charts[id]
             const { series } = chart
 
+            if (chart.dataSources[0] === 'manual') {
+                // TODO: kind of silly
+                continue;
+            }
+
             let value: number | undefined
             try {
                 value = chart.retrieveData(state)
@@ -308,8 +313,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
             switch (typeof value) {
                 case 'undefined':
-                    // Ignore. Might be nice to surface this in some way
-                    // Maybe gray out the chart BG?
+                    // gray out the chart BG?
                     chart.setNoData(true)
                     break
                 case 'number':
@@ -404,6 +408,7 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
 
         // TODO: call the callback right now and note the return type
 
+        // TODO: this breaks if the color scheme isn't valid
         const chart = new Chart<STATE>(
             label,
             dataOptions,
