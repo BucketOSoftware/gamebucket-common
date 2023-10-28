@@ -185,7 +185,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
             } else {
                 root.classList.add('color-crt')
             }
-            console.debug("Console text saturation:", scheme.consoleText.saturationv(), root.className)
         }
 
         if (scheme.consoleBackground) {
@@ -337,7 +336,6 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
         const { sole } = this
 
         this.consoleCommands.forEach(([aliases, submitHandler, typeHandler]) => {
-            console.debug("Adding command:", aliases, submitHandler, typeHandler)
             if (typeof aliases === 'string') {
                 aliases = [aliases]
             }
