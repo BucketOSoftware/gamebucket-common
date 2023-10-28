@@ -14,6 +14,12 @@ export type GVec2 = { x: number; y: number }
 export type GVec3 = { x: number; y: number; z: number }
 export type GQuat = { w: number, x: number; y: number; z: number }
 
+
+export function toTVec3(v: GVec3): TVec3 {
+    return new TVec3(v.x, v.y, v.z)
+}
+
+
 export function degToRad(degrees: number) {
     return (degrees * Math.PI) / 180
 }

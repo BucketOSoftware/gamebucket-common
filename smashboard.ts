@@ -654,7 +654,7 @@ function findCvars<CV extends object>(constants: CV, searchTerm: string = '') {
     return results.map(([keypath, value]) => {
         const path = keypath.join('.')
         if (typeof value === 'boolean') {
-            return `<a href="#" data-click-command="toggle ${path}">${path}: ${value ? "[✓]" : "[ ]"}`
+            return `<a href="#" data-click-command="toggle ${path}">${path}: ${value ? "[✓]" : "[ ]"}</a>`
         }
         return keypath.join('.') + ': ' + value
     }
