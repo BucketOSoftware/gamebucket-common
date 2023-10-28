@@ -149,6 +149,8 @@ export default class Capture {
             )
 
             this.recorder = recorder
+
+            requestIdleCallback(() => this.showTimeDisplay())
             recorder.start()
         } else {
             recorder.stop()
@@ -156,5 +158,42 @@ export default class Capture {
             this.recorder = undefined
             console.log('Recording stopped')
         }
+    }
+
+    formattedDuration() {
+        const dur = this.duration
+        const min = (dur / 60) | 0
+        const sec = dur % 60
+
+        return ('' + min) + ':' + ('' + sec).padStart(2, '0')
+    }
+
+    showTimeDisplay() {
+        const ele = document.createElement('div')
+        ele.className = 'capture-readout'
+        ele.style.color = 'hsl(0, 90%, 60%)'
+        ele.style.backgroundColor = 'hsla(0, 0%, 0%, 66%)'
+        ele.style.position = 'absolute'
+        ele.style.zIndex = '1000000'
+        ele.style.right = '1rem'
+        ele.style.top = '1rem'
+        ele.style.padding = '0.5rem'
+        ele.style.borderRadius = '0.5rem'
+        ele.style.fontSize = '1.2rem'
+        ele.style.fontFamily = '"Overpass Mono", Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, monospace'
+        ele.style.fontWeight = 'bold'
+
+        ele.innerText = "⏺ 0:00"// + this.formattedDuration()
+        document.body.appendChild(ele)
+
+        const update = () => {
+            if (this.recorder) {
+                ele.innerText = "⏺ " + this.formattedDuration()
+                requestIdleCallback(update)
+            } else {
+                ele.remove()
+            }
+        }
+        requestIdleCallback(update)
     }
 }

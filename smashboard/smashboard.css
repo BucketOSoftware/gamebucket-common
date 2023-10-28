@@ -74,7 +74,7 @@
 }
 
 .smashboard .crt {
-    font-family: "Overpass Mono", monospace;
+    font-family: "Overpass Mono", Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, monospace;
     font-size: var(--smashboard-console-font-size);
     line-height: calc(var(--smashboard-console-font-size) * 1.25);
     color: var(--smashboard-console-text-color);
