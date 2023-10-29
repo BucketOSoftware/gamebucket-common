@@ -5,7 +5,7 @@ declare global {
 }
 
 import Color from 'color'
-import { capitalize, get, set } from 'lodash-es'
+import { capitalize, get, set, unset } from 'lodash-es'
 import ow from 'ow'
 
 import './smashboard/smashboard.css'
@@ -559,26 +559,39 @@ export default class Smashboard<STATE, CVARS extends Object = {}> {
             // Set a cvar
             [
                 ['set', 'cv'],
-                (c, _cmd, path, value) => {
+                (cc, _cmd, path, value) => {
                     let newValue: string | number = value
                     // TODO: more types
-                    const existingType = typeof get(c.cvars, path)
+                    const existingType = typeof get(cc.cvars, path)
                     switch (existingType) {
                         case 'number':
                             newValue = Number.parseFloat(newValue)
                             if (Number.isNaN(newValue)) {
-                                return c.error("Couldn't parse number:", value)
+                                return cc.error("Couldn't parse number:", value)
                             }
                             break
                         case 'string':
                             break
                         default:
-                            return c.error("Can't set a value of type", existingType)
+                            return cc.error("Can't set a value of type", existingType)
                     }
-                    set(c.cvars, path, newValue)
+
+                    set(cc.cvars, path, newValue)
+                    return `Set ${path} to ${newValue}`
                 },
-                (c, _cmd, name, _value) => {
-                    return findCvars(c.cvars, name)
+                (cc, _cmd, name, _value) => {
+                    return findCvars(cc.cvars, name)
+                }
+            ],
+            // Return a cvar to the default
+            [
+                ['reset'],
+                (cc, _, path) => {
+                    unset(cc.cvars, path)
+                    return `Reset ${path} to default`
+                },
+                (cc, _cmd, name, _value) => {
+                    return findCvars(cc.cvars, name)
                 }
             ],
             // Toggle a boolean cvar
