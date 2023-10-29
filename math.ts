@@ -37,18 +37,26 @@ export function hardclip(n: number, gain: number) {
     return MathUtils.clamp(n * gain, -1, 1)
 }
 
+export const clamp = MathUtils.clamp
+
+export function mapRange(value: number, inMin: number, inMax: number, outMin: number, outMax: number, easing = (n: number) => n) {
+    return (easing(
+        // convert value into 0..1
+        (clamp((value - inMin) / (inMax - inMin), 0, 1))
+    ) // convert it into outMin..outMax
+        * (outMax - outMin)) + outMin
+}
+
+/** Exponential moving average */
 export function ema(prev: number, current: number, smoothing: number) {
-    // const P =
     ow(smoothing, ow.number.inRange(0, 1))
 
     return (smoothing * current) + (1 - smoothing) * prev
-    return prev + (0.1 * (current - prev))
 }
 
 export class SmoothValue {
     private currentAverage: number
     constructor(initial: number, public smoothing: number) {
-
         ow(smoothing, ow.number.inRange(0, 1))
         this.currentAverage = initial
     }
