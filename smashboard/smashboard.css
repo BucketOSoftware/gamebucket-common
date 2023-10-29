@@ -141,7 +141,7 @@
 .smashboard .console .loglevel-echo {
     /* color: hsl(0, 75%, 50%); */
     font-weight: bold;
-    margin-bottom: calc(var(--smashboard-console-font-size) / 2);
+    margin: calc(var(--smashboard-console-font-size) / 2) 0;
 }
 
 .smashboard .loglevel-echo::before {
