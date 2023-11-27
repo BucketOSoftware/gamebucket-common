@@ -39,24 +39,44 @@ export function hardclip(n: number, gain: number) {
 
 export const clamp = MathUtils.clamp
 
-export function mapRange(value: number, inMin: number, inMax: number, outMin: number, outMax: number, easing = (n: number) => n) {
-    return (easing(
-        // convert value into 0..1
-        (clamp((value - inMin) / (inMax - inMin), 0, 1))
-    ) // convert it into outMin..outMax
-        * (outMax - outMin)) + outMin
+const identity = (n: number) => n
+
+export function mapRange(
+    value: number,
+    inMin: number,
+    inMax: number,
+    outMin: number,
+    outMax: number,
+    easing = identity,
+) {
+    return (
+        easing(
+            // convert value into 0..1
+            clamp((value - inMin) / (inMax - inMin), 0, 1),
+        ) * // convert it into outMin..outMax
+            (outMax - outMin) +
+        outMin
+    )
+}
+
+/** Don't know if this is the right name for this */
+export function mapUnitToNormal(value: number, easing?: typeof identity) {
+    return mapRange(value, 0, 1, -1, 1, easing)
 }
 
 /** Exponential moving average */
 export function ema(prev: number, current: number, smoothing: number) {
     ow(smoothing, ow.number.inRange(0, 1))
 
-    return (smoothing * current) + (1 - smoothing) * prev
+    return smoothing * current + (1 - smoothing) * prev
 }
 
 export class SmoothValue {
     private currentAverage: number
-    constructor(initial: number, public smoothing: number) {
+    constructor(
+        initial: number,
+        public smoothing: number,
+    ) {
         ow(smoothing, ow.number.inRange(0, 1))
         this.currentAverage = initial
     }
@@ -65,12 +85,21 @@ export class SmoothValue {
         return this.currentAverage
     }
     update(newValue: number) {
-        this.currentAverage = (this.smoothing * newValue) + (1 - this.smoothing) * this.currentAverage
+        this.currentAverage =
+            this.smoothing * newValue +
+            (1 - this.smoothing) * this.currentAverage
         return this.currentAverage
     }
 }
 
-export function oscillerp(x: number, y: number, time_s: number, hz = 1, gain = 1, softClip = false) {
+export function oscillerp(
+    x: number,
+    y: number,
+    time_s: number,
+    hz = 1,
+    gain = 1,
+    softClip = false,
+) {
     // TODO: softclip
     return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) / 2)
 }
@@ -99,5 +128,5 @@ export function vhash(x: number, y: number) {
  * with {@link Array.prototype.reduce}
  */
 export function setBit(accumulator: number, item: number) {
-    return accumulator | (1 << item);
+    return accumulator | (1 << item)
 }
