@@ -2,12 +2,13 @@ import ow from 'ow'
 
 import { clamp } from './math'
 import { GVec2, radToDeg, degToRad } from './geometry'
+import { Size } from './rect'
 
-export function build(size: GVec2) {
+export function build({ width, height }: Size) {
     let output = []
-    for (let y = 0; y < size.y; y++) {
-        for (let x = 0; x < size.x; x++) {
-            output.push({ x, y, idx: toIdx(x, y, size.x) })
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            output.push({ x, y, idx: toIdx(x, y, width) })
         }
     }
     return output
@@ -57,13 +58,13 @@ const offsets8 = [
  * Returns indexes of tile neighbors in 4 or 8 directions
  */
 export function neighbors(
-    grid: GVec2,
+    grid: Size,
     idx: number,
     distance = 1,
     eightway = false,
     output: number[] = [],
 ) {
-    let { x: width } = grid
+    let { width } = grid
 
     // let output: number[] = []
 
@@ -82,13 +83,13 @@ export function neighbors(
 /**
  * Returns true if x, y is within the given grid
  */
-export function inBounds(grid: GVec2, x: number, y: number) {
-    let { x: width, y: height } = grid
+export function inBounds(grid: Size, x: number, y: number) {
+    let { width, height } = grid
     return x >= 0 && y >= 0 && x < width && y < height
 }
 
 export function tilesInCircle(
-    grid: GVec2,
+    grid: Size,
     center_x: number,
     center_y: number,
     radius: number,
@@ -167,8 +168,8 @@ export function tilesInSquarePacked(
     return idx >> 1
 }
 
-export function clipToBounds(grid: GVec2, x: number, y: number) {
-    return new Tile(clamp(x, 0, grid.x - 1), clamp(y, 0, grid.y - 1), grid)
+export function clipToBounds(grid: Size, x: number, y: number) {
+    return new Tile(clamp(x, 0, grid.width - 1), clamp(y, 0, grid.height - 1), grid)
 }
 
 export class Tile implements GVec2 {
@@ -177,7 +178,7 @@ export class Tile implements GVec2 {
     constructor(
         public readonly x: number,
         public readonly y: number,
-        public readonly grid: GVec2,
+        public readonly grid: Size,
     ) {
         /*
         ow(x, ow.number.integer)
@@ -187,7 +188,7 @@ export class Tile implements GVec2 {
             ow.boolean.true.message('Tile is out of bounds')
         )
 */
-        this.idx = toIdx(x, y, grid.x)
+        this.idx = toIdx(x, y, grid.width)
     }
 
     /// TODO: remove onlyInBounds and replace with an inBounds(tile, grid) function that can be passed to .filter

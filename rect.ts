@@ -11,6 +11,9 @@ export interface Size {
     height: number
 }
 
+export const area = (size: Size) => size.width * size.height
+export const longerSide = (size: Size) => Math.max(size.width, size.height)
+
 export const containsPoint = (
     { origin, size }: Readonly<Rect>,
     { x, y }: Readonly<GVec2>,
