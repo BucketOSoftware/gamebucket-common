@@ -11,6 +11,15 @@ export function randomBetween(min: number, max: number) {
     return min + Math.random() * (max - min)
 }
 
+export function randomIntBetween(min: number, max: number) {
+    return (min + Math.random() * (max - min)) | 0
+}
+
+export function randomChoice<T>(a: ArrayLike<T>): T {
+    // is this a good method? who knows
+    return a[(Math.random() * a.length) | 0]
+}
+
 export function roundTo(i: number, places: number) {
     return Math.round(i * places) / places
 }

@@ -30,8 +30,8 @@ export function toIdx(x: number, y: number, gridWidth: number) {
  * @param {number} gridWidth
  */
 export function toCoord(idx: number, gridWidth: number): GVec2 {
-    ow(idx, ow.number.greaterThanOrEqual(0))
-    ow(gridWidth, ow.number.greaterThanOrEqual(0))
+    // ow(idx, ow.number.greaterThanOrEqual(0))
+    // ow(gridWidth, ow.number.greaterThanOrEqual(0))
     return { x: idx % gridWidth, y: (idx / gridWidth) | 0 }
 }
 
