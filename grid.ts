@@ -88,6 +88,18 @@ export function inBounds(grid: Size, x: number, y: number) {
     return x >= 0 && y >= 0 && x < width && y < height
 }
 
+// TODO
+type TileIdx = number
+
+export function offset(a: TileIdx, b: TileIdx, gridWidth: number): GVec2 {
+    const x1 = a % gridWidth
+    const x2 = b % gridWidth
+    const y1 = (a / gridWidth) | 0
+    const y2 = (b / gridWidth) | 0
+
+    return { x: x2 - x1, y: y2 - y1 }
+}
+
 export function tilesInCircle(
     grid: Size,
     center_x: number,
@@ -169,7 +181,11 @@ export function tilesInSquarePacked(
 }
 
 export function clipToBounds(grid: Size, x: number, y: number) {
-    return new Tile(clamp(x, 0, grid.width - 1), clamp(y, 0, grid.height - 1), grid)
+    return new Tile(
+        clamp(x, 0, grid.width - 1),
+        clamp(y, 0, grid.height - 1),
+        grid,
+    )
 }
 
 export class Tile implements GVec2 {
