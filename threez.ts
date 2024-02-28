@@ -1,4 +1,3 @@
-import ow from 'ow'
 import {
     ACESFilmicToneMapping,
     Camera,
@@ -11,6 +10,7 @@ import {
     SRGBColorSpace,
     WebGLRenderer,
 } from 'three'
+import invariant from 'tiny-invariant'
 
 export const SHADOW_QUALITY = {
     Abysmal: 0,
@@ -99,8 +99,10 @@ export function fillScreen(
     if (camera instanceof OrthographicCamera) {
         // TODO: if aspect is undefined, fill the screen
         const { frustumSize, aspect } = options
-        ow(frustumSize, ow.number)
-        ow(aspect, ow.number)
+        // ow(frustumSize, ow.number)
+        // ow(aspect, ow.number)
+        invariant(frustumSize)
+        invariant(aspect)
 
         camera.left = (-frustumSize * aspect) / 2
         camera.right = (frustumSize * aspect) / 2

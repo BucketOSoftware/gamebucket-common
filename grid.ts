@@ -1,7 +1,5 @@
-import ow from 'ow'
-
+import { GVec2, degToRad, radToDeg } from './geometry'
 import { clamp } from './math'
-import { GVec2, radToDeg, degToRad } from './geometry'
 import { Size } from './rect'
 
 export function build({ width, height }: Size) {
@@ -106,9 +104,9 @@ export function tilesInCircle(
     center_y: number,
     radius: number,
 ) {
-    ow(center_x, ow.number.finite)
-    ow(center_y, ow.number.finite)
-    ow(radius, ow.number.greaterThan(0))
+    // ow(center_x, ow.number.finite)
+    // ow(center_y, ow.number.finite)
+    // ow(radius, ow.number.greaterThan(0))
 
     // TODO: garbage
     const tiles = []

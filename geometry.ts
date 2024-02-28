@@ -1,5 +1,4 @@
-import { Vector2 as TVec2, Vector3 as TVec3, Quaternion, Euler } from 'three'
-import { roundToPlaces } from './math'
+import { Vector2 as TVec2, Vector3 as TVec3 } from 'three'
 
 // This is solely so other code doesn't have to depend on three.js directly
 export type ZVec2 = TVec2

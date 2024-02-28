@@ -1,5 +1,10 @@
 import { downloadWithMime, CanvasRecorderOpts } from '@thi.ng/dl-asset'
 
+// Depending on the browser, the video produced may not be seekable or in a widely available format. You can transcode it with ffmpeg:
+//
+// `ffmpeg -i 'input_video.webm' -vcodec libx264 -crf 20 'output_video.mp4' `
+
+
 // https://developer.mozilla.org/en-US/docs/Web/Media/Formats/codecs_parameter
 // https://stackoverflow.com/a/42307926/72141
 const videoTypes = ['webm', 'mp4', 'ogg', 'mpeg']
@@ -47,11 +52,7 @@ function determineBestCodec() {
 
     return mimeTypesWithVariations
         .map(([mime, codecs]) => `video/${mime};codecs=${codecs}`)
-        .find((mime) => {
-            console.debug(mime, MediaRecorder.isTypeSupported(mime));
-            return MediaRecorder.isTypeSupported(mime)
-        }
-        )
+        .find((mime) => MediaRecorder.isTypeSupported(mime))
 }
 
 function extension(mimeType: string | undefined) {
@@ -108,7 +109,7 @@ export default class Capture {
 
             const localDate = new Date(
                 this.startTime.getTime() -
-                toMiliseconds(this.startTime.getTimezoneOffset()),
+                    toMiliseconds(this.startTime.getTimezoneOffset()),
             )
 
             const mimeType = this.bestCodec || '' // we think/hope `unassigned` will mean "dealer's choice"
@@ -123,7 +124,7 @@ export default class Capture {
             // https://www.reddit.com/r/gfycat/comments/3pm7cn/optimizing_webm_bitrate_questions/
             const recorder = new MediaRecorder(stream, {
                 mimeType,
-                videoBitsPerSecond: 30_000_000,
+                videoBitsPerSecond: 10_000_000,
             })
 
             let blobs: Blob[] = []

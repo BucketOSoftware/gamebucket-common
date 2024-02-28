@@ -1,10 +1,6 @@
-import ow, { ObjectPredicate } from 'ow'
-import { MathUtils } from 'three'
-
-export const isGVec2: ObjectPredicate = ow.object.exactShape({
-    x: ow.number,
-    y: ow.number,
-})
+import invariant from 'tiny-invariant'
+import { clamp, lerp, inverseLerp } from 'three/src/math/MathUtils.js'
+export { clamp, lerp, inverseLerp } from 'three/src/math/MathUtils.js'
 
 /** Returns a number between min and max, inclusive */
 export function randomBetween(min: number, max: number) {
@@ -41,12 +37,11 @@ export function oscillate(time_s: number, hz = 1) {
     return Math.sin(time_s * hz * 2 * Math.PI)
 }
 
+/** Apply gain to a number and clip it to the range [-1, 1] */
 export function hardclip(n: number, gain: number) {
-    ow(n, ow.number.inRange(-1, 1))
-    return MathUtils.clamp(n * gain, -1, 1)
+    invariant(n >= -1 && n <= 1, 'Expected a number between -1 and 1')
+    return clamp(n * gain, -1, 1)
 }
-
-export const clamp = MathUtils.clamp
 
 const identity = (n: number) => n
 
@@ -68,14 +63,21 @@ export function mapRange(
     )
 }
 
-/** Don't know if this is the right name for this */
+/** @todo Don't know if this is the right name for this
+ * @param value A number in the range of [0, 1] inclusive
+ * @param easing An easing function to apply to the input
+ * @returns `value` mapped to the range [-1, 1] inclusive
+ */
 export function mapUnitToNormal(value: number, easing?: typeof identity) {
     return mapRange(value, 0, 1, -1, 1, easing)
 }
 
 /** Exponential moving average */
 export function ema(prev: number, current: number, smoothing: number) {
-    ow(smoothing, ow.number.inRange(0, 1))
+    invariant(
+        smoothing >= 0 && smoothing <= 1,
+        'Smoothing factor must be between 0 and 1',
+    )
 
     return smoothing * current + (1 - smoothing) * prev
 }
@@ -86,7 +88,10 @@ export class SmoothValue {
         initial: number,
         public smoothing: number,
     ) {
-        ow(smoothing, ow.number.inRange(0, 1))
+        invariant(
+            smoothing >= 0 && smoothing <= 1,
+            'Smoothing factor must be between 0 and 1',
+        )
         this.currentAverage = initial
     }
 
@@ -110,11 +115,8 @@ export function oscillerp(
     softClip = false,
 ) {
     // TODO: softclip
-    return MathUtils.lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) / 2)
+    return lerp(x, y, (hardclip(oscillate(time_s, hz), gain) + 1) / 2)
 }
-
-export const lerp = MathUtils.lerp
-export const inverseLerp = MathUtils.inverseLerp
 
 const vr_a = 12.9898,
     vr_b = 78.233,
@@ -133,8 +135,8 @@ export function vhash(x: number, y: number) {
     return result - (result | 0)
 }
 
-/** Turn on bit number `item` (counting from the right) in `accumulator`. Works
- * with {@link Array.prototype.reduce}
+/** Turn on bit number `item` (counting from the right) in `accumulator`.
+ * Works with {@link Array.prototype.reduce}
  */
 export function setBit(accumulator: number, item: number) {
     return accumulator | (1 << item)
