@@ -1,13 +1,24 @@
 {
     "extends": "@tsconfig/recommended/tsconfig.json",
+
     "compilerOptions": {
+        "composite": true,
+
+        "declarationMap": true,
         "sourceMap": true,
         "module": "esnext",
-        "moduleResolution": "bundler",
-        "allowJs": true,
+
+        "lib": ["esnext", "DOM"],
         "resolveJsonModule": true,
-        "jsx": "react",
-        "lib": ["es2019", "DOM", "WebWorker"]
+        "moduleResolution": "bundler",
+
+        // For preact:
+        "jsx": "react-jsx",
+        "jsxImportSource": "preact",
+        "paths": {
+            "react": ["./node_modules/preact/compat/"],
+            "react-dom": ["./node_modules/preact/compat/"]
+        }
     },
-    "include": ["**/*"]
+    "include": ["**/*.ts", "**/*.tsx"]
 }
