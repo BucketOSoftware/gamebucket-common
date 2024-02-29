@@ -96,6 +96,7 @@ export function fillScreen(
     },
 ) {
     // TODO: Maybe transition between 16:9 and 4:3 ratios depending on which one we're closer to?
+    // This assumes we're not actually filling the screen, I guess? what was the idea here
     if (camera instanceof OrthographicCamera) {
         // TODO: if aspect is undefined, fill the screen
         const { frustumSize, aspect } = options
