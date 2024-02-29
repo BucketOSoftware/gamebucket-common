@@ -46,8 +46,15 @@ export default class EditorLiaison {
     teardown() {
         console.debug('Tearing down the editor app!')
         render(null, this.domElement)
+
         this.outlinePass!.dispose()
         this.outlinePass = undefined
+
+        if (this.controls) {
+            this.mapControls(false)
+            this.controls.dispose()
+            this.controls = undefined
+        }
     }
 
     get camera() {
@@ -73,17 +80,25 @@ export default class EditorLiaison {
         return compo
     }
 
+    update(dt?: number) {
+        this.controls?.update(dt)
+    }
+
     mapControls(enabled: boolean, renderer?: THREE.WebGLRenderer) {
         if (enabled) {
+            invariant(renderer)
             this.controls ??= new MapControls(
                 this.editorCamera,
-                renderer!.domElement,
+                renderer.domElement,
             )
             this.controls.enabled = true
-            // TODO: requires a loop
-            // controls.enableDamping = true
+            this.controls.enableDamping = false
+            this.controls.autoRotate = true
+            this.controls.listenToKeyEvents(window)
         } else {
             if (this.controls) {
+                this.controls.stopListenToKeyEvents()
+
                 this.controls.enabled = false
             }
         }
@@ -122,11 +137,7 @@ function renderPass(scene: THREE.Scene, camera: Camera) {
 function outlinePass(scene: THREE.Scene, camera: Camera) {
     // DONTYET: this creates a bunch of materials but doesn't provide a way to precompile them
     const brite = 1 / 50
-    const outliner = new OutlinePass(
-        ZVec2(1, 1),
-        scene,
-        camera,
-    )
+    const outliner = new OutlinePass(ZVec2(1, 1), scene, camera)
     outliner.edgeStrength = 12
     outliner.edgeGlow = 2
     outliner.edgeThickness = 3
