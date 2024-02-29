@@ -1,5 +1,3 @@
-// import 'preact/debug'
-
 import {
     AppsIcon,
     DeviceCameraVideoIcon,
@@ -11,6 +9,7 @@ import {
 } from '@primer/octicons-react'
 import {
     BaseStyles,
+    Box,
     FormControl,
     IconButton,
     Text,
@@ -30,15 +29,15 @@ import {
 } from 'preact/hooks'
 import { Provider as ReduxProvider } from 'react-redux'
 import * as THREE from 'three'
-import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js'
+
 import invariant from 'tiny-invariant'
 
-import { ZVec2 } from '../geometry'
-import type {
-    SerializedNode,
-    SerializedScene,
-    Tup3,
-    UniqueID,
+import {
+    hideableTypes,
+    type SerializedNode,
+    type SerializedScene,
+    type Tup3,
+    type UniqueID,
 } from '../scenebucket'
 
 import { useObserve } from './hooks'
@@ -46,88 +45,41 @@ import { Panel, PanelBody } from './panel'
 import {
     createStore,
     loadScene,
+    NodeTogglableProperties,
     selectNode,
-    setVisible,
+    toggleProperty,
     useDispatch,
     useSelector,
 } from './store'
 import * as styles from './styles'
+import EditorLiaison, { Params } from './liaison'
 
 type TODO = any
-
-// -----
-
-const SceneUpdater = createContext<EditorLiaison>({} as EditorLiaison)
-
 type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
-export class EditorLiaison {
-    static readonly OBJECT_PICKED = 'objectPicked'
+const LiaisonContext = createContext<EditorLiaison>({} as EditorLiaison)
 
-    getObjectById: (id: UniqueID) => THREE.Object3D
-    onUpdate: (node?: SerializedNode) => void
+// interface Params {
+//     scene: THREE.Scene
+//     camera: Camera
+//     getObjectById: (id: UniqueID) => THREE.Object3D
+//     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
+// }
 
-    private outliner: OutlinePass
-
-    constructor({ scene, camera, getObjectById, onUpdate }: Params) {
-        this.getObjectById = getObjectById
-        this.onUpdate = onUpdate
-
-        const brite = 1 / 50
-        const outliner = (this.outliner = new OutlinePass(
-            ZVec2(1, 1),
-            scene,
-            camera,
-        ))
-        outliner.edgeStrength = 12
-        outliner.edgeGlow = 2
-        outliner.edgeThickness = 3
-        outliner.visibleEdgeColor.set(0.1 * brite, 0.5 * brite, 2.5 * brite)
-        outliner.hiddenEdgeColor.set(1 * brite, 1 * brite, 2.25 * brite)
-        outliner.pulsePeriod = 1.4
-    }
-
-    get postProcessingPasses() {
-        return [this.outliner]
-    }
-
-    /** Highlight the objects defined by these IDs in the Outline pass */
-    setSelection(id: UniqueID | UniqueID[] | undefined) {
-        this.outliner.selectedObjects = arrayWrap(id)
-            .filter((i) => i)
-            .map((id) => this.getObjectById(id as UniqueID))
-        this.onUpdate()
-    }
-
-    /** Report a click on the canvas to the editor. Invoke like this:
-     * 	@example liaison.clickAt(
-     *              (event.clientX / window.innerWidth) * 2 - 1,
-     *				-(event.clientY / window.innerHeight) * 2 + 1))
-     *
-     */
-    clickAt(x: number, y: number) {}
-}
-
-interface Params {
-    scene: THREE.Scene
-    camera: Camera
-    getSceneData: () => SerializedScene
-    getObjectById: (id: UniqueID) => THREE.Object3D
-    onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
-}
-
-export function start(options: Params) {
-    const liaison = new EditorLiaison(options)
-
+//
+export function start(
+    options: Params & { getSceneData: () => SerializedScene },
+) {
     const store = createStore()
     store.dispatch(loadScene(options.getSceneData()))
 
     const div = document.createElement('div')
     div.id = 'gbk-editor'
     document.body.append(div)
+    const liaison = new EditorLiaison(options, div)
 
     render(
-        <SceneUpdater.Provider value={liaison}>
+        <LiaisonContext.Provider value={liaison}>
             <ReduxProvider store={store}>
                 <styles.GlobalStyles />
                 <ThemeProvider theme={styles.theme}>
@@ -136,7 +88,7 @@ export function start(options: Params) {
                     </BaseStyles>
                 </ThemeProvider>
             </ReduxProvider>
-        </SceneUpdater.Provider>,
+        </LiaisonContext.Provider>,
         div,
     )
 
@@ -156,7 +108,7 @@ function Editor() {
 }
 
 function SceneTree() {
-    const liaison = useContext(SceneUpdater)
+    const liaison = useContext(LiaisonContext)
     const dispatch = useDispatch()
 
     const selection = useSelector((state) => state.ui.selected)
@@ -237,9 +189,14 @@ function SceneNode(props: { id: UniqueID }) {
 }
 
 function VisibilityButton({ id }: { id: UniqueID }) {
-    const dispatch = useDispatch()
-    const sync = useContext(SceneUpdater)
     const node = useSelector((state) => state.scene.nodes[id])
+
+    if (!hideableTypes[node.type]) {
+        return null
+    }
+
+    const dispatch = useDispatch()
+    const sync = useContext(LiaisonContext)
 
     useObserve(() => sync.onUpdate(node), id, [node.visible])
 
@@ -251,7 +208,13 @@ function VisibilityButton({ id }: { id: UniqueID }) {
             size="small"
             onClick={(ev: Event) => {
                 ev.stopPropagation() // avoid selecting the node
-                dispatch(setVisible([id, !node.visible]))
+                dispatch(
+                    toggleProperty({
+                        id,
+                        property: 'visible',
+                        value: !node.visible,
+                    }),
+                )
             }}
         />
     )
@@ -279,12 +242,12 @@ function NodeDetailsPanel() {
     }
 
     const dispatch = useDispatch()
-    const sync = useContext(SceneUpdater)
+    const sync = useContext(LiaisonContext)
     const node = useSelector((state) => state.scene.nodes[selected])
 
     useObserve(() => sync.onUpdate(node), node.id, [node])
 
-    const { id, name, position, visible } = node
+    const { id, name, position } = node
 
     const [inputPosition, setInputPosition] = useState(position.join(', '))
 
@@ -300,7 +263,11 @@ function NodeDetailsPanel() {
     return (
         <Panel title={name!} onClose={() => dispatch(selectNode())}>
             <PanelBody>
-                <Toggle id={id} value={visible} action={setVisible} />
+                {hideableTypes[node.type] && (
+                    <PropertyToggle id={id} property="visible" />
+                )}
+                <PropertyToggle id={id} property="castShadow" />
+                <PropertyToggle id={id} property="receiveShadow" />
                 <form
                     onSubmit={(ev) => {
                         ev.preventDefault()
@@ -323,32 +290,41 @@ function NodeDetailsPanel() {
     )
 }
 
-function Toggle({
+function PropertyToggle({
     id,
-    value,
-    action,
+    property,
 }: {
     id: UniqueID
-    value: boolean
-    action: typeof setVisible
+    property: NodeTogglableProperties
 }) {
     const dispatch = useDispatch()
+    const currentValue = useSelector((state) => state.scene.nodes[id][property])
+
     return (
-        <>
+        <Box style={{ display: 'flex' }}>
             <Text
-                id="node-details-panel-visbility"
+                id={'node-details-panel-' + property}
                 fontWeight="bold"
                 fontSize={1}
+                sx={{ textTransform: 'capitalize', flexGrow: 1 }}
             >
-                Visibility
+                {property}
             </Text>
             <ToggleSwitch
-                aria-labelledby="node-details-panel-visbility"
-                checked={value}
+                aria-labelledby={'node-details-panel-' + property}
                 size="small"
-                onClick={(_: MouseEvent) => dispatch(action([id, !value]))}
+                checked={currentValue}
+                onClick={(_: MouseEvent) =>
+                    dispatch(
+                        toggleProperty({
+                            id,
+                            property,
+                            value: !currentValue,
+                        }),
+                    )
+                }
             />
-        </>
+        </Box>
     )
 }
 function VectorInput(props: {
@@ -382,52 +358,4 @@ function VectorInput(props: {
             ))}
         </div>
     )
-}
-
-/*
-function ThreeObj(props: ThreeSkeleton) {
-    // if (props.children.length) {
-    const list = (
-        <ul>
-            {props.children.map((o) => (
-                <ThreeObj {...o} />
-            ))}
-        </ul>
-    )
-
-    const updater = useContext(UpdaterContext)
-    return (
-        <li key={props.uuid}>
-            {props.name || props.type}
-            <input
-                type="checkbox"
-                checked={props.visible}
-                onChange={(ev) => {
-                    updater(props.uuid, 'visible', !ev.target.checked)
-                }}
-            />
-            {list}
-        </li>
-    )
-}
-
-// function ObjectProperties(props: { uuid: string; visible: boolean }) {
-    // return <input type="checkbox" checked={props.visible} />
-// }
-
-function wrappr(obj: three.Object3D): ThreeSkeleton {
-    return {
-        uuid: obj.uuid,
-        type: obj.type,
-        name: obj.name,
-
-        visible: obj.visible,
-        children: obj.children.map(wrappr),
-    }
-}
-
-*/
-
-function arrayWrap<T>(ik: unknown): T[] {
-    return Array.isArray(ik) ? ik : [ik]
 }

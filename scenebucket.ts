@@ -6,7 +6,6 @@ import invariant from 'tiny-invariant'
 
 import { radToDeg } from '../lib/geometry'
 
-
 export type TODO = any
 
 // TODO: replace with types from our own lib
@@ -84,7 +83,7 @@ export type Light = {
 )
 
 /** Properties added to the Three obj's userData */
-export interface BucketUserData {
+export interface BucketThreepioUserData {
     src: 'TODO?' | undefined
     id: UniqueID
 }
@@ -118,6 +117,9 @@ export interface BucketNode
 interface BucketExtras {
     bucket?: {
         hidden?: boolean
+        castShadow?: boolean
+        receiveShadow?: boolean
+
         /** if this is defined, this object came from a loaded GLTF file */
         src?: {
             uri: string
@@ -191,6 +193,9 @@ export class SceneBucketFile {
         }
 
         for (let [id, node] of idToNode) {
+            // TODO: make this another function I guess
+            const bucketMeta = node.extras?.bucket
+
             const isCamera = node.camera !== undefined && 'camera'
             const isLight =
                 node.extensions?.KHR_lights_punctual?.light !== undefined &&
@@ -208,7 +213,12 @@ export class SceneBucketFile {
                 rotation: node.rotation ? clone(node.rotation) : [0, 0, 0, 1],
                 scale: node.scale ? clone(node.scale) : [1, 1, 1],
 
-                // This ties it back to the SBK it was loaded from
+                visible: !(bucketMeta?.hidden || false),
+                castShadow: bucketMeta?.castShadow || false,
+                receiveShadow: bucketMeta?.receiveShadow || false,
+
+                extras: extras.get(node),
+
                 src: node.extras?.bucket?.src?.uri,
 
                 children:
@@ -217,9 +227,6 @@ export class SceneBucketFile {
                             // TODO: this is a WeakMap... would we ever drop the node in a way that needs that functionality, though?
                             nodeToId.get(scene.nodes[idx])!,
                     ) ?? [],
-                visible: !(node.extras?.bucket?.hidden || false),
-
-                extras: extras.get(node),
             }
         }
         return draft
@@ -243,8 +250,9 @@ export interface SerializedNode {
     rotation: Quat4
 
     visible: boolean
-    // castShadow: boolean
-    // receiveShadow: boolean
+
+    castShadow: boolean
+    receiveShadow: boolean
 
     src?: string // URL to GLTF
 
@@ -375,7 +383,9 @@ export class ThreeSync implements SerializedScene {
         const existingId = threepio.userData.bucket?.id
 
         // was this node created by us, or some other code?
-        const ud = threepio.userData.bucket as BucketUserData | undefined
+        const ud = threepio.userData.bucket as
+            | BucketThreepioUserData
+            | undefined
         if (ud?.src) {
             // The node should already exist
             invariant(existingId)
@@ -386,7 +396,16 @@ export class ThreeSync implements SerializedScene {
             invariant(ud?.src === undefined)
         }
 
-        const { name, position, scale, quaternion, visible } = threepio
+        const {
+            name,
+            position,
+            scale,
+            quaternion,
+            visible,
+            castShadow,
+            receiveShadow,
+        } = threepio
+
         const type = typeFromThreepio(threepio)
         return {
             id: getThreeID(threepio),
@@ -398,7 +417,10 @@ export class ThreeSync implements SerializedScene {
             position: position.toArray() as Tup3,
             scale: scale.toArray() as Tup3,
             rotation: quaternion.toArray() as Quat4,
+            // booleans
             visible,
+            castShadow,
+            receiveShadow,
         }
     }
 
@@ -409,7 +431,6 @@ export class ThreeSync implements SerializedScene {
 
         const { src } = node
         if (!isUndefined(src)) {
-            // if (false) {
             // Different rules here -- we're going to import this threepio
             // instead of creating it
             invariant(isUndefined(threepio) || threepio instanceof THREE.Group)
@@ -510,7 +531,7 @@ function createThreeFromNode(node: SerializedNode): THREE.Object3D {
     }
 
     threepio = new klass()
-    const userData: BucketUserData = {
+    const userData: BucketThreepioUserData = {
         src: 'TODO?', //; should this point to the SBK file or something',
         id: node.id,
     }
@@ -539,10 +560,18 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
     dest.quaternion.fromArray(source.rotation)
     dest.scale.fromArray(source.scale)
 
+    // TODO: it's really problematic to have to repeat basically this code when syncing the other direction!
     dest.visible = source.visible
+    dest.castShadow = source.castShadow
+    dest.receiveShadow = source.receiveShadow
+    // @ts-expect-error
+    if (dest.isLight) {
+    // @ts-expect-error
+        dest.shadow?.camera.updateProjectionMatrix()
+    }
+    // console.warn('changing shadows:', dest, dest.castShadow, dest.receiveShadow)
 
     // dest.matrixWorldNeedsUpdate = true
-    // dest.userData.spec = source
     // dest.updateMatrixWorld()
 
     const extras = source.extras
@@ -589,6 +618,7 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
         }
     }
 }
+
 function typeFromThreepio(threepio: any): SerializedNode['type'] {
     if (threepio.isMesh) return 'mesh'
     if (threepio.isGroup) return 'group'
@@ -596,4 +626,12 @@ function typeFromThreepio(threepio: any): SerializedNode['type'] {
     if (threepio.isCamera) return 'camera'
 
     return 'node'
+}
+
+export const hideableTypes: Record<SerializedNode['type'], boolean> = {
+    mesh: true,
+    group: true,
+    light: true,
+    node: true,
+    camera: false,
 }

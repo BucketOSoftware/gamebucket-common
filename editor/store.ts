@@ -19,6 +19,20 @@ const INITIAL_STATE = {
     nodes: {} as Record<UniqueID, SerializedNode>,
 }
 
+// TODO: librarify
+type KeysOfType<T, ValueType> = {
+    [K in keyof T]: T[K] extends ValueType ? K : never
+}[keyof T]
+
+type OnlyKeysOfType<T, ValueType> = Omit<
+    T,
+    Exclude<keyof T, KeysOfType<T, ValueType>>
+>
+
+/** Properties of a node that can be toggled, i.e. booleans */
+export type NodeTogglableProperties = keyof OnlyKeysOfType<SerializedNode, boolean>
+
+
 /** Stuff related to the scene under edit */
 export const sceneSlice = createSlice({
     name: 'scene',
@@ -29,6 +43,28 @@ export const sceneSlice = createSlice({
         },
         setVisible(state, action: Payload<[id: UniqueID, visible: boolean]>) {
             state.nodes[action.payload[0]].visible = action.payload[1]
+        },
+        setCastShadow(
+            state,
+            { payload }: Payload<{ id: UniqueID; castShadow: boolean }>,
+        ) {
+            state.nodes[payload.id].castShadow = payload.castShadow
+        },
+        /** Redux Best Practices tells us not to do this because we should be
+         * basing these on actions the user takes -- but in this case that's
+         * what this is!
+         */
+        toggleProperty(
+            state,
+            {
+                payload: { id, property, value },
+            }: Payload<{
+                id: UniqueID
+                property: NodeTogglableProperties
+                value: boolean
+            }>,
+        ) {
+            state.nodes[id][property] = value
         },
     },
     extraReducers: undefined, // for listening to actions not defined here
@@ -52,7 +88,7 @@ export const createStore = () =>
         },
     })
 
-export const { loadScene, setVisible } = sceneSlice.actions
+export const { loadScene, toggleProperty } = sceneSlice.actions
 export const { selectNode } = uiSlice.actions
 
 type StoreType = ReturnType<typeof createStore>
