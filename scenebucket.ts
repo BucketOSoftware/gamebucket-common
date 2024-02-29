@@ -287,6 +287,8 @@ export class ThreeSync implements SerializedScene {
         return { nodes: this.nodes, roots: this.roots }
     }
 
+    private toThreeUpdateQueue: THREE.Object3D[] = []
+    /** Sync a single node to three.js */
     updateNode(newNode: SerializedNode) {
         // console.debug("Update: ", newNode.id)
         const oldNode = this.nodes[newNode.id]
@@ -306,7 +308,7 @@ export class ThreeSync implements SerializedScene {
             return
         }
 
-        this.syncNodeToThree(oldNode.id, threepio.parent!)
+        this.syncNodeToThree(oldNode.id, threepio.parent!, false)
     }
 
     /** TODO: support multiple cameras I guess */
@@ -424,7 +426,11 @@ export class ThreeSync implements SerializedScene {
         }
     }
 
-    private syncNodeToThree(id: UniqueID, threeParent: THREE.Object3D) {
+    private syncNodeToThree(
+        id: UniqueID,
+        threeParent: THREE.Object3D,
+        recurse = true,
+    ) {
         let node = this.nodes[id]
         let threepio = this.idToThree.get(id)
         // console.debug('Syncing:', node, threepio)
@@ -484,8 +490,10 @@ export class ThreeSync implements SerializedScene {
 
         copyProps(threepio, node)
 
-        for (let child of node.children) {
-            this.syncNodeToThree(child, threepio)
+        if (recurse) {
+            for (let child of node.children) {
+                this.syncNodeToThree(child, threepio)
+            }
         }
     }
 }
