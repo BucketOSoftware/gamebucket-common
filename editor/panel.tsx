@@ -8,17 +8,9 @@ import {
     XIcon,
 } from '@primer/octicons-react'
 import { Box, ButtonGroup, Heading, IconButton } from '@primer/react'
-import { PropsWithChildren } from 'preact/compat'
 import { useState } from 'preact/hooks'
+import type { PropsWithChildren } from 'preact/compat'
 
-/*
-  color: ${get('colors.fg.muted')};
-  padding: ${get('space.2')};
-  */
-// const CloseButton: React.FC<React.PropsWithChildren<{onClose: () => void}>> = ({onClose}) => {
-//   return (
-//   )
-// }
 export function Panel(
     props: {
         title: string
@@ -79,6 +71,7 @@ function PanelHeader(props: {
             flexShrink={0}
             boxShadow="panelSection"
             backgroundColor="neutral.subtle"
+            sx={{ userSelect: 'none' }}
         >
             <Heading
                 sx={{ px: 1, fontSize: 3, color: 'accent.fg', flexGrow: 1 }}
