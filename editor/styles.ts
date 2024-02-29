@@ -44,6 +44,7 @@ export const sidebar = {
     position: 'absolute',
     display: 'flex',
     flexDirection: 'column',
+    flexWrap: 'wrap',
 
     top: styles.theme.space[1],
     bottom: styles.theme.space[1],

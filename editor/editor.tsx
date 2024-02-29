@@ -23,7 +23,7 @@ import {
     TreeView,
 } from '@primer/react'
 import { throttle } from 'lodash-es'
-import { ComponentChildren, createContext, render } from 'preact'
+import { FunctionComponent, createContext, render } from 'preact'
 import { PropsWithChildren } from 'preact/compat'
 import {
     useCallback,
@@ -36,7 +36,6 @@ import { Provider as ReduxProvider } from 'react-redux'
 import * as THREE from 'three'
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js'
 import invariant from 'tiny-invariant'
-
 
 import { ZVec2 } from '../geometry'
 import type {
@@ -188,7 +187,7 @@ function SceneTree() {
     }, [dispatch])
 
     return (
-        <Panel title="Objects">
+        <Panel title="Objects" basis="50%" manspread>
             <PanelBody>
                 <TreeView>
                     {roots.map((id) => (
@@ -291,6 +290,7 @@ function NodeIcon(props: { type: SerializedNode['type'] }) {
 function Panel(props: {
     title: string
     manspread?: boolean
+    basis?: any
     onClose?: () => void
     children?: ComponentChildren
 }) {
@@ -303,7 +303,9 @@ function Panel(props: {
                 borderRadius: 2,
 
                 minWidth: '256px',
-                flexShrink: props.manspread ? 0 : 1,
+                flexBasis: props.basis,
+                flexGrow: props.manspread ? 2 : 0,
+                flexShrink: props.manspread ? 1 : 0,
                 overflowY: 'scroll',
 
                 // children layout
@@ -386,7 +388,7 @@ function NodeDetailsPanel() {
     }
 
     return (
-        <Panel manspread title={name!} onClose={() => dispatch(selectNode())}>
+        <Panel title={name!} onClose={() => dispatch(selectNode())}>
             <PanelBody>
                 <Toggle id={id} value={visible} action={setVisible} />
                 <form
