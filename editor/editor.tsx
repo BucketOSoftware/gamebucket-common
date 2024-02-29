@@ -8,13 +8,10 @@ import {
     FileDirectoryIcon,
     LightBulbIcon,
     WorkflowIcon,
-    XIcon,
 } from '@primer/octicons-react'
 import {
     BaseStyles,
-    Box,
     FormControl,
-    Heading,
     IconButton,
     Text,
     TextInput,
@@ -23,8 +20,7 @@ import {
     TreeView,
 } from '@primer/react'
 import { throttle } from 'lodash-es'
-import { FunctionComponent, createContext, render } from 'preact'
-import { PropsWithChildren } from 'preact/compat'
+import { createContext, render } from 'preact'
 import {
     useCallback,
     useContext,
@@ -46,6 +42,7 @@ import type {
 } from '../scenebucket'
 
 import { useObserve } from './hooks'
+import { Panel, PanelBody } from './panel'
 import {
     createStore,
     loadScene,
@@ -55,8 +52,6 @@ import {
     useSelector,
 } from './store'
 import * as styles from './styles'
-import styled from 'styled-components'
-// import { sidebar } from './styles'
 
 type TODO = any
 
@@ -187,7 +182,7 @@ function SceneTree() {
     }, [dispatch])
 
     return (
-        <Panel title="Objects" basis="50%" manspread>
+        <Panel title="Objects" manspread expandable basis="33%">
             <PanelBody>
                 <TreeView>
                     {roots.map((id) => (
@@ -275,91 +270,6 @@ function NodeIcon(props: { type: SerializedNode['type'] }) {
         default:
             return <WorkflowIcon />
     }
-}
-
-/*
-  color: ${get('colors.fg.muted')};
-  padding: ${get('space.2')};
-  */
-// const CloseButton: React.FC<React.PropsWithChildren<{onClose: () => void}>> = ({onClose}) => {
-//   return (
-
-//   )
-// }
-
-function Panel(props: {
-    title: string
-    manspread?: boolean
-    basis?: any
-    onClose?: () => void
-    children?: ComponentChildren
-}) {
-    return (
-        <Box
-            as="section"
-            sx={{
-                backgroundColor: 'neutral.subtle', //'hsla(177, 33%, 90%, 0.9)',
-                backdropFilter: 'contrast(25%) brightness(175%) blur(2px)',
-                borderRadius: 2,
-
-                minWidth: '256px',
-                flexBasis: props.basis,
-                flexGrow: props.manspread ? 2 : 0,
-                flexShrink: props.manspread ? 1 : 0,
-                overflowY: 'scroll',
-
-                // children layout
-                display: 'flex',
-                flexDirection: 'column',
-            }}
-        >
-            <PanelHeader title={props.title} onClose={props.onClose} />
-
-            {props.children}
-        </Box>
-    )
-}
-
-function PanelHeader(props: { title: string; onClose?: () => void }) {
-    return (
-        <Box
-            display="flex"
-            alignItems="center"
-            pt={2}
-            pr={2}
-            pb={1}
-            pl={1}
-            flexShrink={0}
-            boxShadow="panelSection"
-        >
-            <Heading
-                sx={{ px: 1, fontSize: 3, color: 'accent.fg', flexGrow: 1 }}
-            >
-                {props.title}
-            </Heading>
-            {props.onClose && <DialogCloseButton onClick={props.onClose} />}
-        </Box>
-    )
-}
-
-function PanelBody({ children }: PropsWithChildren) {
-    return (
-        <Box my={2} px={3} overflowY="scroll">
-            {children}
-        </Box>
-    )
-}
-
-function DialogCloseButton({ onClick }: { onClick: () => void }) {
-    return (
-        <IconButton
-            icon={XIcon}
-            aria-label="Close"
-            variant="invisible"
-            size="small"
-            onClick={onClick}
-        />
-    )
 }
 
 function NodeDetailsPanel() {
