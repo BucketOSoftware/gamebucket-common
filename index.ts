@@ -5,6 +5,7 @@ export * as grid from './grid'
 export * as rect from './rect'
 
 export { default as Capture } from './capture'
-export * as Editor from './editor'
-export * as Smashboard from './smashboard'
-// export *
+
+// To be loaded async
+// export * as Editor from './editor'
+// export * as Smashboard from './smashboard'

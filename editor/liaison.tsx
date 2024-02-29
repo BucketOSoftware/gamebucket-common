@@ -9,6 +9,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import invariant from 'tiny-invariant'
 import { ZVec2 } from '../geometry'
 import type { SerializedNode, UniqueID } from '../scenebucket'
+import { render } from 'preact'
 
 type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
@@ -39,6 +40,14 @@ export default class EditorLiaison {
         this.onUpdate = onUpdate
 
         this.editorCamera = camera.clone()
+    }
+
+    /** stop rendering the editor. afterwards, you should probably toss this object! */
+    teardown() {
+        console.debug('Tearing down the editor app!')
+        render(null, this.domElement)
+        this.outlinePass!.dispose()
+        this.outlinePass = undefined
     }
 
     get camera() {
@@ -111,12 +120,12 @@ function renderPass(scene: THREE.Scene, camera: Camera) {
 }
 
 function outlinePass(scene: THREE.Scene, camera: Camera) {
+    // DONTYET: this creates a bunch of materials but doesn't provide a way to precompile them
     const brite = 1 / 50
     const outliner = new OutlinePass(
         ZVec2(1, 1),
         scene,
         camera,
-        // this.editorCamera,
     )
     outliner.edgeStrength = 12
     outliner.edgeGlow = 2

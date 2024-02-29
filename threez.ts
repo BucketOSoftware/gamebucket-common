@@ -118,6 +118,22 @@ export function fillScreen(
     camera.updateProjectionMatrix()
 }
 
+/**
+ * @returns True if `obj` and all its ancestors are visible
+ */
+export function objectWillBeRendered(obj: THREE.Object3D) {
+    let walker: THREE.Object3D | null = obj
+    while (walker) {
+        if (!walker.visible) {
+            return false
+        }
+
+        walker = walker.parent
+    }
+    return true
+}
+
+/** Ways the camera could be positioned */
 type CameraMode =
     // Whatever the normal game behavior would be
     | 'game'
@@ -126,6 +142,7 @@ type CameraMode =
     // Orbit the target (prob. doesn't work with mouselook)
     | 'orbit'
 
+/** Things the camera could be looking at */
 type CameraTarget =
     // Whatever the normal game behavior would be
     | 'game'
@@ -133,6 +150,8 @@ type CameraTarget =
     | 'object'
     // Track a cursor/point in 3D space
     | 'point'
+    // Ensure multiple points are visible on screen, somehow?
+    | 'area'
     // Track a spherical coordinate relative to the camera
     | 'mouselook'
 

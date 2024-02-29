@@ -66,17 +66,29 @@ const LiaisonContext = createContext<EditorLiaison>({} as EditorLiaison)
 //     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
 // }
 
+function createDomRoot() {
+    const div = document.createElement('div')
+    document.body.append(div)
+}
+
 //
 export function start(
-    options: Params & { getSceneData: () => SerializedScene },
+    options: Params & {
+        getSceneData: () => SerializedScene
+
+        domElement: HTMLElement
+    },
 ) {
     const store = createStore()
     store.dispatch(loadScene(options.getSceneData()))
 
-    const div = document.createElement('div')
-    div.id = 'gbk-editor'
-    document.body.append(div)
-    const liaison = new EditorLiaison(options, div)
+    const dom = options.domElement || createDomRoot()
+    if (dom.id) {
+        console.warn('Editor: changing id of DOM element', dom)
+        dom.id = 'gbk-editor'
+    }
+
+    const liaison = new EditorLiaison(options, dom)
 
     render(
         <LiaisonContext.Provider value={liaison}>
@@ -89,7 +101,7 @@ export function start(
                 </ThemeProvider>
             </ReduxProvider>
         </LiaisonContext.Provider>,
-        div,
+        dom,
     )
 
     return liaison
