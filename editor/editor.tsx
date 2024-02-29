@@ -41,6 +41,7 @@ import {
 } from '../scenebucket'
 
 import { useObserve } from './hooks'
+import EditorLiaison, { Params } from './liaison'
 import { Panel, PanelBody } from './panel'
 import {
     createStore,
@@ -52,7 +53,6 @@ import {
     useSelector,
 } from './store'
 import * as styles from './styles'
-import EditorLiaison, { Params } from './liaison'
 
 type TODO = any
 type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera

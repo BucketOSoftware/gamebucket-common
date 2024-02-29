@@ -30,8 +30,10 @@ type OnlyKeysOfType<T, ValueType> = Omit<
 >
 
 /** Properties of a node that can be toggled, i.e. booleans */
-export type NodeTogglableProperties = keyof OnlyKeysOfType<SerializedNode, boolean>
-
+export type NodeTogglableProperties = keyof OnlyKeysOfType<
+    SerializedNode,
+    boolean
+>
 
 /** Stuff related to the scene under edit */
 export const sceneSlice = createSlice({

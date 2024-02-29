@@ -566,7 +566,7 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
     dest.receiveShadow = source.receiveShadow
     // @ts-expect-error
     if (dest.isLight) {
-    // @ts-expect-error
+        // @ts-expect-error
         dest.shadow?.camera.updateProjectionMatrix()
     }
     // console.warn('changing shadows:', dest, dest.castShadow, dest.receiveShadow)
