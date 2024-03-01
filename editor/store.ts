@@ -1,16 +1,20 @@
-// this line gets remove by Organize Imports but we need it to suppress a TS build error
-// import type * as rtx from '@reduxjs/toolkit'
+// this import declaration is to silence some odd build errors...
 import type * as rtx from '@reduxjs/toolkit'
+// ...and this is to keep "Organize Imports" or other tools from removing that import
+if (false) {
+    const doNothing: () => rtx.Action | undefined = () => undefined
+}
+
 import {
     PayloadAction as Payload,
     configureStore,
     createSlice,
 } from '@reduxjs/toolkit'
+import { cloneDeep } from 'lodash-es'
 import {
     useDispatch as useDispatchUntyped,
     useSelector as useSelectorUntyped,
 } from 'react-redux'
-import { cloneDeep } from 'lodash-es'
 
 import { SerializedNode, UniqueID } from '../scenebucket'
 
@@ -40,22 +44,14 @@ export const sceneSlice = createSlice({
     name: 'scene',
     initialState: INITIAL_STATE,
     reducers: {
-        loadScene(state, action: Payload<typeof INITIAL_STATE>) {
+        loadScene(_state, action: Payload<typeof INITIAL_STATE>) {
             return cloneDeep(action.payload)
-        },
-        setVisible(state, action: Payload<[id: UniqueID, visible: boolean]>) {
-            state.nodes[action.payload[0]].visible = action.payload[1]
-        },
-        setCastShadow(
-            state,
-            { payload }: Payload<{ id: UniqueID; castShadow: boolean }>,
-        ) {
-            state.nodes[payload.id].castShadow = payload.castShadow
         },
         /** Redux Best Practices tells us not to do this because we should be
          * basing these on actions the user takes -- but in this case that's
          * what this is!
          */
+
         toggleProperty(
             state,
             {

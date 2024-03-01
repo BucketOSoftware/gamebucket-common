@@ -84,16 +84,12 @@ export default class EditorLiaison {
         this.controls?.update(dt)
     }
 
-    mapControls(enabled: boolean, renderer?: THREE.WebGLRenderer) {
+    mapControls(enabled: boolean, canvas?: HTMLCanvasElement) {
         if (enabled) {
-            invariant(renderer)
-            this.controls ??= new MapControls(
-                this.editorCamera,
-                renderer.domElement,
-            )
+            invariant(canvas)
+            this.controls ??= new MapControls(this.editorCamera, canvas)
             this.controls.enabled = true
             this.controls.enableDamping = false
-            this.controls.autoRotate = true
             this.controls.listenToKeyEvents(window)
         } else {
             if (this.controls) {
