@@ -23,6 +23,7 @@ import {
 import { useObserve } from './hooks'
 import EditorLiaison, { Params } from './liaison'
 import { Panel, PanelBody } from './panel'
+import { SceneTree } from './scene-tree'
 import {
     createStore,
     loadScene,
@@ -33,19 +34,11 @@ import {
     useSelector,
 } from './store'
 import * as styles from './styles'
-import { SceneTree } from './scene-tree'
 
 export type TODO = any
 type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
 export const LiaisonContext = createContext<EditorLiaison>({} as EditorLiaison)
-
-// interface Params {
-//     scene: THREE.Scene
-//     camera: Camera
-//     getObjectById: (id: UniqueID) => THREE.Object3D
-//     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
-// }
 
 function createDomRoot() {
     const div = document.createElement('div')
@@ -74,12 +67,7 @@ export function start(
     render(
         <LiaisonContext.Provider value={liaison}>
             <ReduxProvider store={store}>
-                <styles.GlobalStyles />
-                <ThemeProvider theme={styles.theme}>
-                    <BaseStyles>
-                        <Editor />
-                    </BaseStyles>
-                </ThemeProvider>
+                <Editor />
             </ReduxProvider>
         </LiaisonContext.Provider>,
         dom,
@@ -93,10 +81,17 @@ export function start(
 
 function Editor() {
     return (
-        <aside style={styles.sidebar}>
-            <SceneTree />
-            <NodeDetailsPanel />
-        </aside>
+        <>
+            <styles.GlobalStyles />
+            <ThemeProvider theme={styles.theme}>
+                <BaseStyles>
+                    <aside style={styles.sidebar}>
+                        <SceneTree />
+                        <NodeDetailsPanel />
+                    </aside>
+                </BaseStyles>
+            </ThemeProvider>
+        </>
     )
 }
 

@@ -53,17 +53,6 @@ export const sidebar = {
 
     transform: 'perspective(1000px) rotate3d(0, 1, 0, 10deg)',
     transformOrigin: 'left',
-}
-/*
-export const panel = {
-    backgroundColor: 'neutral.subtle', //'hsla(177, 33%, 90%, 0.9)',
-    backdropFilter: 'contrast(25%) brightness(175%) blur(2px)',
-    borderRadius: 2,
-    overflowY: 'scroll',
 
-    minWidth: '256px',
-    // pl: 3,
-    // pr: 2,
-    // py: 2,
+    zIndex: 100,
 }
-*/
