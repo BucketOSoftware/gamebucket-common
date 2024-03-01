@@ -159,11 +159,12 @@ function PropertyToggle({
 }) {
     const dispatch = useDispatch()
     const currentValue = useSelector((state) => state.scene.nodes[id][property])
+    const domId = 'node-details-panel-' + property
 
     return (
         <Box style={{ display: 'flex' }}>
             <Text
-                id={'node-details-panel-' + property}
+                id={domId}
                 fontWeight="bold"
                 fontSize={1}
                 sx={{ textTransform: 'capitalize', flexGrow: 1 }}
@@ -171,7 +172,7 @@ function PropertyToggle({
                 {property}
             </Text>
             <ToggleSwitch
-                aria-labelledby={'node-details-panel-' + property}
+                aria-labelledby={domId}
                 size="small"
                 checked={currentValue}
                 onClick={(_: MouseEvent) =>

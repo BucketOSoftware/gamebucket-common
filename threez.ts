@@ -12,6 +12,8 @@ import {
 } from 'three'
 import invariant from 'tiny-invariant'
 
+import { GVec2 } from './geometry'
+
 export const SHADOW_QUALITY = {
     Abysmal: 0,
     Low: 1,
@@ -160,4 +162,22 @@ export class Cinematographer {
     target: CameraTarget = 'game'
 
     constructor(public camera: Camera) {}
+}
+
+/**
+ * @param event A mouse or pointer event targeted on a canvas
+ * @returns A 2D vector ranging from -1, -1 at the bottom left to 1, 1 at the top right
+ */
+export function normalizedCanvasPosition(
+    event: MouseEvent | PointerEvent,
+): GVec2 {
+    let canvas = event.target as HTMLCanvasElement
+    const { top, left, width, height } = canvas.getBoundingClientRect()
+    let x = ((event.clientX - left) * canvas.width) / width
+    let y = ((event.clientY - top) * canvas.height) / height
+
+    x = (x / canvas.width) * 2 - 1
+    y = (y / canvas.height) * -2 + 1
+
+    return { x, y }
 }
