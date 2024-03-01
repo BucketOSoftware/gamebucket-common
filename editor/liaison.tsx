@@ -1,28 +1,32 @@
+import { render } from 'preact'
 import * as THREE from 'three'
 import {
-    Scene,
-    Object3D,
+    Camera,
+    CameraHelper,
     DirectionalLight,
     DirectionalLightHelper,
-    CameraHelper,
+    Object3D,
+    PointLightHelper,
+    Scene,
+    SpotLightHelper,
 } from 'three'
-import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js'
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import type { Pass } from 'three/addons/postprocessing/Pass.js'
 import { MapControls } from 'three/addons/controls/MapControls.js'
 import { ClearPass } from 'three/addons/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import invariant from 'tiny-invariant'
+
 import { ZVec2 } from '../geometry'
 import type { SerializedNode, UniqueID } from '../scenebucket'
-import { render } from 'preact'
+import { compact } from 'lodash-es'
 
-type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
+type EitherCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
 export interface Params {
     // scene: THREE.Scene
-    camera: Camera
+    camera: EitherCamera
     getObjectById: (id: UniqueID) => Object3D
     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
 }
@@ -31,16 +35,19 @@ export default class EditorLiaison {
     static readonly OBJECT_PICKED = 'objectPicked'
 
     getObjectById: Params['getObjectById']
+    /** Callback: called when a node is modified */
     onUpdate: (node?: SerializedNode) => void
 
     // private outliner: OutlinePass
-    private editorCamera: Camera
-    /** Scene for  */
+    private editorCamera: EitherCamera
+    /** Scene for widgets and such */
     private editorScene: THREE.Scene = new Scene()
     // private passes: [render: RenderPass, outline: OutlinePass]
     private controls?: MapControls
+
     private outlinePass?: OutlinePass
     private overlayPass?: RenderPass
+    private activeHelpers = new Map<Object3D, Object3D[]>()
 
     constructor(
         { camera, getObjectById, onUpdate }: Params,
@@ -57,6 +64,8 @@ export default class EditorLiaison {
         console.debug('Tearing down the editor app!')
         render(null, this.domElement)
 
+        // deselect to release any resources
+        this.setSelection()
         // TODO: dispose this.editorScene
 
         if (this.outlinePass) {
@@ -103,6 +112,7 @@ export default class EditorLiaison {
     }
 
     update(dt?: number) {
+        // TODO: update helpers
         this.controls?.update(dt)
     }
 
@@ -123,48 +133,38 @@ export default class EditorLiaison {
     }
 
     /** Highlight the objects defined by these IDs in the Outline pass */
-    setSelection(id: UniqueID | UniqueID[] | undefined) {
+    setSelection(id?: UniqueID | UniqueID[]) {
         invariant(
-            this.outlinePass,
+            this.outlinePass && this.overlayPass,
             'setSelection: must create the renderer before calling setSelection',
         )
         this.outlinePass.selectedObjects = arrayWrap(id)
             .filter((i) => i)
             .map((id) => this.getObjectById(id as UniqueID))
 
-        invariant(
-            this.outlinePass.selectedObjects.length <= 1,
-            'TODO: support multiple selection',
-        )
-
-        requestIdleCallback(
-            (e) => {
-                console.warn('idle', e.timeRemaining())
-                if (this.outlinePass) {
-                    // Show/hide helpers as needed
-                    for (let obj of this.outlinePass.selectedObjects) {
-                        switch (obj.type) {
-                            case 'DirectionalLight':
-                                invariant(obj instanceof DirectionalLight)
-                                const helper = new DirectionalLightHelper(
-                                    obj as DirectionalLight,
-                                )
-                                const shadowCamHelp = new CameraHelper(
-                                    obj.shadow.camera,
-                                )
-                                this.editorScene.add(helper)
-                                this.editorScene.add(shadowCamHelp)
-                                this.overlayPass!.enabled = true
-                                break
-                            default:
-                        }
-                    }
+        // TODO: reuse helpers if applicable
+        for (let [_threepio, helpers] of this.activeHelpers) {
+            for (let helper of helpers) {
+                helper.removeFromParent()
+                if ('dispose' in helper) {
+                    invariant(helper.dispose instanceof Function)
+                    helper.dispose()
                 }
-            },
-            { timeout: 500 },
-        )
+            }
+        }
 
-        this.outlinePass.enabled = !!this.outlinePass.selectedObjects.length
+        for (let threepio of this.outlinePass.selectedObjects) {
+            const helpers = compact(helpersForObject(threepio))
+            console.warn(helpers)
+            if (helpers.length) {
+                this.activeHelpers.set(threepio, helpers)
+                this.editorScene.add(...helpers)
+            }
+        }
+
+        const enable = !!this.outlinePass.selectedObjects.length
+        this.outlinePass.enabled = enable
+        this.overlayPass.enabled = enable
 
         this.onUpdate()
     }
@@ -206,4 +206,39 @@ function outlinePass(scene: THREE.Scene, camera: Camera) {
     outliner.pulsePeriod = 1.4
 
     return outliner
+}
+
+function helpersForObject(threepio: Object3D): (Object3D | null)[] {
+    switch (threepio.type) {
+        case 'DirectionalLight':
+            invariant(threepio instanceof DirectionalLight)
+            return [
+                new DirectionalLightHelper(threepio),
+                threepio.castShadow
+                    ? new CameraHelper(threepio.shadow.camera)
+                    : null,
+            ]
+        case 'SpotLight':
+            invariant(threepio instanceof THREE.SpotLight)
+            return [
+                new SpotLightHelper(threepio),
+                threepio.castShadow
+                    ? new CameraHelper(threepio.shadow.camera)
+                    : null,
+            ]
+        case 'PointLight':
+            invariant(threepio instanceof THREE.PointLight)
+            return [
+                new PointLightHelper(threepio),
+                // new PointLightHelper(threepio, threepio.distance),
+            ]
+
+        case 'PerspectiveCamera':
+        case 'OrthographicCamera':
+            invariant(threepio instanceof Camera)
+            return [new CameraHelper(threepio)]
+
+        default:
+            return []
+    }
 }
