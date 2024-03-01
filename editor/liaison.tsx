@@ -65,9 +65,12 @@ export default class EditorLiaison {
     //     return this.passes
     // }
 
-    /** Get an effects composer that renders the editor's graphics. Tied to a particular scene. */
+    /** Get an effects composer that renders the editor's graphics. Tied to a
+     * particular THREE.scene, so it would be necessary to recreate it if you
+     * change the scene. */
     getRenderer(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
         this.outlinePass = outlinePass(scene, this.editorCamera)
+        this.outlinePass.enabled = false
 
         const compo = new EffectComposer(renderer)
         compo.passes = [
@@ -109,6 +112,9 @@ export default class EditorLiaison {
         this.outlinePass.selectedObjects = arrayWrap(id)
             .filter((i) => i)
             .map((id) => this.getObjectById(id as UniqueID))
+
+        this.outlinePass.enabled = !!this.outlinePass.selectedObjects.length
+
         this.onUpdate()
     }
 
