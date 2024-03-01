@@ -1,4 +1,11 @@
 import * as THREE from 'three'
+import {
+    Scene,
+    Object3D,
+    DirectionalLight,
+    DirectionalLightHelper,
+    CameraHelper,
+} from 'three'
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import type { Pass } from 'three/addons/postprocessing/Pass.js'
@@ -16,7 +23,7 @@ type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 export interface Params {
     // scene: THREE.Scene
     camera: Camera
-    getObjectById: (id: UniqueID) => THREE.Object3D
+    getObjectById: (id: UniqueID) => Object3D
     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
 }
 
@@ -28,9 +35,12 @@ export default class EditorLiaison {
 
     // private outliner: OutlinePass
     private editorCamera: Camera
+    /** Scene for  */
+    private editorScene: THREE.Scene = new Scene()
     // private passes: [render: RenderPass, outline: OutlinePass]
     private controls?: MapControls
     private outlinePass?: OutlinePass
+    private overlayPass?: RenderPass
 
     constructor(
         { camera, getObjectById, onUpdate }: Params,
@@ -47,8 +57,12 @@ export default class EditorLiaison {
         console.debug('Tearing down the editor app!')
         render(null, this.domElement)
 
-        this.outlinePass!.dispose()
-        this.outlinePass = undefined
+        // TODO: dispose this.editorScene
+
+        if (this.outlinePass) {
+            this.outlinePass.dispose()
+            this.outlinePass = undefined
+        }
 
         if (this.controls) {
             this.mapControls(false)
@@ -68,15 +82,20 @@ export default class EditorLiaison {
     /** Get an effects composer that renders the editor's graphics. Tied to a
      * particular THREE.scene, so it would be necessary to recreate it if you
      * change the scene. */
-    getRenderer(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
-        this.outlinePass = outlinePass(scene, this.editorCamera)
+    getRenderer(renderer: THREE.WebGLRenderer, userScene: THREE.Scene) {
+        const { editorCamera, editorScene } = this
+        this.outlinePass = outlinePass(userScene, editorCamera)
         this.outlinePass.enabled = false
+
+        this.overlayPass = renderOverlayPass(editorScene, editorCamera)
+        this.overlayPass.enabled = false
 
         const compo = new EffectComposer(renderer)
         compo.passes = [
             new ClearPass(),
-            renderPass(scene, this.editorCamera),
+            renderPass(userScene, this.editorCamera),
             this.outlinePass,
+            this.overlayPass,
             new OutputPass(),
         ]
 
@@ -113,6 +132,38 @@ export default class EditorLiaison {
             .filter((i) => i)
             .map((id) => this.getObjectById(id as UniqueID))
 
+        invariant(
+            this.outlinePass.selectedObjects.length <= 1,
+            'TODO: support multiple selection',
+        )
+
+        requestIdleCallback(
+            (e) => {
+                console.warn('idle', e.timeRemaining())
+                if (this.outlinePass) {
+                    // Show/hide helpers as needed
+                    for (let obj of this.outlinePass.selectedObjects) {
+                        switch (obj.type) {
+                            case 'DirectionalLight':
+                                invariant(obj instanceof DirectionalLight)
+                                const helper = new DirectionalLightHelper(
+                                    obj as DirectionalLight,
+                                )
+                                const shadowCamHelp = new CameraHelper(
+                                    obj.shadow.camera,
+                                )
+                                this.editorScene.add(helper)
+                                this.editorScene.add(shadowCamHelp)
+                                this.overlayPass!.enabled = true
+                                break
+                            default:
+                        }
+                    }
+                }
+            },
+            { timeout: 500 },
+        )
+
         this.outlinePass.enabled = !!this.outlinePass.selectedObjects.length
 
         this.onUpdate()
@@ -134,6 +185,13 @@ function arrayWrap<T>(ik: unknown): T[] {
 
 function renderPass(scene: THREE.Scene, camera: Camera) {
     return new RenderPass(scene, camera)
+}
+
+function renderOverlayPass(scene: THREE.Scene, camera: Camera) {
+    const pass = new RenderPass(scene, camera)
+    pass.clear = false
+    pass.clearDepth = true
+    return pass
 }
 
 function outlinePass(scene: THREE.Scene, camera: Camera) {
