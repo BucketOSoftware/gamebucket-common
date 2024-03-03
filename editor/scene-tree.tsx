@@ -5,56 +5,48 @@ import {
     EyeIcon,
     FileDirectoryIcon,
     LightBulbIcon,
-    WorkflowIcon
-} from '@primer/octicons-react';
-import { IconButton, TreeView } from '@primer/react';
+    WorkflowIcon,
+} from '@primer/octicons-react'
+import { IconButton, TreeView } from '@primer/react'
+import { useCallback, useContext, useEffect, useRef } from 'preact/hooks'
+import invariant from 'tiny-invariant'
+
 import {
-    useCallback,
-    useContext,
-    useEffect,
-    useRef
-} from 'preact/hooks';
-import invariant from 'tiny-invariant';
-import {
-    hideableTypes,
-    type SerializedNode, type UniqueID
-} from '../scenebucket';
-import { useObserve } from './hooks';
-import EditorLiaison from './liaison';
-import { Panel, PanelBody } from './panel';
-import {
-    selectNode,
-    toggleProperty,
-    useDispatch,
-    useSelector
-} from './store';
-import { LiaisonContext, TODO } from './editor';
+    type SerializedNode,
+    type UniqueID,
+} from '../scenebucket'
+
+import { LiaisonContext } from './editor'
+import { useObserve } from './hooks'
+import EditorLiaison from './liaison'
+import { Panel, PanelBody } from './panel'
+import { selectNode, toggleProperty, useDispatch, useSelector } from './store'
 
 export function SceneTree() {
-    const liaison = useContext(LiaisonContext);
-    const dispatch = useDispatch();
+    const liaison = useContext(LiaisonContext)
+    const dispatch = useDispatch()
 
-    const selection = useSelector((state) => state.ui.selected);
-    const roots = useSelector((state) => state.scene.roots);
+    const selection = useSelector((state) => state.ui.selected)
+    const roots = useSelector((state) => state.scene.roots)
 
-    useEffect(() => liaison.setSelection(selection), [selection]);
+    useEffect(() => liaison.setSelection(selection), [selection])
 
     useEffect(() => {
         function select(ev: Event) {
-            invariant('detail' in ev);
-            const id = (ev.detail || undefined) as UniqueID | undefined;
-            dispatch(selectNode(id));
+            invariant('detail' in ev)
+            const id = (ev.detail || undefined) as UniqueID | undefined
+            dispatch(selectNode(id))
         }
 
-        document.body.addEventListener(EditorLiaison.OBJECT_PICKED, select);
+        document.body.addEventListener(EditorLiaison.OBJECT_PICKED, select)
 
         return () => {
             document.body.removeEventListener(
                 EditorLiaison.OBJECT_PICKED,
-                select
-            );
-        };
-    }, [dispatch]);
+                select,
+            )
+        }
+    }, [dispatch])
 
     return (
         <Panel title="Objects" manspread expandable basis="33%">
@@ -66,20 +58,20 @@ export function SceneTree() {
                 </TreeView>
             </PanelBody>
         </Panel>
-    );
+    )
 }
-function SceneNode(props: { id: UniqueID; }) {
-    const dispatch = useDispatch();
-    const isSelected = useSelector((state) => state.ui.selected) === props.id;
-    const node = useSelector((state) => state.scene.nodes[props.id]);
-    const { name, children: kids, type } = node;
+function SceneNode(props: { id: UniqueID }) {
+    const dispatch = useDispatch()
+    const isSelected = useSelector((state) => state.ui.selected) === props.id
+    const node = useSelector((state) => state.scene.nodes[props.id])
+    const { name, children: kids, type } = node
 
-    const ref = useRef<HTMLElement>(null);
+    const ref = useRef<HTMLElement>(null)
     useEffect(() => {
         if (isSelected) {
-            ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
         }
-    }, [ref, isSelected]);
+    }, [ref, isSelected])
 
     return (
         <TreeView.Item
@@ -89,7 +81,7 @@ function SceneNode(props: { id: UniqueID; }) {
             current={isSelected}
             onSelect={useCallback(
                 () => dispatch(selectNode(props.id)),
-                [dispatch, props.id]
+                [dispatch, props.id],
             )}
         >
             <TreeView.LeadingVisual label={type}>
@@ -101,25 +93,25 @@ function SceneNode(props: { id: UniqueID; }) {
             </TreeView.TrailingVisual>
             {kids.length ? (
                 <TreeView.SubTree>
-                    {kids.map((id: TODO) => (
+                    {kids.map((id: UniqueID) => (
                         <SceneNode id={id} />
                     ))}
                 </TreeView.SubTree>
             ) : null}
         </TreeView.Item>
-    );
+    )
 }
-function VisibilityButton({ id }: { id: UniqueID; }) {
-    const node = useSelector((state) => state.scene.nodes[id]);
+function VisibilityButton({ id }: { id: UniqueID }) {
+    const node = useSelector((state) => state.scene.nodes[id])
 
-    if (!hideableTypes[node.type]) {
-        return null;
+    if (node.visible === null) {
+        return null
     }
 
-    const dispatch = useDispatch();
-    const sync = useContext(LiaisonContext);
+    const dispatch = useDispatch()
+    const sync = useContext(LiaisonContext)
 
-    useObserve(() => sync.onUpdate(node), id, [node.visible]);
+    useObserve(() => sync.onUpdate(node), id, [node.visible])
 
     return (
         <IconButton
@@ -128,28 +120,29 @@ function VisibilityButton({ id }: { id: UniqueID; }) {
             variant="invisible"
             size="small"
             onClick={(ev: Event) => {
-                ev.stopPropagation(); // avoid selecting the node
+                ev.stopPropagation() // avoid selecting the node
                 dispatch(
                     toggleProperty({
                         id,
                         property: 'visible',
                         value: !node.visible,
-                    })
-                );
-            }} />
-    );
+                    }),
+                )
+            }}
+        />
+    )
 }
-function NodeIcon(props: { type: SerializedNode['type']; }) {
+function NodeIcon(props: { type: SerializedNode['type'] }) {
     switch (props.type) {
         case 'camera':
-            return <DeviceCameraVideoIcon />;
+            return <DeviceCameraVideoIcon />
         case 'light':
-            return <LightBulbIcon />;
+            return <LightBulbIcon />
         case 'group':
-            return <FileDirectoryIcon />;
+            return <FileDirectoryIcon />
         case 'mesh':
-            return <AppsIcon />;
+            return <AppsIcon />
         default:
-            return <WorkflowIcon />;
+            return <WorkflowIcon />
     }
 }

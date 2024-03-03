@@ -1,134 +1,29 @@
 import { GLTF as GLTFType } from '@gltf-transform/core'
-import { clone, cloneDeep, isUndefined, set, uniqueId } from 'lodash-es'
+import { clone, cloneDeep, isUndefined, set } from 'lodash-es'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import invariant from 'tiny-invariant'
 
-import { radToDeg } from '../lib/geometry'
+import { radToDeg } from '../geometry'
 
+import {
+    BucketNode,
+    BucketThreepioUserData,
+    CameraProperties,
+    LightProperties,
+    SceneBucketFormat,
+    SerializedNode,
+    SerializedScene,
+    UniqueID,
+    createNodeID,
+    getThreeID,
+    nodeTypeFromThree,
+} from './format'
 export type TODO = any
 
 // TODO: replace with types from our own lib
 export type Tup3 = THREE.Vector3Tuple
 export type Quat4 = THREE.Vector4Tuple
-
-type Brand<T extends string> = { __brand__: T }
-
-export type UniqueID = string & Brand<'EDITOR_UNIQUE_ID'>
-
-function createFileID(): UniqueID {
-    return uniqueId('SBK') as UniqueID
-}
-
-function getThreeID(threepio: THREE.Object3D): UniqueID {
-    return threepio.uuid as UniqueID
-}
-
-// stuff we don't care about
-type GLTFUnusedFields =
-    | 'accessors'
-    | 'buffers'
-    | 'bufferViews'
-    | 'materials'
-    | 'meshes' // TODO: include meshes later?
-    | 'samplers'
-    | 'textures'
-
-/** GLTF altered to support SceneBucket stuff */
-interface SceneBucketFormat extends Omit<GLTFType.IGLTF, GLTFUnusedFields> {
-    /** These are turned into THREE.Group objs */
-    scenes: {
-        name?: string
-        nodes: number[] // indices of root nodes (there can be multiple!)
-        extras: BucketExtras
-    }[]
-
-    /** @see https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node */
-    // Notes:
-    // - A node MAY have either a matrix or any combination of translation/
-    // rotation/scale (TRS) properties
-    // - When a node is targeted for animation (referenced by an animation.
-    // channel.target), matrix MUST NOT be present.
-    nodes: BucketNode[]
-
-    extensions: {
-        KHR_lights_punctual?: {
-            // /** As per https://github.com/CesiumGS/glTF/blob/3d-tiles-next/extensions/2.0/Khronos/KHR_lights_punctual/README.md#light-shared-properties
-            lights: Light[]
-        }
-    }
-}
-
-export type Light = {
-    name?: string
-    /** RGB value for light's color in linear space. */
-    color?: Tup3
-    intensity?: number
-} & (
-    | {
-          type: 'point'
-          range?: number
-      }
-    | {
-          type: 'directional'
-      }
-    | {
-          type: 'spot'
-          spot: {
-              innerConeAngle?: number // default 0
-              outerConeAngle?: number // PI / 4.0
-          }
-          range?: number
-      }
-)
-
-/** Properties added to the Three obj's userData */
-export interface BucketThreepioUserData {
-    src: 'TODO?' | undefined
-    id: UniqueID
-}
-
-/**
- *
- * @todo matrix/skin/weights
- */
-export interface BucketNode
-    extends Omit<GLTFType.INode, 'matrix' | 'skin' | 'weights' | 'mesh'> {
-    // name?: string // for finding/debugging
-
-    // NOT MATERIAL! at least not yet
-    // TODO: matrix: number[] (16) -- but can't be used if node is targeted by animations
-    translation?: Tup3
-    rotation?: Quat4
-    scale?: Tup3
-
-    // mesh?: number
-
-    extras?: BucketExtras
-
-    extensions?: {
-        KHR_lights_punctual?: {
-            light: number
-        }
-    }
-}
-
-/** Stuff added to "extras" */
-interface BucketExtras {
-    bucket?: {
-        hidden?: boolean
-        castShadow?: boolean
-        receiveShadow?: boolean
-
-        /** if this is defined, this object came from a loaded GLTF file */
-        src?: {
-            uri: string
-            // TODO: point to an object within the hierarchy -- maybe with a
-            // CSS-style selector?
-        }
-    }
-    [k: string]: unknown
-}
 
 // #pragma section -
 
@@ -138,9 +33,10 @@ interface BucketExtras {
 export class SceneBucketFile {
     public readonly nodes = new Map<UniqueID, BucketNode>()
     private readonly nodeToId = new WeakMap<BucketNode, UniqueID>()
+    /** Properties contained in separate chunks of the GLTF file. @todo: Write types for these as they exist in the GLTF file, as oppposed to how we serialize them */
     private readonly extras = new WeakMap<
         BucketNode,
-        Light | GLTFType.ICamera
+        LightProperties | CameraProperties
     >()
 
     private readonly doc: Readonly<SceneBucketFormat>
@@ -153,7 +49,7 @@ export class SceneBucketFile {
 
         // index the nodes in this file
         for (let node of scene.nodes ?? []) {
-            const id = createFileID()
+            const id = createNodeID()
             idToNode.set(id, node)
             nodeToId.set(node, id)
 
@@ -194,69 +90,62 @@ export class SceneBucketFile {
 
         for (let [id, node] of idToNode) {
             // TODO: make this another function I guess
-            const bucketMeta = node.extras?.bucket
 
-            const isCamera = node.camera !== undefined && 'camera'
-            const isLight =
-                node.extensions?.KHR_lights_punctual?.light !== undefined &&
-                'light'
-            const isMesh = node.extras?.bucket?.src !== undefined && 'mesh'
-            const isGroup = node.children && 'group'
-
-            draft.nodes[id] = {
-                id,
-                type: isCamera || isLight || isMesh || isGroup || 'node',
-                name: node.name,
-                position: node.translation
-                    ? clone(node.translation)
-                    : [0, 0, 0],
-                rotation: node.rotation ? clone(node.rotation) : [0, 0, 0, 1],
-                scale: node.scale ? clone(node.scale) : [1, 1, 1],
-
-                visible: !(bucketMeta?.hidden || false),
-                castShadow: bucketMeta?.castShadow || false,
-                receiveShadow: bucketMeta?.receiveShadow || false,
-
-                extras: extras.get(node),
-
-                src: node.extras?.bucket?.src?.uri,
-
-                children:
-                    node.children?.map(
-                        (idx) =>
-                            // TODO: this is a WeakMap... would we ever drop the node in a way that needs that functionality, though?
-                            nodeToId.get(scene.nodes[idx])!,
-                    ) ?? [],
-            }
+            draft.nodes[id] = this.nodeFromSBk(id, node)
         }
         return draft
     }
-}
 
-export interface SerializedScene {
-    roots: UniqueID[]
-    nodes: Record<UniqueID, SerializedNode>
-}
+    nodeFromSBk(id: UniqueID, node: BucketNode): SerializedNode {
+        const bucketMeta = node.extras?.bucket
 
-export interface SerializedNode {
-    id: UniqueID
-    type: 'group' | 'mesh' | 'camera' | 'light' | 'node'
+        const isCamera = node.camera !== undefined && 'camera'
+        const isLight =
+            node.extensions?.KHR_lights_punctual?.light !== undefined && 'light'
+        const isMesh = node.extras?.bucket?.src !== undefined && 'mesh'
+        const isGroup = node.children && 'group'
 
-    name: string | undefined
-    children: UniqueID[]
+        const canBeHidden = !isCamera
+        const canCastShadow = isMesh || isCamera
+        const canReceiveShadow = isMesh
 
-    position: Tup3
-    scale: Tup3
-    rotation: Quat4
+        const extras = this.extras.get(node)
 
-    visible: boolean
+        const position: Tup3 = node.translation
+            ? clone(node.translation)
+            : [0, 0, 0]
+        const rotation: Quat4 = node.rotation
+            ? clone(node.rotation)
+            : [0, 0, 0, 1]
+        const scale: Tup3 = node.scale ? clone(node.scale) : [1, 1, 1]
 
-    castShadow: boolean
-    receiveShadow: boolean
+        return {
+            id,
+            type: isCamera || isLight || isMesh || isGroup || 'node',
+            name: node.name,
 
-    src?: string // URL to GLTF
+            position,
+            rotation,
+            scale,
 
-    extras?: Light | GLTFType.ICamera
+            visible: canBeHidden ? !(bucketMeta?.hidden || false) : null,
+            castShadow: canCastShadow ? bucketMeta?.castShadow || false : null,
+            receiveShadow: canReceiveShadow
+                ? bucketMeta?.receiveShadow || false
+                : null,
+
+            src: isMesh ? node.extras?.bucket?.src?.uri : null,
+            light: isLight ? serializeLight(extras) : null,
+            camera: isCamera ? serializeCamera(extras) : null,
+
+            children:
+                node.children?.map(
+                    (idx) =>
+                        // TODO: this is a WeakMap... would we ever drop the node in a way that needs that functionality, though?
+                        this.nodeToId.get(this.doc.nodes[idx])!,
+                ) ?? [],
+        }
+    }
 }
 
 /**
@@ -287,7 +176,6 @@ export class ThreeSync implements SerializedScene {
         return { nodes: this.nodes, roots: this.roots }
     }
 
-    private toThreeUpdateQueue: THREE.Object3D[] = []
     /** Sync a single node to three.js */
     updateNode(newNode: SerializedNode) {
         // console.debug("Update: ", newNode.id)
@@ -408,7 +296,8 @@ export class ThreeSync implements SerializedScene {
             receiveShadow,
         } = threepio
 
-        const type = typeFromThreepio(threepio)
+        const type = nodeTypeFromThree(threepio)
+
         return {
             id: getThreeID(threepio),
             name: name || threepio.constructor.name,
@@ -433,22 +322,28 @@ export class ThreeSync implements SerializedScene {
     ) {
         let node = this.nodes[id]
         let threepio = this.idToThree.get(id)
-        // console.debug('Syncing:', node, threepio)
 
-        const { src } = node
-        if (!isUndefined(src)) {
+        const desiredUri = node.src || undefined
+        if (!isUndefined(desiredUri)) {
             // Different rules here -- we're going to import this threepio
             // instead of creating it
             invariant(isUndefined(threepio) || threepio instanceof THREE.Group)
             invariant(
-                node.children.length === 0,
-                "Children on a pointer node -- should be supported, but currenlty in'st",
+                !node.children || node.children.length === 0,
+                "Children on a pointer node -- should be supported, but currenlty isn't",
             )
 
-            const uriChanged = threepio?.userData.bucket?.src !== src
-            if (uriChanged) {
+            const existingUri: string | undefined =
+                threepio?.userData.bucket?.src?.uri
+            const uriChanged = existingUri !== desiredUri
+            if (uriChanged && desiredUri) {
+                invariant(typeof desiredUri === 'string')
+
+                // TODO: what do we do if desiredUri is now undefined? Should we
+                // remove the loaded object?
+
                 // console.warn('Loading...', src)
-                this.loader.loadAsync(src).then((gltf) => {
+                this.loader.loadAsync(desiredUri).then((gltf) => {
                     // see if another one has been loaded in the meantime
                     threepio = this.idToThree.get(id)
                     if (threepio) {
@@ -459,14 +354,18 @@ export class ThreeSync implements SerializedScene {
                     }
 
                     const loaded = gltf.scene.clone() // TODO: necessary?
-                    set(loaded, 'userData.bucket.src', src)
+                    set(loaded, 'userData.bucket.src', desiredUri)
                     this.idToThree.set(id, loaded)
                     this.threeToId.set(loaded, id)
                     threeParent.add(loaded)
 
                     // TODO: allow for doing stuff like setting all children to
                     // .castShadow = true or something
-                    console.debug('Loaded and ready to go:', src, loaded)
+                    console.debug(
+                        'Loaded and ready to go:',
+                        existingUri,
+                        loaded,
+                    )
                     copyProps(loaded, node)
                     if (this.onLoad) {
                         this.onLoad(loaded)
@@ -516,22 +415,24 @@ function setAndCheckV3(dest: THREE.Vector3, src: Readonly<THREE.Vector3Tuple>) {
     return diff
 }
 
-const typeToKlass /* : Record<Light['type'] | GLTFType.ICamera['type'],> */ = {
+const typeToKlass = {
     point: THREE.PointLight,
     spot: THREE.SpotLight,
     directional: THREE.DirectionalLight,
     perspective: THREE.PerspectiveCamera,
     orthographic: THREE.OrthographicCamera,
+    ambient: THREE.AmbientLight,
+    hemisphere: THREE.HemisphereLight,
     OTHER: THREE.Object3D,
 }
 
 function createThreeFromNode(node: SerializedNode): THREE.Object3D {
     let threepio: THREE.Object3D
     // TODO: meshes!
-    let klass = typeToKlass[node.extras?.type ?? 'OTHER']
-
+    let klass = typeToKlass[node.light?.type ?? node.camera?.type ?? 'OTHER']
+    invariant(klass)
     if (!klass) {
-        if (node.children.length) {
+        if (node.children?.length) {
             klass = THREE.Group
         } else {
             klass = THREE.Object3D
@@ -568,10 +469,11 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
     dest.quaternion.fromArray(source.rotation)
     dest.scale.fromArray(source.scale)
 
-    // TODO: it's really problematic to have to repeat basically this code when syncing the other direction!
-    dest.visible = source.visible
-    dest.castShadow = source.castShadow
-    dest.receiveShadow = source.receiveShadow
+    // TODO?: it's really problematic to have to repeat basically this code when syncing the other direction!
+    // TODO?: is it okay to coerce null to a boolean here
+    dest.visible = source.visible === null ? true : source.visible
+    dest.castShadow = !!source.castShadow
+    dest.receiveShadow = !!source.receiveShadow
     // @ts-expect-error
     if (dest.isLight) {
         // @ts-expect-error
@@ -582,14 +484,19 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
     // dest.matrixWorldNeedsUpdate = true
     // dest.updateMatrixWorld()
 
-    const extras = source.extras
-    if (extras) {
-        const { type } = extras
+    // const extras = source.extras
+    invariant(!(source.light && source.camera))
+    if (source.light) {
+        invariant(dest instanceof THREE.Light)
+        const { color, spot, range, intensity } = source.light
+        // const { type } = extras
+        dest.color = colorFromTuple(color)
 
-        switch (type) {
+        switch (source.light.type) {
             case 'spot': {
                 invariant(dest instanceof THREE.SpotLight)
-                const { innerConeAngle, outerConeAngle } = extras.spot
+                invariant(spot)
+                const { innerConeAngle, outerConeAngle } = spot
                 dest.angle = outerConeAngle ?? Math.PI / 4
                 dest.penumbra = 1 - (innerConeAngle ?? 0) / dest.angle
             }
@@ -600,46 +507,72 @@ function copyProps(dest: THREE.Object3D, source: SerializedNode) {
                 )
 
                 // spot and point have a distance param
-                dest.distance = extras.range ?? 0 // apparently 0 means infinite. sure, why not
+                dest.distance = range ?? 0 // apparently 0 means infinite. sure, why not
             case 'directional':
                 invariant(dest instanceof THREE.Light)
-                dest.color = colorFromTuple(extras.color!)
-                dest.intensity = extras.intensity ?? 1
-                break
-
-            // now for the camera stuff
-            case 'perspective':
-                invariant(dest instanceof THREE.PerspectiveCamera)
-
-                const { yfov, aspectRatio, znear, zfar } = extras.perspective!
-                dest.fov = radToDeg(yfov)
-                // TODO: is this the right thing to do? seems like resizing the viewport would affect aspect ratio
-                dest.aspect = aspectRatio ?? 1
-                dest.near = znear
-                dest.far = zfar ?? 2_000_000 // can't remember why this is the default
-                break
-            case 'orthographic':
-                invariant(dest instanceof THREE.OrthographicCamera)
-
-                console.error('TODO')
+                dest.intensity = intensity ?? 1
                 break
         }
     }
+
+    if (source.camera) {
+        const { type, perspective, orthographic } = source.camera
+        switch (type) {
+            // now for the camera stuff
+            case 'perspective': {
+                invariant(dest instanceof THREE.PerspectiveCamera)
+
+                const { yfov, aspectRatio, znear, zfar } = perspective!
+                // TODO?: is this the right thing to do? seems like resizing the viewport would require the user to change the aspect ratio anyway
+                dest.aspect = aspectRatio ?? 1
+                dest.fov = radToDeg(yfov)
+                dest.far = zfar ?? 2_000_000 // can't remember why this is the default
+                dest.near = znear
+                break
+            }
+            case 'orthographic': {
+                invariant(dest instanceof THREE.OrthographicCamera)
+
+                const { xmag, ymag, zfar, znear } = orthographic!
+
+                const params: Partial<THREE.OrthographicCamera> = {
+                    left: -xmag,
+                    right: xmag,
+                    top: -ymag,
+                    bottom: ymag,
+                    near: znear,
+                    far: zfar,
+                }
+                Object.assign(dest, params)
+                break
+            }
+        }
+
+        dest.updateProjectionMatrix()
+    }
 }
 
-function typeFromThreepio(threepio: any): SerializedNode['type'] {
-    if (threepio.isMesh) return 'mesh'
-    if (threepio.isGroup) return 'group'
-    if (threepio.isLight) return 'light'
-    if (threepio.isCamera) return 'camera'
+function serializeLight(light: any): LightProperties {
+    const { color, intensity, type, range, spot } = light
+    // TODO: three-specific types
+    invariant(['point', 'directional', 'spot'].includes(type))
 
-    return 'node'
+    const isSpot = type === 'spot'
+    const isDirectional = type === 'directional'
+    // TODO: sanity check that we don't have unreasonable properties
+    // const {} = light
+    return {
+        type,
+        color,
+        intensity,
+        range: isSpot || isDirectional ? range : null,
+        spot: isSpot ? spot : null,
+    }
 }
 
-export const hideableTypes: Record<SerializedNode['type'], boolean> = {
-    mesh: true,
-    group: true,
-    light: true,
-    node: true,
-    camera: false,
+/** Placeholder in case the serialized version of camera diverges from the GLTF version */
+function serializeCamera(
+    extras: LightProperties | GLTFType.ICamera | undefined,
+): CameraProperties {
+    return extras as CameraProperties
 }

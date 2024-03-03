@@ -36,7 +36,7 @@ type OnlyKeysOfType<T, ValueType> = Omit<
 /** Properties of a node that can be toggled, i.e. booleans */
 export type NodeTogglableProperties = keyof OnlyKeysOfType<
     SerializedNode,
-    boolean
+    boolean | null // this seems like it has to exactly match what's in SerializedNode -- maybe it's best to just list them out
 >
 
 /** Stuff related to the scene under edit */

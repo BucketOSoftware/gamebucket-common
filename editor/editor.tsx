@@ -13,12 +13,7 @@ import { useCallback, useContext, useRef, useState } from 'preact/hooks'
 import { Provider as ReduxProvider } from 'react-redux'
 import * as THREE from 'three'
 
-import {
-    hideableTypes,
-    type SerializedScene,
-    type Tup3,
-    type UniqueID,
-} from '../scenebucket'
+import { type SerializedScene, type UniqueID, type Tup3 } from '../scenebucket'
 
 import { useObserve } from './hooks'
 import EditorLiaison, { Params } from './liaison'
@@ -34,9 +29,10 @@ import {
     useSelector,
 } from './store'
 import * as styles from './styles'
+import invariant from 'tiny-invariant'
 
-export type TODO = any
-type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
+type TODO = any
+// type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
 export const LiaisonContext = createContext<EditorLiaison>({} as EditorLiaison)
 
@@ -123,9 +119,7 @@ function NodeDetailsPanel() {
     return (
         <Panel title={name!} onClose={() => dispatch(selectNode())}>
             <PanelBody>
-                {hideableTypes[node.type] && (
-                    <PropertyToggle id={id} property="visible" />
-                )}
+                <PropertyToggle id={id} property="visible" />
                 <PropertyToggle id={id} property="castShadow" />
                 <PropertyToggle id={id} property="receiveShadow" />
                 <form
@@ -160,6 +154,11 @@ function PropertyToggle({
     const dispatch = useDispatch()
     const currentValue = useSelector((state) => state.scene.nodes[id][property])
     const domId = 'node-details-panel-' + property
+
+    // If null, the property doesn't apply to this object
+    if (currentValue === null) {
+        return null
+    }
 
     return (
         <Box style={{ display: 'flex' }}>

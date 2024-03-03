@@ -232,7 +232,6 @@ function helpersForObject(threepio: Object3D): (Object3D | null)[] {
                 new PointLightHelper(threepio),
                 // new PointLightHelper(threepio, threepio.distance),
             ]
-
         case 'PerspectiveCamera':
         case 'OrthographicCamera':
             invariant(threepio instanceof Camera)
