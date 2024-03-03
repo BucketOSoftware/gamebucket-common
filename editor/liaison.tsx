@@ -18,15 +18,17 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import invariant from 'tiny-invariant'
 
-import { ZVec2 } from '../geometry'
+import { GVec2, ZVec2 } from '../geometry'
 import type { SerializedNode, UniqueID } from '../scenebucket'
 import { compact } from 'lodash-es'
+import { isNormalizedCanvasPosition } from '../threez'
 
 type EitherCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera
 
 export interface Params {
-    // scene: THREE.Scene
+    scene: THREE.Scene
     camera: EitherCamera
+    canvas: HTMLCanvasElement
     getObjectById: (id: UniqueID) => Object3D
     onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
 }
@@ -38,11 +40,15 @@ export default class EditorLiaison {
     /** Callback: called when a node is modified */
     onUpdate: (node?: SerializedNode) => void
 
-    // private outliner: OutlinePass
-    private editorCamera: EitherCamera
+    public readonly canvas: HTMLCanvasElement
+    private readonly editorCamera: EitherCamera
     /** Scene for widgets and such */
-    private editorScene: THREE.Scene = new Scene()
-    // private passes: [render: RenderPass, outline: OutlinePass]
+    private readonly editorScene: THREE.Scene = new Scene()
+    /** The scene under edit.
+     * @todo? What if we want to edit more than one, or change it while the editor is open? */
+    private userScene: THREE.Scene
+
+    private raycaster = new THREE.Raycaster()
     private controls?: MapControls
 
     private outlinePass?: OutlinePass
@@ -50,19 +56,21 @@ export default class EditorLiaison {
     private activeHelpers = new Map<Object3D, Object3D[]>()
 
     constructor(
-        { camera, getObjectById, onUpdate }: Params,
-        public readonly domElement: HTMLElement,
+        { camera, getObjectById, onUpdate, scene, canvas }: Params,
+        public readonly editorRoot: HTMLElement,
     ) {
         this.getObjectById = getObjectById
         this.onUpdate = onUpdate
 
+        this.canvas = canvas
+        this.userScene = scene
         this.editorCamera = camera.clone()
     }
 
     /** stop rendering the editor. afterwards, you should probably toss this object! */
     teardown() {
         console.debug('Tearing down the editor app!')
-        render(null, this.domElement)
+        render(null, this.editorRoot)
 
         // deselect to release any resources
         this.setSelection()
@@ -91,8 +99,8 @@ export default class EditorLiaison {
     /** Get an effects composer that renders the editor's graphics. Tied to a
      * particular THREE.scene, so it would be necessary to recreate it if you
      * change the scene. */
-    getRenderer(renderer: THREE.WebGLRenderer, userScene: THREE.Scene) {
-        const { editorCamera, editorScene } = this
+    getRenderer(renderer: THREE.WebGLRenderer) {
+        const { editorCamera, editorScene, userScene } = this
         this.outlinePass = outlinePass(userScene, editorCamera)
         this.outlinePass.enabled = false
 
@@ -112,14 +120,27 @@ export default class EditorLiaison {
     }
 
     update(dt?: number) {
-        // TODO: update helpers
+        // TODO: update helpers? or do we do that when the objects move somehow
         this.controls?.update(dt)
     }
 
-    mapControls(enabled: boolean, canvas?: HTMLCanvasElement) {
+    hitTest(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
+
+        const { raycaster, editorCamera, userScene } = this
+
+        raycaster.setFromCamera(point as THREE.Vector2, editorCamera)
+        return raycaster.intersectObject(userScene, true)
+    }
+
+    mapControls(enabled: boolean) {
+        console.warn(enabled ? 'enabling' : 'disabling', 'map controls')
+
+        const { editorCamera, canvas } = this
         if (enabled) {
             invariant(canvas)
-            this.controls ??= new MapControls(this.editorCamera, canvas)
+            // TODO: would need to redo this if editorCamera changes!
+            this.controls ??= new MapControls(editorCamera, canvas)
             this.controls.enabled = true
             this.controls.enableDamping = false
             this.controls.listenToKeyEvents(window)

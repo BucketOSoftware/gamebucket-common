@@ -11,25 +11,24 @@ import { throttle } from 'lodash-es'
 import { createContext, render } from 'preact'
 import { useCallback, useContext, useRef, useState } from 'preact/hooks'
 import { Provider as ReduxProvider } from 'react-redux'
-import * as THREE from 'three'
 
-import { type SerializedScene, type UniqueID, type Tup3 } from '../scenebucket'
+import { type SerializedScene, type Tup3, type UniqueID } from '../scenebucket'
 
 import { useObserve } from './hooks'
 import EditorLiaison, { Params } from './liaison'
 import { Panel, PanelBody } from './panel'
 import { SceneTree } from './scene-tree'
 import {
+    NodeTogglableProperties,
     createStore,
     loadScene,
-    NodeTogglableProperties,
     selectNode,
     toggleProperty,
     useDispatch,
     useSelector,
 } from './store'
 import * as styles from './styles'
-import invariant from 'tiny-invariant'
+import { Toolbar } from './toolbox'
 
 type TODO = any
 // type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
@@ -81,6 +80,7 @@ function Editor() {
             <styles.GlobalStyles />
             <ThemeProvider theme={styles.theme}>
                 <BaseStyles>
+                    <Toolbar />
                     <aside style={styles.sidebar}>
                         <SceneTree />
                         <NodeDetailsPanel />

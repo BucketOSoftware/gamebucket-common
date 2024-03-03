@@ -8,7 +8,7 @@ import { radToDeg } from '../geometry'
 
 import {
     BucketNode,
-    BucketThreepioUserData,
+    Object3DUserData,
     CameraProperties,
     LightProperties,
     SceneBucketFormat,
@@ -17,8 +17,9 @@ import {
     UniqueID,
     createNodeID,
     getThreeID,
-    nodeTypeFromThree
+    nodeTypeFromThree,
 } from './format'
+import { Object3D } from 'three'
 export type TODO = any
 
 // TODO: replace with types from our own lib
@@ -255,11 +256,14 @@ export class ThreeSync implements SerializedScene {
             invariant(!this.threeToId.has(threepio))
             invariant(!this.roots.includes(node.id))
 
+            const data = threepio.userData as Object3DUserData
+            set(data, 'bucket.id', node.id)
+
             this.threeToId.set(threepio, node.id)
             this.idToThree.set(node.id, threepio)
             this.nodes[node.id] = node
-            // TODO: does this bear oout?
             // console.warn('Created new node for obj: ', node, threepio)
+            // TODO?: does this bear oout?
             if ((threepio.parent as THREE.Scene).isScene) {
                 this.roots.push(node.id)
             }
@@ -273,17 +277,15 @@ export class ThreeSync implements SerializedScene {
         const existingId = threepio.userData.bucket?.id
 
         // was this node created by us, or some other code?
-        const ud = threepio.userData.bucket as
-            | BucketThreepioUserData
-            | undefined
-        if (ud?.src) {
+        const ud = threepio.userData as Object3DUserData
+        if (ud.bucket?.src) {
             // The node should already exist
             invariant(existingId)
             invariant(this.nodes[existingId])
         } else {
             // The node may or may not exist but it should have no src
             invariant(existingId === undefined || existingId === threepio.uuid)
-            invariant(ud?.src === undefined)
+            invariant(ud.bucket?.src === undefined)
         }
 
         const {
@@ -333,9 +335,8 @@ export class ThreeSync implements SerializedScene {
                 "Children on a pointer node -- should be supported, but currenlty isn't",
             )
 
-            const userData: BucketThreepioUserData | undefined =
-                threepio?.userData.bucket
-            const existingUri: string | undefined = userData?.src
+            const userData: Object3DUserData | undefined = threepio?.userData
+            const existingUri = userData?.bucket?.src
             const uriChanged = existingUri !== desiredUri
             // console.warn('URI:', existingUri, '->', desiredUri, uriChanged)
             if (uriChanged && desiredUri) {
@@ -364,23 +365,25 @@ export class ThreeSync implements SerializedScene {
                         )
                     }
 
-                    const loaded = gltf.scene.clone() // TODO: necessary?
-                    set(loaded, 'userData.bucket.src', desiredUri)
-                    this.idToThree.set(id, loaded)
-                    this.threeToId.set(loaded, id)
-                    threeParent.add(loaded)
-
                     // TODO: allow for doing stuff like setting all children to
                     // .castShadow = true or something
-                    console.debug(
-                        'Loaded and ready to go:',
-                        existingUri,
-                        loaded,
+                    // TODO?: is this necessary?
+                    // TODO: handle SkinnedMeshes with that special utility function dammit
+                    const loaded = gltf.scene.clone()
+                    set(
+                        loaded.userData as Object3DUserData,
+                        'bucket.src',
+                        new URL(desiredUri, window.location.href), //TODO: is this a good idea?
                     )
+
+                    this.registerThreepio(id, loaded, threeParent)
                     copyProps(loaded, node)
+
                     if (this.onLoad) {
                         this.onLoad(loaded)
                     }
+
+                    console.debug('Loaded and ready to go:', desiredUri, loaded)
                     return loaded
                 })
             } else {
@@ -393,9 +396,7 @@ export class ThreeSync implements SerializedScene {
 
         if (!threepio) {
             threepio = createThreeFromNode(node)
-            this.idToThree.set(id, threepio)
-            this.threeToId.set(threepio, id)
-            threeParent.add(threepio)
+            this.registerThreepio(id, threepio, threeParent)
         }
 
         copyProps(threepio, node)
@@ -405,6 +406,17 @@ export class ThreeSync implements SerializedScene {
                 this.syncNodeToThree(child, threepio)
             }
         }
+    }
+
+    private registerThreepio(
+        id: UniqueID,
+        threepio: Object3D,
+        parent: Object3D,
+    ) {
+        this.idToThree.set(id, threepio)
+        this.threeToId.set(threepio, id)
+        parent.add(threepio)
+        set(threepio.userData, 'bucket.id', id)
     }
 }
 
@@ -451,8 +463,8 @@ function createThreeFromNode(node: SerializedNode): THREE.Object3D {
     }
 
     threepio = new klass()
-    const userData: BucketThreepioUserData = {
-        src: 'TODO?', //; should this point to the SBK file or something',
+    const userData: Object3DUserData['bucket'] = {
+        // src: 'TODO?', //; should this point to the SBK file or something',
         id: node.id,
     }
     threepio.userData.bucket = userData

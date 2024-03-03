@@ -26,9 +26,6 @@ export const theme = deepmerge(defaultTheme, {
                         selectedBg: 'rgba(208, 215, 222, 0.72)',
                     },
                 },
-                overlay: {
-                    backdrop: 'red',
-                },
             },
             shadows: {
                 panelSection:

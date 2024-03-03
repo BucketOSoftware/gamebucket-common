@@ -181,3 +181,7 @@ export function normalizedCanvasPosition(
 
     return { x, y }
 }
+
+export function isNormalizedCanvasPosition({ x, y }: GVec2): boolean {
+    return x >= -1 && x <= 1 && y >= -1 && y < 1
+}
