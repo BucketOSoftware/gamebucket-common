@@ -135,7 +135,7 @@ export interface LightProperties {
 // We don't change 'em
 export type CameraProperties = GLTFType.ICamera
 
-/** Properties added to the Three obj's userData */
+/** Properties added to the Three obj's userData.bucket */
 export interface BucketThreepioUserData {
     /** Indicates that this object was created from a node that linked to a
      * GLTF file */

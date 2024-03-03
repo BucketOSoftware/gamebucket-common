@@ -17,7 +17,7 @@ import {
     UniqueID,
     createNodeID,
     getThreeID,
-    nodeTypeFromThree,
+    nodeTypeFromThree
 } from './format'
 export type TODO = any
 
@@ -333,15 +333,26 @@ export class ThreeSync implements SerializedScene {
                 "Children on a pointer node -- should be supported, but currenlty isn't",
             )
 
-            const existingUri: string | undefined =
-                threepio?.userData.bucket?.src?.uri
+            const userData: BucketThreepioUserData | undefined =
+                threepio?.userData.bucket
+            const existingUri: string | undefined = userData?.src
             const uriChanged = existingUri !== desiredUri
+            // console.warn('URI:', existingUri, '->', desiredUri, uriChanged)
             if (uriChanged && desiredUri) {
+                console.debug(
+                    'src changed for node ',
+                    id,
+                    ': ',
+                    existingUri,
+                    '->',
+                    desiredUri,
+                )
                 invariant(typeof desiredUri === 'string')
 
-                // TODO: what do we do if desiredUri is now undefined? Should we
+                // TODO?: what do we do if desiredUri is now undefined? Should we
                 // remove the loaded object?
 
+                // TODO: better handle race conditions here
                 // console.warn('Loading...', src)
                 this.loader.loadAsync(desiredUri).then((gltf) => {
                     // see if another one has been loaded in the meantime

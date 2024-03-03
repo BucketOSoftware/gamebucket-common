@@ -155,7 +155,7 @@ export default class EditorLiaison {
 
         for (let threepio of this.outlinePass.selectedObjects) {
             const helpers = compact(helpersForObject(threepio))
-            console.warn(helpers)
+            // console.warn(helpers)
             if (helpers.length) {
                 this.activeHelpers.set(threepio, helpers)
                 this.editorScene.add(...helpers)
