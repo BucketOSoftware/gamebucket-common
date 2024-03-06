@@ -20,7 +20,8 @@ import {
     nodeTypeFromThree,
 } from './format'
 import { Object3D } from 'three'
-export type TODO = any
+
+type TODO = any
 
 // TODO: replace with types from our own lib
 export type Tup3 = THREE.Vector3Tuple
@@ -29,39 +30,41 @@ export type Quat4 = THREE.Vector4Tuple
 // #pragma section -
 
 /**
- * Translates between SceneBucket format (SBK) and Three.js via editor intermediary
+ * Translates between SceneBucket format (SBk) and Three.js via editor intermediary
  */
 export class SceneBucketFile {
     public readonly nodes = new Map<UniqueID, BucketNode>()
     private readonly nodeToId = new WeakMap<BucketNode, UniqueID>()
-    /** Properties contained in separate chunks of the GLTF file. @todo: Write types for these as they exist in the GLTF file, as oppposed to how we serialize them */
+    private readonly doc: Readonly<SceneBucketFormat>
+
+    /** Properties contained in separate chunks of the GLTF file. @todo: Write
+     * types for these as they exist in the GLTF file, as oppposed to how we
+     * serialize them -- there's going to be a mismatch*/
     private readonly extras = new WeakMap<
         BucketNode,
         LightProperties | CameraProperties
     >()
 
-    private readonly doc: Readonly<SceneBucketFormat>
-
     constructor(gltf: TODO) {
-        // necessary to clone?
+        // TODO? necessary to clone?
         this.doc = cloneDeep(gltf)
 
-        const { doc: scene, nodes: idToNode, nodeToId, extras } = this
+        const { doc, nodes: idToNode, nodeToId, extras } = this
 
         // index the nodes in this file
-        for (let node of scene.nodes ?? []) {
+        for (let node of doc.nodes ?? []) {
             const id = createNodeID()
             idToNode.set(id, node)
             nodeToId.set(node, id)
 
             if ('camera' in node) {
-                extras.set(node, scene.cameras![node.camera!])
+                extras.set(node, doc.cameras![node.camera!])
             }
 
             const lightIdx = node.extensions?.KHR_lights_punctual?.light
             if (!isUndefined(lightIdx)) {
                 const light =
-                    scene.extensions.KHR_lights_punctual?.lights[lightIdx]
+                    doc.extensions.KHR_lights_punctual?.lights[lightIdx]
                 invariant(light)
                 extras.set(node, light)
             }
@@ -74,17 +77,11 @@ export class SceneBucketFile {
 
     /** translate the GLTF version of the `this.doc` graph into the editor format */
     serialize() {
-        const {
-            defaultScene,
-            doc: scene,
-            nodeToId,
-            nodes: idToNode,
-            extras,
-        } = this
+        const { defaultScene, doc, nodeToId, nodes: idToNode } = this
 
         const draft = {
             roots: defaultScene.nodes.map(
-                (idx) => nodeToId.get(scene.nodes[idx])!, // TODO: verify
+                (idx) => nodeToId.get(doc.nodes[idx])!, // TODO: verify
             ),
             nodes: {} as { [id: UniqueID]: SerializedNode },
         }
@@ -173,33 +170,6 @@ export class ThreeSync implements SerializedScene {
         this.roots = roots
     }
 
-    asSerialized() {
-        return { nodes: this.nodes, roots: this.roots }
-    }
-
-    /** Sync a single node to three.js */
-    updateNode(newNode: SerializedNode) {
-        // console.debug("Update: ", newNode.id)
-        const oldNode = this.nodes[newNode.id]
-        invariant(oldNode)
-        if (newNode === oldNode) {
-            console.debug('No change:', oldNode.id)
-            return
-        }
-
-        // Object.assign(oldNode, newNode)
-        oldNode.visible = newNode.visible
-
-        const threepio = this.idToThree.get(oldNode.id)
-        // console.log(threepio)
-        if (!threepio) {
-            console.warn('Okay nevermind')
-            return
-        }
-
-        this.syncNodeToThree(oldNode.id, threepio.parent!, false)
-    }
-
     /** TODO: support multiple cameras I guess */
     get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera | null {
         for (let [id, obj] of this.idToThree) {
@@ -238,17 +208,43 @@ export class ThreeSync implements SerializedScene {
         // Note: the scene itself isn't ever loaded from a GLTF, it's passed in to us.
         // Thus, we start from the kids
         for (let threepio of threeScene.children) {
-            this.updateNodeFromThree(threepio)
+            this.syncThreeToNode(threepio)
         }
 
         console.timeEnd('syncFromThree')
     }
 
-    private updateNodeFromThree(threepio: THREE.Object3D) {
+    /** Sync a single node to three.js */
+    updateThree(newNode: SerializedNode) {
+        // console.debug("Update: ", newNode.id)
+        const oldNode = this.nodes[newNode.id]
+        invariant(oldNode)
+        if (newNode === oldNode) {
+            console.debug('No change:', oldNode.id)
+            return
+        }
+
+        // Object.assign(oldNode, newNode)
+        oldNode.visible = newNode.visible
+
+        const threepio = this.idToThree.get(oldNode.id)
+        if (!threepio) {
+            console.warn('Okay nevermind')
+            return
+        }
+
+        this.syncNodeToThree(oldNode.id, threepio.parent!, false)
+    }
+
+    private syncThreeToNode(threepio: THREE.Object3D) {
         const existing = this.threeToId.get(threepio)
         if (existing) {
             const node = this.nodes[existing]
-            invariant(node)
+            invariant(
+                node,
+                'TODO: delete objects whose nodes have been deleted',
+            )
+
             Object.assign(node, this.nodeThatRepresents(threepio))
             return node
         } else {
@@ -305,7 +301,7 @@ export class ThreeSync implements SerializedScene {
             name: name || threepio.constructor.name,
             type,
             children: threepio.children.map(
-                (child) => this.updateNodeFromThree(child).id,
+                (child) => this.syncThreeToNode(child).id,
             ), // TODO: move this out so this can be a plain function
             position: position.toArray() as Tup3,
             scale: scale.toArray() as Tup3,
@@ -332,7 +328,7 @@ export class ThreeSync implements SerializedScene {
             invariant(isUndefined(threepio) || threepio instanceof THREE.Group)
             invariant(
                 !node.children || node.children.length === 0,
-                "Children on a pointer node -- should be supported, but currenlty isn't",
+                "Children on a pointer node -- should be supported, but currently isn't",
             )
 
             const userData: Object3DUserData | undefined = threepio?.userData
@@ -340,40 +336,32 @@ export class ThreeSync implements SerializedScene {
             const uriChanged = existingUri !== desiredUri
             // console.warn('URI:', existingUri, '->', desiredUri, uriChanged)
             if (uriChanged && desiredUri) {
-                console.debug(
-                    'src changed for node ',
-                    id,
-                    ': ',
-                    existingUri,
-                    '->',
-                    desiredUri,
-                )
+                // console.debug( 'src changed for node ', id, ': ', existingUri, '->', desiredUri)
                 invariant(typeof desiredUri === 'string')
 
                 // TODO?: what do we do if desiredUri is now undefined? Should we
                 // remove the loaded object?
 
                 // TODO: better handle race conditions here
-                // console.warn('Loading...', src)
+                // console.warn('Loading...', src
                 this.loader.loadAsync(desiredUri).then((gltf) => {
                     // see if another one has been loaded in the meantime
                     threepio = this.idToThree.get(id)
                     if (threepio) {
-                        threepio.removeFromParent()
-                        console.error(
-                            'TODO: release geometry/material resources',
-                        )
+                        this.free(threepio)
                     }
 
                     // TODO: allow for doing stuff like setting all children to
                     // .castShadow = true or something
-                    // TODO?: is this necessary?
-                    // TODO: handle SkinnedMeshes with that special utility function dammit
+                    // TODO: handle SkinnedMeshes with that special utility
+                    // function dammit
+                    // TODO?: is it necessary to clone it? probably, but it
+                    // would be nice to avoid
                     const loaded = gltf.scene.clone()
                     set(
                         loaded.userData as Object3DUserData,
                         'bucket.src',
-                        new URL(desiredUri, window.location.href), //TODO: is this a good idea?
+                        desiredUri,
                     )
 
                     this.registerThreepio(id, loaded, threeParent)
@@ -408,6 +396,11 @@ export class ThreeSync implements SerializedScene {
         }
     }
 
+    private free(threepio: Object3D) {
+        threepio.removeFromParent()
+        console.error('TODO: release geometry/material resources')
+    }
+
     private registerThreepio(
         id: UniqueID,
         threepio: Object3D,
@@ -420,22 +413,13 @@ export class ThreeSync implements SerializedScene {
     }
 }
 
-export function colorFromTuple(color: Tup3 = [1, 1, 1]) {
+function colorFromTuple(color: Tup3 = [1, 1, 1]) {
     return new THREE.Color().setRGB(
         color[0],
         color[1],
         color[2],
         THREE.LinearSRGBColorSpace,
     )
-}
-
-function setAndCheckV3(dest: THREE.Vector3, src: Readonly<THREE.Vector3Tuple>) {
-    let diff = dest.x !== src[0] || dest.y !== src[1] || dest.z !== src[2]
-
-    dest.x = src[0]
-    dest.y = src[1]
-    dest.z = src[2]
-    return diff
 }
 
 const typeToKlass = {
