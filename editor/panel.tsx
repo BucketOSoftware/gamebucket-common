@@ -8,8 +8,8 @@ import {
     XIcon,
 } from '@primer/octicons-react'
 import { Box, ButtonGroup, Heading, IconButton } from '@primer/react'
-import { useState } from 'preact/hooks'
-import type { PropsWithChildren } from 'preact/compat'
+import { useState } from 'react'
+import type { PropsWithChildren } from 'react'
 
 export function Panel(
     props: {

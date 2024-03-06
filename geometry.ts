@@ -21,6 +21,10 @@ export function toTVec3(v: GVec3): TVec3 {
     return new TVec3(v.x, v.y, v.z)
 }
 
+export function toGVec3({ x, y, z }: TVec3): GVec3 {
+    return { x, y, z }
+}
+
 export function degToRad(degrees: number) {
     return (degrees * Math.PI) / 180
 }

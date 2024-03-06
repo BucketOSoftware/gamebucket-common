@@ -1,14 +1,19 @@
-import { render } from 'preact'
-import * as THREE from 'three'
+import { compact } from 'lodash-es'
 import {
     Camera,
     CameraHelper,
     DirectionalLight,
     DirectionalLightHelper,
     Object3D,
+    PointLight,
     PointLightHelper,
+    Raycaster,
     Scene,
+    SpotLight,
     SpotLightHelper,
+    WebGLRenderer,
+    type PerspectiveCamera,
+    type Vector2,
 } from 'three'
 import { MapControls } from 'three/addons/controls/MapControls.js'
 import { ClearPass } from 'three/addons/postprocessing/ClearPass.js'
@@ -18,15 +23,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import invariant from 'tiny-invariant'
 
-import { GVec2, ZVec2 } from '../geometry'
-import type { SerializedNode, UniqueID } from '../scenebucket'
-import { compact } from 'lodash-es'
+import { GVec2, ZVec2, toGVec3 } from '../geometry'
+import type { Object3DUserData, SerializedNode, UniqueID } from '../scenebucket'
 import { isNormalizedCanvasPosition } from '../threez'
 
-type EitherCamera = THREE.PerspectiveCamera | THREE.OrthographicCamera
+type EitherCamera = PerspectiveCamera | THREE.OrthographicCamera
 
 export interface Params {
-    scene: THREE.Scene
+    scene: Scene
     camera: EitherCamera
     canvas: HTMLCanvasElement
     getObjectById: (id: UniqueID) => Object3D
@@ -43,12 +47,12 @@ export default class EditorLiaison {
     public readonly canvas: HTMLCanvasElement
     private readonly editorCamera: EitherCamera
     /** Scene for widgets and such */
-    private readonly editorScene: THREE.Scene = new Scene()
+    private readonly editorScene: Scene = new Scene()
     /** The scene under edit.
      * @todo? What if we want to edit more than one, or change it while the editor is open? */
-    private userScene: THREE.Scene
+    private userScene: Scene
 
-    private raycaster = new THREE.Raycaster()
+    private raycaster = new Raycaster()
     private controls?: MapControls
 
     private outlinePass?: OutlinePass
@@ -70,7 +74,8 @@ export default class EditorLiaison {
     /** stop rendering the editor. afterwards, you should probably toss this object! */
     teardown() {
         console.debug('Tearing down the editor app!')
-        render(null, this.editorRoot)
+        console.error('TODO: root.unmount()')
+        // render(null, this.editorRoot)
 
         // deselect to release any resources
         this.setSelection()
@@ -97,9 +102,9 @@ export default class EditorLiaison {
     // }
 
     /** Get an effects composer that renders the editor's graphics. Tied to a
-     * particular THREE.scene, so it would be necessary to recreate it if you
+     * particular scene, so it would be necessary to recreate it if you
      * change the scene. */
-    getRenderer(renderer: THREE.WebGLRenderer) {
+    getRenderer(renderer: WebGLRenderer) {
         const { editorCamera, editorScene, userScene } = this
         this.outlinePass = outlinePass(userScene, editorCamera)
         this.outlinePass.enabled = false
@@ -124,18 +129,50 @@ export default class EditorLiaison {
         this.controls?.update(dt)
     }
 
-    hitTest(point: GVec2) {
+    private hitTest(point: GVec2) {
         invariant(isNormalizedCanvasPosition(point))
 
         const { raycaster, editorCamera, userScene } = this
 
-        raycaster.setFromCamera(point as THREE.Vector2, editorCamera)
+        raycaster.setFromCamera(point as Vector2, editorCamera)
         return raycaster.intersectObject(userScene, true)
     }
 
-    mapControls(enabled: boolean) {
-        console.warn(enabled ? 'enabling' : 'disabling', 'map controls')
+    idAt(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
 
+        // TODO: allow picking objects behind objects. maybe: if the
+        // result of objectsAt is _exactly_ the same as it was last
+        // time, cycle through the results instead of picking the last one
+        for (let hit of this.hitTest(point)) {
+            const id = selectionId(hit)
+
+            if (id) {
+                return id
+            }
+        }
+    }
+
+    hitTestWithId(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
+
+        for (let hit of this.hitTest(point)) {
+            const id = selectionId(hit)
+
+            if (id) {
+                // otherwise redux will complain about
+
+                return {
+                    id,
+                    point: toGVec3(hit.point),
+                    distance: hit.distance,
+                    // normal: hit.normal
+                }
+            }
+        }
+    }
+
+    mapControls(enabled: boolean) {
         const { editorCamera, canvas } = this
         if (enabled) {
             invariant(canvas)
@@ -159,6 +196,7 @@ export default class EditorLiaison {
             this.outlinePass && this.overlayPass,
             'setSelection: must create the renderer before calling setSelection',
         )
+
         this.outlinePass.selectedObjects = arrayWrap(id)
             .filter((i) => i)
             .map((id) => this.getObjectById(id as UniqueID))
@@ -189,33 +227,24 @@ export default class EditorLiaison {
 
         this.onUpdate()
     }
-
-    /** Report a click on the canvas to the editor. Invoke like this:
-     *  @deprecated
-     * 	@example liaison.clickAt(
-     *              (event.clientX / window.innerWidth) * 2 - 1,
-     *				-(event.clientY / window.innerHeight) * 2 + 1))
-     *
-     */
-    private clickAt(x: number, y: number) {}
 }
 
 function arrayWrap<T>(ik: unknown): T[] {
     return Array.isArray(ik) ? ik : [ik]
 }
 
-function renderPass(scene: THREE.Scene, camera: Camera) {
+function renderPass(scene: Scene, camera: Camera) {
     return new RenderPass(scene, camera)
 }
 
-function renderOverlayPass(scene: THREE.Scene, camera: Camera) {
+function renderOverlayPass(scene: Scene, camera: Camera) {
     const pass = new RenderPass(scene, camera)
     pass.clear = false
     pass.clearDepth = true
     return pass
 }
 
-function outlinePass(scene: THREE.Scene, camera: Camera) {
+function outlinePass(scene: Scene, camera: Camera) {
     // DONTYET: this creates a bunch of materials but doesn't provide a way to precompile them
     const brite = 1 / 50
     const outliner = new OutlinePass(ZVec2(1, 1), scene, camera)
@@ -240,7 +269,7 @@ function helpersForObject(threepio: Object3D): (Object3D | null)[] {
                     : null,
             ]
         case 'SpotLight':
-            invariant(threepio instanceof THREE.SpotLight)
+            invariant(threepio instanceof SpotLight)
             return [
                 new SpotLightHelper(threepio),
                 threepio.castShadow
@@ -248,7 +277,7 @@ function helpersForObject(threepio: Object3D): (Object3D | null)[] {
                     : null,
             ]
         case 'PointLight':
-            invariant(threepio instanceof THREE.PointLight)
+            invariant(threepio instanceof PointLight)
             return [
                 new PointLightHelper(threepio),
                 // new PointLightHelper(threepio, threepio.distance),
@@ -261,4 +290,27 @@ function helpersForObject(threepio: Object3D): (Object3D | null)[] {
         default:
             return []
     }
+}
+
+/** Return the closest ancestor with an ID that is visible and corporeal */
+function selectionId(hit: THREE.Intersection) {
+    let foundID: UniqueID | undefined
+    let walker: THREE.Object3D | null = hit.object
+
+    // Ignore helpers and lines and such
+    if (!hit.face) return
+
+    while (walker) {
+        if (!walker.visible) {
+            // the clicked object won't be drawn
+            return undefined
+        }
+
+        if (!foundID && (walker.userData as Object3DUserData).bucket?.id) {
+            foundID = walker.userData.bucket.id
+        }
+        walker = walker.parent
+    }
+
+    return foundID
 }

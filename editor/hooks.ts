@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'preact/hooks'
+import { useEffect, useRef } from 'react'
 
 export function useObserve<T>(callback: () => void, key: T, observed: any[]) {
     const oldKey = useRef<T>()

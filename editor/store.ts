@@ -16,6 +16,7 @@ import {
     useSelector as useSelectorUntyped,
 } from 'react-redux'
 
+import { GVec2, GVec3 } from '../geometry'
 import { SerializedNode, UniqueID } from '../scenebucket'
 
 const INITIAL_STATE = {
@@ -70,10 +71,29 @@ export const sceneSlice = createSlice({
 
 export const uiSlice = createSlice({
     name: 'ui',
-    initialState: { selected: undefined as UniqueID | undefined },
+
+    initialState: {
+        selected: undefined as UniqueID | undefined,
+        worldClickPoint: undefined as GVec3 | undefined,
+        contextMenu: undefined as { origin: GVec2; open: boolean } | undefined,
+    },
     reducers: {
         selectNode(state, action: Payload<UniqueID | undefined>) {
             state.selected = action.payload
+            state.contextMenu = undefined
+        },
+        openContext(
+            state,
+            {
+                payload,
+            }: Payload<{ id?: UniqueID; world?: GVec3; origin: GVec2 }>,
+        ) {
+            // state.selected = payload.id
+            state.worldClickPoint = payload.world
+            state.contextMenu = { origin: payload.origin, open: true }
+        },
+        closeContext(state) {
+            state.contextMenu = undefined
         },
     },
 })
@@ -87,7 +107,7 @@ export const createStore = () =>
     })
 
 export const { loadScene, toggleProperty } = sceneSlice.actions
-export const { selectNode } = uiSlice.actions
+export const { selectNode, openContext, closeContext } = uiSlice.actions
 
 type StoreType = ReturnType<typeof createStore>
 // Infer the `RootState` and `AppDispatch` types from the store itself

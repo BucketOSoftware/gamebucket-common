@@ -2,6 +2,7 @@ import { theme as defaultTheme } from '@primer/react'
 import deepmerge from 'deepmerge'
 import { createGlobalStyle } from 'styled-components'
 import * as styles from './styles'
+import { HTMLAttributes } from 'react'
 
 export const GlobalStyles = createGlobalStyle`
   #gbk-editor {
@@ -51,5 +52,5 @@ export const sidebar = {
     transform: 'perspective(1000px) rotate3d(0, 1, 0, 10deg)',
     transformOrigin: 'left',
 
-    zIndex: 100,
+    zIndex: 10,
 }

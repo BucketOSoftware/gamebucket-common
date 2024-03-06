@@ -8,13 +8,10 @@ import {
     WorkflowIcon,
 } from '@primer/octicons-react'
 import { IconButton, TreeView } from '@primer/react'
-import { useCallback, useContext, useEffect, useRef } from 'preact/hooks'
+import { useCallback, useContext, useEffect, useRef } from 'react'
 import invariant from 'tiny-invariant'
 
-import {
-    type SerializedNode,
-    type UniqueID,
-} from '../scenebucket'
+import { type SerializedNode, type UniqueID } from '../scenebucket'
 
 import { LiaisonContext } from './editor'
 import { useObserve } from './hooks'
@@ -23,13 +20,9 @@ import { Panel, PanelBody } from './panel'
 import { selectNode, toggleProperty, useDispatch, useSelector } from './store'
 
 export function SceneTree() {
-    const liaison = useContext(LiaisonContext)
     const dispatch = useDispatch()
 
-    const selection = useSelector((state) => state.ui.selected)
     const roots = useSelector((state) => state.scene.roots)
-
-    useEffect(() => liaison.setSelection(selection), [selection])
 
     useEffect(() => {
         function select(ev: Event) {
@@ -53,7 +46,7 @@ export function SceneTree() {
             <PanelBody>
                 <TreeView>
                     {roots.map((id) => (
-                        <SceneNode id={id} />
+                        <SceneNode id={id} key={id} />
                     ))}
                 </TreeView>
             </PanelBody>
@@ -94,7 +87,7 @@ function SceneNode(props: { id: UniqueID }) {
             {kids.length ? (
                 <TreeView.SubTree>
                     {kids.map((id: UniqueID) => (
-                        <SceneNode id={id} />
+                        <SceneNode id={id} key={id} />
                     ))}
                 </TreeView.SubTree>
             ) : null}
@@ -119,7 +112,7 @@ function VisibilityButton({ id }: { id: UniqueID }) {
             icon={node.visible ? EyeIcon : EyeClosedIcon}
             variant="invisible"
             size="small"
-            onClick={(ev: Event) => {
+            onClick={(ev) => {
                 ev.stopPropagation() // avoid selecting the node
                 dispatch(
                     toggleProperty({

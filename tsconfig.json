@@ -12,12 +12,13 @@
         "resolveJsonModule": true,
         "moduleResolution": "bundler",
 
-        // For preact:
         "jsx": "react-jsx",
-        "jsxImportSource": "preact",
+
+        // For preact:
+        // "jsxImportSource": "preact",
         "paths": {
-            "react": ["./node_modules/preact/compat/"],
-            "react-dom": ["./node_modules/preact/compat/"]
+            // "react": ["./node_modules/preact/compat/"],
+            // "react-dom": ["./node_modules/preact/compat/"]
         }
     },
     "include": ["**/*.ts", "**/*.tsx"]
