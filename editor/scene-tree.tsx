@@ -102,9 +102,9 @@ function VisibilityButton({ id }: { id: UniqueID }) {
     }
 
     const dispatch = useDispatch()
-    const sync = useContext(LiaisonContext)
+    const liaison = useContext(LiaisonContext)
 
-    useObserve(() => sync.onUpdate(node), id, [node.visible])
+    useObserve(() => liaison.syncNodeToThree(node), id, [node.visible])
 
     return (
         <IconButton

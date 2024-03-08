@@ -23,7 +23,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import invariant from 'tiny-invariant'
 
-import { GVec2, ZVec2, toGVec3 } from '../geometry'
+import { GVec2, GVec3, ZVec2, toGVec3 } from '../geometry'
 import type { Object3DUserData, SerializedNode, UniqueID } from '../scenebucket'
 import { isNormalizedCanvasPosition } from '../threez'
 
@@ -34,7 +34,8 @@ export interface Params {
     camera: EitherCamera
     canvas: HTMLCanvasElement
     getObjectById: (id: UniqueID) => Object3D
-    onUpdate: EditorLiaison['onUpdate'] //  (node?: SerializedNode) => void
+    syncNodeToThree: EditorLiaison['syncNodeToThree'] //  (node?: SerializedNode) => void
+    syncThreeToNode: EditorLiaison['syncThreeToNode']
 }
 
 export default class EditorLiaison {
@@ -42,7 +43,9 @@ export default class EditorLiaison {
 
     getObjectById: Params['getObjectById']
     /** Callback: called when a node is modified */
-    onUpdate: (node?: SerializedNode) => void
+    syncNodeToThree: (node?: SerializedNode) => void
+    /**  */
+    syncThreeToNode: (threepio: Object3D) => void
 
     public readonly canvas: HTMLCanvasElement
     private readonly editorCamera: EitherCamera
@@ -60,11 +63,19 @@ export default class EditorLiaison {
     private activeHelpers = new Map<Object3D, Object3D[]>()
 
     constructor(
-        { camera, getObjectById, onUpdate, scene, canvas }: Params,
+        {
+            camera,
+            getObjectById,
+            syncNodeToThree,
+            syncThreeToNode,
+            scene,
+            canvas,
+        }: Params,
         public readonly editorRoot: HTMLElement,
     ) {
         this.getObjectById = getObjectById
-        this.onUpdate = onUpdate
+        this.syncNodeToThree = syncNodeToThree
+        this.syncThreeToNode = syncThreeToNode
 
         this.canvas = canvas
         this.userScene = scene
@@ -129,49 +140,6 @@ export default class EditorLiaison {
         this.controls?.update(dt)
     }
 
-    private hitTest(point: GVec2) {
-        invariant(isNormalizedCanvasPosition(point))
-
-        const { raycaster, editorCamera, userScene } = this
-
-        raycaster.setFromCamera(point as Vector2, editorCamera)
-        return raycaster.intersectObject(userScene, true)
-    }
-
-    idAt(point: GVec2) {
-        invariant(isNormalizedCanvasPosition(point))
-
-        // TODO: allow picking objects behind objects. maybe: if the
-        // result of objectsAt is _exactly_ the same as it was last
-        // time, cycle through the results instead of picking the last one
-        for (let hit of this.hitTest(point)) {
-            const id = selectionId(hit)
-
-            if (id) {
-                return id
-            }
-        }
-    }
-
-    hitTestWithId(point: GVec2) {
-        invariant(isNormalizedCanvasPosition(point))
-
-        for (let hit of this.hitTest(point)) {
-            const id = selectionId(hit)
-
-            if (id) {
-                // otherwise redux will complain about
-
-                return {
-                    id,
-                    point: toGVec3(hit.point),
-                    distance: hit.distance,
-                    // normal: hit.normal
-                }
-            }
-        }
-    }
-
     mapControls(enabled: boolean) {
         const { editorCamera, canvas } = this
         if (enabled) {
@@ -225,7 +193,73 @@ export default class EditorLiaison {
         this.outlinePass.enabled = enable
         this.overlayPass.enabled = enable
 
-        this.onUpdate()
+        this.syncNodeToThree()
+    }
+
+    //----- Manipulating the scene
+
+    pointAt(threepio: Object3D, target: GVec3) {
+        const hasTarget = threepio && 'target' in threepio
+        if (hasTarget) {
+            // TODO: think on how targets work
+            const tgt = threepio.target as Object3D
+            invariant(tgt.parent === null)
+            tgt.position.copy(target)
+
+            // If the target isn't added to the scene, this needs to be done manually?
+            tgt.updateMatrix()
+            tgt.updateMatrixWorld()
+            // does weird stuff if there's no parent?
+            // tgt.worldToLocal(tgt.position)
+        } else {
+            const { x, y, z } = target
+            threepio.lookAt(x, y, z)
+        }
+
+        this.syncThreeToNode(threepio)
+    }
+
+    private hitTest(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
+
+        const { raycaster, editorCamera, userScene } = this
+
+        raycaster.setFromCamera(point as Vector2, editorCamera)
+        return raycaster.intersectObject(userScene, true)
+    }
+
+    idAt(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
+
+        // TODO: allow picking objects behind objects. maybe: if the
+        // result of objectsAt is _exactly_ the same as it was last
+        // time, cycle through the results instead of picking the last one
+        for (let hit of this.hitTest(point)) {
+            const id = selectionId(hit)
+
+            if (id) {
+                return id
+            }
+        }
+    }
+
+    hitTestWithId(point: GVec2) {
+        invariant(isNormalizedCanvasPosition(point))
+
+        for (let hit of this.hitTest(point)) {
+            const id = selectionId(hit)
+
+            if (id) {
+                // otherwise redux will complain about
+
+                return {
+                    id,
+                    point: toGVec3(hit.point),
+                    distance: hit.distance,
+                    // normal: hit.normal
+                }
+            }
+        }
     }
 }
 

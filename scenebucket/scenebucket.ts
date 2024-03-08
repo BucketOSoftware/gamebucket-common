@@ -126,6 +126,9 @@ export class SceneBucketFile {
             rotation,
             scale,
 
+            // TODO: null if it can't have a target
+            target: node.extras?.bucket?.target ?? undefined,
+
             visible: canBeHidden ? !(bucketMeta?.hidden || false) : null,
             castShadow: canCastShadow ? bucketMeta?.castShadow || false : null,
             receiveShadow: canReceiveShadow
@@ -202,6 +205,7 @@ export class ThreeSync implements SerializedScene {
         console.timeEnd('syncToThree')
     }
 
+    /** Convert an entire Three scene into a set of nodes */
     fromThree(threeScene: THREE.Scene) {
         console.time('syncFromThree')
 
@@ -214,6 +218,8 @@ export class ThreeSync implements SerializedScene {
         console.timeEnd('syncFromThree')
     }
 
+    static readonly scalarProps = ['visible', 'castShadow', 'receiveShadow']
+
     /** Sync a single node to three.js */
     updateThree(newNode: SerializedNode) {
         // console.debug("Update: ", newNode.id)
@@ -224,8 +230,8 @@ export class ThreeSync implements SerializedScene {
             return
         }
 
-        // Object.assign(oldNode, newNode)
-        oldNode.visible = newNode.visible
+        // Does this work?
+        Object.assign(oldNode, newNode)
 
         const threepio = this.idToThree.get(oldNode.id)
         if (!threepio) {
@@ -236,81 +242,18 @@ export class ThreeSync implements SerializedScene {
         this.syncNodeToThree(oldNode.id, threepio.parent!, false)
     }
 
-    private syncThreeToNode(threepio: THREE.Object3D) {
-        const existing = this.threeToId.get(threepio)
-        if (existing) {
-            const node = this.nodes[existing]
-            invariant(
-                node,
-                'TODO: delete objects whose nodes have been deleted',
-            )
-
-            Object.assign(node, this.nodeThatRepresents(threepio))
-            return node
-        } else {
-            const node = this.nodeThatRepresents(threepio)
-            invariant(!this.threeToId.has(threepio))
-            invariant(!this.roots.includes(node.id))
-
-            const data = threepio.userData as Object3DUserData
-            set(data, 'bucket.id', node.id)
-
-            this.threeToId.set(threepio, node.id)
-            this.idToThree.set(node.id, threepio)
-            this.nodes[node.id] = node
-            // console.warn('Created new node for obj: ', node, threepio)
-            // TODO?: does this bear oout?
-            if ((threepio.parent as THREE.Scene).isScene) {
-                this.roots.push(node.id)
-            }
-            return node
-        }
-    }
-
-    private nodeThatRepresents(
-        threepio: THREE.Object3D<THREE.Object3DEventMap>,
-    ): SerializedNode {
-        const existingId = threepio.userData.bucket?.id
-
-        // was this node created by us, or some other code?
-        const ud = threepio.userData as Object3DUserData
-        if (ud.bucket?.src) {
-            // The node should already exist
-            invariant(existingId)
-            invariant(this.nodes[existingId])
-        } else {
-            // The node may or may not exist but it should have no src
-            invariant(existingId === undefined || existingId === threepio.uuid)
-            invariant(ud.bucket?.src === undefined)
+    /** Update a node from the live 3js object */
+    updateNode(threepio: THREE.Object3D) {
+        const id = this.getID(threepio)
+        if (!id) {
+            console.warn('No node/ID for object?', threepio)
+            return
         }
 
-        const {
-            name,
-            position,
-            scale,
-            quaternion,
-            visible,
-            castShadow,
-            receiveShadow,
-        } = threepio
-
-        const type = nodeTypeFromThree(threepio)
-
-        return {
-            id: getThreeID(threepio),
-            name: name || threepio.constructor.name,
-            type,
-            children: threepio.children.map(
-                (child) => this.syncThreeToNode(child).id,
-            ), // TODO: move this out so this can be a plain function
-            position: position.toArray() as Tup3,
-            scale: scale.toArray() as Tup3,
-            rotation: quaternion.toArray() as Quat4,
-            // booleans
-            visible,
-            castShadow,
-            receiveShadow,
-        }
+        invariant(id in this.nodes, "Object doesn't have an associated node")
+        // TODO: do we need to recurse here?
+        this.syncThreeToNode(threepio, false)
+        console.debug('Updated node:', this.nodes[id], threepio)
     }
 
     private syncNodeToThree(
@@ -396,9 +339,132 @@ export class ThreeSync implements SerializedScene {
         }
     }
 
+    /**
+     *
+     * @param threepio
+     * @param recurse If true, existing objects' `children` array will be updated
+     * @returns
+     */
+    private syncThreeToNode(
+        threepio: THREE.Object3D,
+        recurse = true,
+    ): SerializedNode {
+        const existingId = this.threeToId.get(threepio)
+        if (existingId) {
+            const node = this.nodes[existingId]
+            invariant(
+                node,
+                'TODO: delete objects whose nodes have been deleted',
+            )
+
+            // TODO: do we have to worry about deleted properties, or do we set them
+            // to something empty or null?
+            invariant(node.id)
+            Object.assign(node, this.nodeThatRepresents(threepio))
+
+            if (recurse) {
+                // TODO: what happens to orphaned nodes?
+                node.children = threepio.children.map(
+                    (child) => this.syncThreeToNode(child).id,
+                )
+            }
+
+            return node
+        } else {
+            console.assert(
+                recurse,
+                "Recursion is turned off but this is a new node; we'll miss stuff",
+            )
+            const node = this.nodeThatRepresents(
+                threepio,
+                threepio.children.map(
+                    (child) => this.syncThreeToNode(child, recurse).id,
+                ),
+            ) as SerializedNode
+
+            node.id = getThreeID(threepio)
+            invariant(!this.threeToId.has(threepio))
+            invariant(!this.roots.includes(node.id))
+
+            const data = threepio.userData as Object3DUserData
+            set(data, 'bucket.id', node.id)
+
+            this.registerNode(node, threepio)
+
+            // TODO?: does this bear oout?
+            if ((threepio.parent as THREE.Scene).isScene) {
+                this.roots.push(node.id)
+            }
+
+            return node
+        }
+    }
+
+    /**
+     * @todo Make this into a plain function
+     * @returns A plain object that contains the pertinent properties of a Three object
+     */
+    private nodeThatRepresents(
+        threepio: THREE.Object3D<THREE.Object3DEventMap>,
+        children: UniqueID[] = [],
+    ) {
+        const existingId = threepio.userData.bucket?.id
+
+        // was this node created by us, or some other code?
+        const ud = threepio.userData as Object3DUserData
+        if (ud.bucket?.src) {
+            // The node should already exist
+            invariant(existingId)
+            invariant(this.nodes[existingId])
+        } else {
+            // The node may or may not exist but it should have no src
+            invariant(existingId === undefined || existingId === threepio.uuid)
+            invariant(ud.bucket?.src === undefined)
+        }
+
+        const {
+            name,
+            position,
+            scale,
+            quaternion,
+            visible,
+            castShadow,
+            receiveShadow,
+        } = threepio
+
+        const type = nodeTypeFromThree(threepio)
+
+        return {
+            // id: getThreeID(threepio),
+            name: name || threepio.constructor.name,
+            type,
+            children,
+
+            // vectors
+            position: position.toArray() as Tup3,
+            scale: scale.toArray() as Tup3,
+            rotation: quaternion.toArray() as Quat4,
+            target:
+                'target' in threepio
+                    ? ((threepio.target as Object3D).position.toArray() as Tup3)
+                    : null,
+
+            // booleans
+            visible,
+            castShadow,
+            receiveShadow,
+        }
+    }
+
     private free(threepio: Object3D) {
         threepio.removeFromParent()
         console.error('TODO: release geometry/material resources')
+    }
+
+    private registerNode(node: SerializedNode, threepio: Object3D) {
+        this.threeToId.set(threepio, node.id)
+        this.idToThree.set(node.id, threepio)
+        this.nodes[node.id] = node
     }
 
     private registerThreepio(

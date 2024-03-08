@@ -138,7 +138,7 @@ function NodeDetailsPanel() {
         (state) => state.ui.selected && state.scene.nodes[state.ui.selected],
     )!
 
-    useObserve(() => sync.onUpdate(node), node.id, [node])
+    useObserve(() => sync.syncNodeToThree(node), node.id, [node])
 
     const { id, name, position } = node
 

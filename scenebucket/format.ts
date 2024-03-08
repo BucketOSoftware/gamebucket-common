@@ -80,6 +80,8 @@ export interface BucketExtras {
         hidden?: boolean
         castShadow?: boolean
         receiveShadow?: boolean
+        /** For lights, cameras, etc. Will be a separate object in 3js */
+        target?: Tup3
 
         /** if this is defined, this object came from a loaded GLTF file */
         src?: {
@@ -167,11 +169,16 @@ export interface SerializedNode {
     rotation: Quat4
     scale: Tup3
 
+    /** For cameras, directional lights, etc.
+     * Undefined means we don't know if the object would have a target
+     * @todo: How do we handle the target's parentage? */
+    target: Tup3 | undefined | null
+
     visible: boolean | null
     castShadow: boolean | null
     receiveShadow: boolean | null
 
-    /** URL to GLTF file -- null unless type is `mesh` */
+    /** URL to GLTF file -- null unless type is `mesh` or `group`? */
     src?: string | null
 
     light?: LightProperties | null

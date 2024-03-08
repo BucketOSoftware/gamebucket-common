@@ -1,15 +1,11 @@
-import {
-    ActionList,
-    ActionListItemProps,
-    ActionMenu,
-    Text,
-} from '@primer/react'
+import { ActionList, ActionListItemProps, ActionMenu } from '@primer/react'
 import { useCallback, useContext, useMemo } from 'react'
 import invariant from 'tiny-invariant'
 
 import { LiaisonContext } from './editor'
 import { closeContextMenu, useDispatch, useSelector } from './store'
-import { Object3D } from 'three'
+
+import { formatVec3 } from '../geometry'
 
 type OnSelectCallback = Exclude<ActionListItemProps['onSelect'], undefined>
 
@@ -31,10 +27,8 @@ export function ContextMenu() {
             open={isOpen}
             onOpenChange={(open) => {
                 if (!open) {
-                    // console.warn('Closing menu')
                     dispatch(closeContextMenu())
                 } else {
-                    // console.error('OPening menu?!')
                 }
             }}
         >
@@ -47,9 +41,8 @@ export function ContextMenu() {
                 left={origin?.x}
             >
                 <ActionList>
-                    <ActionList.Heading>{}</ActionList.Heading>
                     <LookHere />
-                    <ActionList.Item
+                    {/* <ActionList.Item
                         onSelect={() => alert('Quote reply clicked')}
                     >
                         Quote reply
@@ -64,17 +57,9 @@ export function ContextMenu() {
                         <ActionList.TrailingVisual>
                             ⌘E
                         </ActionList.TrailingVisual>
-                    </ActionList.Item>
+                    </ActionList.Item> */}
                     <ActionList.Divider />
-                    <ActionList.Item
-                        variant="danger"
-                        onSelect={() => alert('Delete file clicked')}
-                    >
-                        Delete file
-                        <ActionList.TrailingVisual>
-                            ⌘D
-                        </ActionList.TrailingVisual>
-                    </ActionList.Item>
+                    {DeleteObject()}
                 </ActionList>
             </ActionMenu.Overlay>
         </ActionMenu>
@@ -84,37 +69,20 @@ export function ContextMenu() {
 function LookHere() {
     const liaison = useContext(LiaisonContext)
     const selectedId = useSelector((state) => state.ui.selected)
-    const clickPoint = useSelector((state) => state.ui.worldClickPoint)
+    const clickPoint = useSelector((state) => state.ui.worldClickPoint!)
     const obj = useMemo(
         () => selectedId && liaison.getObjectById(selectedId),
         [selectedId],
     )
-    const hasTarget = obj && 'target' in obj
-    // invariant(clickPoint)
 
     const onSelect = useCallback<OnSelectCallback>(
         (ev) => {
-            invariant(obj)
             ev.stopPropagation()
-            if (hasTarget) {
-                // TODO: think on how targets work
-                const tgt = obj.target as Object3D
-                invariant(tgt.parent === null)
-                invariant(clickPoint)
-                tgt.position.copy(clickPoint)
-                // If the target isn't added to the scene, this needs to be done manually?
-                tgt.updateMatrix()
-                tgt.updateMatrixWorld()
-                // tgt.worldToLocal(tgt.position)
 
-                console.warn('TGT:', tgt.position)
-                liaison.onUpdate()
-                // const obj = invariant(obj)
-                console.log('okay', obj, obj.target)
+            invariant(obj)
+            invariant(clickPoint)
 
-                // obj.lookAt(clickPoint.x, clickPoint.y, clickPoint.z)
-            }
-            // console.log('Look at', clickPoint, obj.rotation, obj.quaternion)
+            liaison.pointAt(obj, clickPoint)
         },
         [clickPoint, obj, liaison],
     )
@@ -125,8 +93,20 @@ function LookHere() {
 
     return (
         <ActionList.Item onSelect={onSelect}>
-            {hasTarget ? 'Face here' : 'Look here'}
-            <ActionList.TrailingVisual>⌘T</ActionList.TrailingVisual>
+            Point here
+            <ActionList.Description variant="block">
+                {formatVec3(clickPoint)}
+            </ActionList.Description>
+            <ActionList.TrailingVisual>{/*⌘*/}⬆T</ActionList.TrailingVisual>
+        </ActionList.Item>
+    )
+}
+
+function DeleteObject() {
+    return (
+        <ActionList.Item variant="danger" onSelect={() => console.warn('TODO')}>
+            Delete file
+            <ActionList.TrailingVisual>⌘D</ActionList.TrailingVisual>
         </ActionList.Item>
     )
 }
