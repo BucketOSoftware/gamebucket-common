@@ -108,11 +108,11 @@ function SelectionTool({ activeTool, selectTool }: ToolProps) {
             }
         }
 
-        canvas.addEventListener('click', handleClick)
+        canvas.addEventListener('dblclick', handleClick)
         canvas.addEventListener('contextmenu', handleContext)
 
         return () => {
-            canvas.removeEventListener('click', handleClick)
+            canvas.removeEventListener('dblclick', handleClick)
             canvas.removeEventListener('contextmenu', handleContext)
         }
     }, [liaison, activeTool])
