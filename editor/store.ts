@@ -82,7 +82,7 @@ export const uiSlice = createSlice({
             state.selected = action.payload
             state.contextMenu = undefined
         },
-        openContext(
+        openContextMenu(
             state,
             {
                 payload,
@@ -92,7 +92,7 @@ export const uiSlice = createSlice({
             state.worldClickPoint = payload.world
             state.contextMenu = { origin: payload.origin, open: true }
         },
-        closeContext(state) {
+        closeContextMenu(state) {
             state.contextMenu = undefined
         },
     },
@@ -107,7 +107,7 @@ export const createStore = () =>
     })
 
 export const { loadScene, toggleProperty } = sceneSlice.actions
-export const { selectNode, openContext, closeContext } = uiSlice.actions
+export const { selectNode, openContextMenu, closeContextMenu } = uiSlice.actions
 
 type StoreType = ReturnType<typeof createStore>
 // Infer the `RootState` and `AppDispatch` types from the store itself

@@ -1,6 +1,4 @@
 import {
-    ActionList,
-    ActionMenu,
     BaseStyles,
     Box,
     FormControl,
@@ -31,10 +29,9 @@ import { Panel, PanelBody } from './panel'
 import { SceneTree } from './scene-tree'
 import {
     NodeTogglableProperties,
-    closeContext,
     createStore,
     loadScene,
-    openContext,
+    openContextMenu,
     selectNode,
     toggleProperty,
     useDispatch,
@@ -42,8 +39,8 @@ import {
 } from './store'
 import * as styles from './styles'
 import { Toolbar } from './toolbox'
-import invariant from 'tiny-invariant'
 import { Vector3 } from 'three'
+import { ContextMenu } from './context-menu'
 
 type TODO = any
 // type Camera = THREE.PerspectiveCamera | THREE.OrthographicCamera
@@ -129,103 +126,6 @@ function Editor() {
                 </BaseStyles>
             </ThemeProvider>
         </>
-    )
-}
-
-function ContextMenu() {
-    const dispatch = useDispatch()
-    const liaison = useContext(LiaisonContext)
-
-    const isOpen = useSelector(
-        (state) => state.ui.contextMenu?.origin !== undefined,
-    )
-
-    const id = useSelector((state) => state.ui.selected)
-    const world = useSelector((state) => state.ui.worldClickPoint)
-    const origin = useSelector((state) => state.ui.contextMenu?.origin)
-
-    // console.log('CMenu: ', isOpen, origin)
-
-    // const x = useSelector((state) => state.ui.contextMenu?.origin.x || 0)
-    // const y = useSelector((state) => state.ui.contextMenu?.origin.y || 0)
-    // console.warn(x, y, isOpen)
-
-    return (
-        <ActionMenu
-            open={isOpen}
-            onOpenChange={(open) => {
-                console.warn('Change context to: ', open, isOpen)
-                if (!open) {
-                    console.warn('Closing menu')
-                    dispatch(closeContext())
-                } else {
-                    console.error('OPening menu?!')
-                }
-            }}
-        >
-            <ActionMenu.Anchor>
-                <Text>HELLO</Text>
-            </ActionMenu.Anchor>
-            <ActionMenu.Overlay
-                side="inside-top"
-                top={origin?.y}
-                left={origin?.x}
-            >
-                <ActionList>
-                    {id && world && (
-                        <ActionList.Item
-                            onSelect={(ev) => {
-                                ev.stopPropagation()
-
-                                const obj = liaison.getObjectById(id)
-                                invariant(obj)
-                                console.log('okay', obj.rotation)
-                                obj.lookAt(world.x, world.y, world.z)
-
-                                // liaison.syncToNodes()
-                                console.log(
-                                    'Look at',
-                                    world,
-                                    obj.rotation,
-                                    obj.quaternion,
-                                )
-                            }}
-                        >
-                            Look here
-                            <ActionList.TrailingVisual>
-                                ⌘T
-                            </ActionList.TrailingVisual>
-                        </ActionList.Item>
-                    )}
-                    <ActionList.Item
-                        onSelect={() => alert('Quote reply clicked')}
-                    >
-                        Quote reply
-                        <ActionList.TrailingVisual>
-                            ⌘Q
-                        </ActionList.TrailingVisual>
-                    </ActionList.Item>
-                    <ActionList.Item
-                        onSelect={() => alert('Edit comment clicked')}
-                    >
-                        Edit comment
-                        <ActionList.TrailingVisual>
-                            ⌘E
-                        </ActionList.TrailingVisual>
-                    </ActionList.Item>
-                    <ActionList.Divider />
-                    <ActionList.Item
-                        variant="danger"
-                        onSelect={() => alert('Delete file clicked')}
-                    >
-                        Delete file
-                        <ActionList.TrailingVisual>
-                            ⌘D
-                        </ActionList.TrailingVisual>
-                    </ActionList.Item>
-                </ActionList>
-            </ActionMenu.Overlay>
-        </ActionMenu>
     )
 }
 

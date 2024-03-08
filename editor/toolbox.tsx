@@ -11,7 +11,7 @@ import {
 import { normalizedCanvasPosition } from '../threez'
 
 import { LiaisonContext } from './editor'
-import { openContext, selectNode, useDispatch } from './store'
+import { openContextMenu, selectNode, useDispatch } from './store'
 
 type Tools = 'drag' | 'select'
 const DEFAULT_TOOL: Tools = 'select'
@@ -26,7 +26,7 @@ interface ToolProps {
     selectTool: (which: Tools) => void
 }
 
-export function Toolbar(props: PropsWithChildren) {
+export function Toolbar() {
     const liaison = useContext(LiaisonContext)
 
     const [tool, setTool] = useState<Tools>(DEFAULT_TOOL)
@@ -90,14 +90,10 @@ function SelectionTool({ activeTool, selectTool }: ToolProps) {
         function handleContext(event: MouseEvent) {
             event.preventDefault()
 
-            // const canvas = event.target as HTMLCanvasElement
-            const point = normalizedCanvasPosition(event)
-            // pageX, pageY
-            console.warn('context!', event.pageX, event.pageY)
             const info = liaison.hitTestWithId(normalizedCanvasPosition(event))
             if (info) {
                 dispatch(
-                    openContext({
+                    openContextMenu({
                         id: info.id,
                         world: info?.point,
                         origin: { x: event.pageX, y: event.pageY },
@@ -105,7 +101,7 @@ function SelectionTool({ activeTool, selectTool }: ToolProps) {
                 )
             } else {
                 dispatch(
-                    openContext({
+                    openContextMenu({
                         origin: { x: event.pageX, y: event.pageY },
                     }),
                 )
@@ -114,6 +110,7 @@ function SelectionTool({ activeTool, selectTool }: ToolProps) {
 
         canvas.addEventListener('click', handleClick)
         canvas.addEventListener('contextmenu', handleContext)
+
         return () => {
             canvas.removeEventListener('click', handleClick)
             canvas.removeEventListener('contextmenu', handleContext)
