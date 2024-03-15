@@ -21,7 +21,7 @@ export const containsPoint = (
     x >= origin.x &&
     x < origin.x + size.width &&
     y >= origin.y &&
-    y <= origin.y + size.height
+    y < origin.y + size.height
 
 export const intersects = (a: Readonly<Rect>, b: Readonly<Rect>) =>
     !(
