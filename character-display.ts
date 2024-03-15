@@ -111,4 +111,17 @@ export default class CharacterDisplay {
 
         // console.timeEnd('render')
     }
+    /**
+     * @param x An x coordinate within the canvas
+     * @param y A y coordinate within the canvas
+     * @returns {GVec2} The coordinate of the buffer cell at the given pixel */
+    cellAtPixel(x: number, y: number): GVec2 {
+        invariant(x >= 0 && y >= 0, 'Coordinate is negative')
+        const { cellSize, magnify, offset } = this
+
+        return {
+            x: Math.floor(x / cellSize.width / magnify + offset.x),
+            y: Math.floor(y / cellSize.height / magnify + offset.y),
+        }
+    }
 }
