@@ -12,18 +12,20 @@ import fontImage from './font-12x12'
 // Bit 6: Red background
 // Bit 7: Bright background; or blinking text
 
-export const COLOR_BLUE_FG = 1 << 0
-export const COLOR_GREEN_FG = 1 << 1
-export const COLOR_RED_FG = 1 << 2
-export const COLOR_BRIGHT_FG = 1 << 3
-export const COLOR_BLUE_BG = 1 << 4
-export const COLOR_GREEN_BG = 1 << 5
-export const COLOR_RED_BG = 1 << 6
+export const COLOR_BLUE = 1 << 0
+export const COLOR_GREEN = 1 << 1
+export const COLOR_RED = 1 << 2
+export const COLOR_BRIGHT = 1 << 3
+export const COLOR_BG_BLUE = 1 << 4
+export const COLOR_BG_GREEN = 1 << 5
+export const COLOR_BG_RED = 1 << 6
 export const COLOR_BLINK = 1 << 7
 export const COLOR_BRIGHT_BG = 1 << 7
 
-export const COLOR_WHITE_FG = COLOR_BLUE_FG | COLOR_RED_FG | COLOR_GREEN_FG
-export const COLOR_WHITE_BG = COLOR_BLUE_BG | COLOR_RED_BG | COLOR_GREEN_BG
+export const COLOR_WHITE = COLOR_BLUE | COLOR_RED | COLOR_GREEN
+export const COLOR_BG_WHITE = COLOR_BG_BLUE | COLOR_BG_RED | COLOR_BG_GREEN
+
+export const COLOR_BG_BLACK = 0
 
 /** If true, slightly reduce the brightness of backgrounds -- not accurate to
  *  CGA hardware but easier on the eyes  */
@@ -31,7 +33,7 @@ let TAME_BG_COLORS = true
 /** If true, the BLINK/BRIGHT_BG bit makes backgroundds brighter; if false, it makes the foreground blink */
 let BRIGHT_BACKGROUNDS = false
 
-const palette = new Uint8Array(255 * 6)
+const palette = new Uint8Array(256 * 6)
 {
     const intensityMed = 170
     const intensityLow = 85
@@ -40,17 +42,17 @@ const palette = new Uint8Array(255 * 6)
     for (let colorbits = 0; colorbits <= 0xffff; colorbits++) {
         const idx = colorbits * 6
 
-        palette[idx + 0] |= colorbits & COLOR_RED_FG ? intensityMed : 0
-        palette[idx + 1] |= colorbits & COLOR_GREEN_FG ? intensityMed : 0
-        palette[idx + 2] |= colorbits & COLOR_BLUE_FG ? intensityMed : 0
+        palette[idx + 0] |= colorbits & COLOR_RED ? intensityMed : 0
+        palette[idx + 1] |= colorbits & COLOR_GREEN ? intensityMed : 0
+        palette[idx + 2] |= colorbits & COLOR_BLUE ? intensityMed : 0
 
-        palette[idx + 0] += colorbits & COLOR_BRIGHT_FG ? intensityLow : 0
-        palette[idx + 1] += colorbits & COLOR_BRIGHT_FG ? intensityLow : 0
-        palette[idx + 2] += colorbits & COLOR_BRIGHT_FG ? intensityLow : 0
+        palette[idx + 0] += colorbits & COLOR_BRIGHT ? intensityLow : 0
+        palette[idx + 1] += colorbits & COLOR_BRIGHT ? intensityLow : 0
+        palette[idx + 2] += colorbits & COLOR_BRIGHT ? intensityLow : 0
 
-        palette[idx + 3] = colorbits & COLOR_RED_BG ? intensityBg : 0
-        palette[idx + 4] = colorbits & COLOR_GREEN_BG ? intensityBg : 0
-        palette[idx + 5] = colorbits & COLOR_BLUE_BG ? intensityBg : 0
+        palette[idx + 3] = colorbits & COLOR_BG_RED ? intensityBg : 0
+        palette[idx + 4] = colorbits & COLOR_BG_GREEN ? intensityBg : 0
+        palette[idx + 5] = colorbits & COLOR_BG_BLUE ? intensityBg : 0
 
         if (BRIGHT_BACKGROUNDS) {
             palette[idx + 3] += colorbits & COLOR_BRIGHT_BG ? intensityLow : 0
@@ -63,14 +65,13 @@ const palette = new Uint8Array(255 * 6)
 export default class CharacterDisplay {
     // TODO?: Is this accurate?
     readonly blinkPeriod = 800
+    readonly cellSize = { width: 12, height: 12 }
 
     private font: HTMLImageElement
     private ctx: CanvasRenderingContext2D | null
 
     /** Tile coordinate to display in the top-left. Not limited to the bounds of the board */
     scroll = { x: 0, y: 0 }
-
-    readonly cellSize = { width: 12, height: 12 }
 
     private worldBounds = {
         origin: { x: 0, y: 0 },
@@ -80,6 +81,7 @@ export default class CharacterDisplay {
     booleanFont?: Uint8Array
 
     private pixelBuffer: ImageData
+    private bytesPerGlyph: number
 
     constructor(
         public readonly canvas: HTMLCanvasElement,
@@ -91,15 +93,16 @@ export default class CharacterDisplay {
         document.body.style.backgroundColor = 'black'
         this.font = document.createElement('img')
         this.font.src = fontImage
+        this.bytesPerGlyph = rect.area(cellSize)
 
         // Create display
         canvas.width = cellSize.width * viewportSize.width
         canvas.height = cellSize.height * viewportSize.height
         canvas.style.backgroundColor = 'black'
         canvas.style.width =
-            cellSize.width * viewportSize.width * magnify + 'px'
+            canvas.width * magnify + 'px'
         canvas.style.height =
-            cellSize.height * viewportSize.height * magnify + 'px'
+            canvas.height * magnify + 'px'
         canvas.style.imageRendering = 'pixelated'
         canvas.style.margin = '0 auto'
         canvas.style.position = 'inherit'
@@ -122,25 +125,31 @@ export default class CharacterDisplay {
     }
 
     render(
-        bufferSize: Readonly<rect.Size>,
+        {
+            width: backgroundWidth,
+            height: backgroundHeight,
+        }: Readonly<rect.Size>,
         background: Readonly<Uint8Array | Uint8ClampedArray>,
         sprites?: Readonly<Uint8Array | Uint8ClampedArray>,
         colors?: Readonly<Uint8Array | Uint8ClampedArray>,
         time?: number, // in ms
+        border = COLOR_BG_BLACK,
     ) {
         // console.time('render')
 
         // TODO: modify this.offset if it would cause us to render subpixel tiles
         const {
             ctx,
-            viewportSize,
-            cellSize,
+            viewportSize: { width: viewportWidth, height: viewportHeight },
+            cellSize: { height: cellHeight },
             worldBounds,
             booleanFont: font,
             pixelBuffer,
             blinkPeriod,
         } = this
-        worldBounds.size = { ...bufferSize }
+        // worldBounds.size = { ...backgroundSize }
+        worldBounds.size.width = backgroundWidth
+        worldBounds.size.height = backgroundHeight
         invariant(ctx, 'No context')
         invariant(font, 'No font')
 
@@ -148,79 +157,60 @@ export default class CharacterDisplay {
             ? false
             : !((((time || 0) / blinkPeriod) | 0) % 2)
 
-        const sw = cellSize.width
-        const sh = cellSize.height
-        const dw = sw
-        const dh = sh
-
-        this.scroll.x = Math.floor(this.scroll.x)
-        this.scroll.y = Math.floor(this.scroll.y)
-        const { x: offsetX, y: offsetY } = this.scroll
+        // const defaultPaletteEntry =
 
         // TODO: reimplement fractional scrolling, maybe
+        this.scroll.x = Math.floor(this.scroll.x)
+        this.scroll.y = Math.floor(this.scroll.y)
+        const { x: scrollX, y: scrollY } = this.scroll
+
         // const offsetX = Math.floor(this.offset.x)
         // const offsetY = Math.floor(this.offset.y)
         // const fracX = (this.offset.x - offsetX) * dw
         // const fracY = (this.offset.y - offsetY) * dh
 
-        const bytesPerGlyphRow = cellSize.width
-        const bytesPerGlyph = rect.area(cellSize)
+        const bufferXstart = scrollX
+
+        const charBuffer = new Uint8Array(viewportWidth)
+        const colorBuffer = new Uint8Array(viewportWidth)
 
         let outIdx = 0
         // iterate by cell rows...
-        for (let cellY = 0; cellY < viewportSize.height; cellY++) {
-            // buffer index that maps onto the leftmost cell
-            const rowStart = (cellY + offsetY) * bufferSize.width
+        for (let cellY = 0; cellY < viewportHeight; cellY++) {
+            const backgroundRowIdx = (cellY + scrollY) * backgroundWidth
+            const validRow =
+                cellY + scrollY >= 0 && cellY + scrollY < backgroundHeight
 
-            const actualStart = Math.max(rowStart + offsetX, rowStart)
-            const actualEndExclu = (cellY + offsetY + 1) * bufferSize.width
+            const firstValid = -scrollX
+            const lastValidExcl = Math.min(
+                -scrollX + backgroundWidth,
+                backgroundWidth,
+            )
 
-            for (let localY = 0; localY < cellSize.height; localY++) {
+            // first, grab the whole array
+            for (let x = 0; x < viewportWidth; x++) {
+                const idx = backgroundRowIdx + scrollX + x
+                const validIndex =
+                    validRow && x >= firstValid && x < lastValidExcl
+
+                charBuffer[x] = validIndex ? background[idx] : 0
+                if (colors) {
+                    colorBuffer[x] = validIndex ? colors[idx] : border
+                }
+            }
+
+            // Get the whole row of
+            for (let localY = 0; localY < cellHeight; localY++) {
                 // Now draw all 12 pixel rows of this cell one row at a time
-                for (let cellX = 0; cellX < viewportSize.width; cellX++) {
-                    const contentIdx = rowStart + offsetX + cellX
-                    const validIndex =
-                        contentIdx >= actualStart && contentIdx < actualEndExclu
-                    const asciiCode = validIndex ? background[contentIdx] : 0
-
-                    // Ascii code is an index into the font
-                    // this assumes cells & glyphs are the same pixel size
-                    const fontCharStartsAtByte = asciiCode * bytesPerGlyph
-                    const offsetWithinFont = localY * bytesPerGlyphRow
-                    const fontIdx = fontCharStartsAtByte + offsetWithinFont
-
-                    // Default to medium white on black
-                    const defaultPaletteEntry = COLOR_WHITE_FG
-                    const colorBits =
-                        validIndex && colors
-                            ? colors[contentIdx]
-                            : defaultPaletteEntry
-                    const paletteIdx = colorBits * 6
-                    const fgColorR = palette[paletteIdx]
-                    const fgColorG = palette[paletteIdx + 1]
-                    const fgColorB = palette[paletteIdx + 2]
-
-                    const bgColorR = palette[paletteIdx + 3]
-                    const bgColorG = palette[paletteIdx + 4]
-                    const bgColorB = palette[paletteIdx + 5]
-
-                    const hide = blinkCycle && colorBits & COLOR_BLINK
-
-                    // Now draw the row!
-                    for (let byte = 0; byte < bytesPerGlyphRow; byte++) {
-                        const solidPixel = !hide && !!font[fontIdx + byte]
-                        if (solidPixel) {
-                            pixelBuffer.data[outIdx] = fgColorR
-                            pixelBuffer.data[outIdx + 1] = fgColorG
-                            pixelBuffer.data[outIdx + 2] = fgColorB
-                        } else {
-                            pixelBuffer.data[outIdx] = bgColorR
-                            pixelBuffer.data[outIdx + 1] = bgColorG
-                            pixelBuffer.data[outIdx + 2] = bgColorB
-                        }
-                        // pixelBuffer.data[outIdx + 3] = 255
-                        outIdx += 4
-                    }
+                for (let cellX = 0; cellX < viewportWidth; cellX++) {
+                    outIdx = this.bltRow(
+                        pixelBuffer.data,
+                        outIdx,
+                        charBuffer[cellX],
+                        localY,
+                        colorBuffer[cellX],
+                        blinkCycle,
+                    )
                 }
             }
         }
@@ -228,6 +218,39 @@ export default class CharacterDisplay {
         ctx.putImageData(pixelBuffer, 0, 0)
 
         // console.timeEnd('render')
+    }
+
+    private bltRow(
+        outputBuffer: Uint8ClampedArray,
+        outputIdx: number,
+        asciiCode: number,
+        srcRow: number,
+        colorBits: number = COLOR_WHITE,
+        blinkCycle = false,
+    ) {
+        const {
+            bytesPerGlyph: fontBytesPerGlyph,
+            booleanFont: font,
+            cellSize: { width: cellWidth },
+        } = this
+        // Assumption is that there is one byte per pixel
+        const fontIdx = asciiCode * fontBytesPerGlyph + srcRow * cellWidth
+
+        // Default to medium white on black
+        const paletteIdx = colorBits * 6
+        const hide = blinkCycle && colorBits & COLOR_BLINK
+
+        // Now draw the row!
+        for (let byte = 0; byte < cellWidth; byte++) {
+            const solidPixel = !hide && !!font![fontIdx + byte]
+            outputBuffer[outputIdx] = palette[paletteIdx + (solidPixel ? 0 : 3)]
+            outputBuffer[outputIdx + 1] =
+                palette[paletteIdx + (solidPixel ? 1 : 4)]
+            outputBuffer[outputIdx + 2] =
+                palette[paletteIdx + (solidPixel ? 2 : 5)]
+            outputIdx += 4
+        }
+        return outputIdx
     }
 
     /**
