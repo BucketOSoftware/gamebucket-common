@@ -61,11 +61,14 @@ const palette = new Uint8Array(255 * 6)
 }
 
 export default class CharacterDisplay {
-    blinkPeriod = 800
+    // TODO?: Is this accurate?
+    readonly blinkPeriod = 800
 
     private font: HTMLImageElement
-    ctx: CanvasRenderingContext2D | null
-    offset = { x: 0, y: 0 }
+    private ctx: CanvasRenderingContext2D | null
+
+    /** Tile coordinate to display in the top-left. Not limited to the bounds of the board */
+    scroll = { x: 0, y: 0 }
 
     readonly cellSize = { width: 12, height: 12 }
 
@@ -119,12 +122,13 @@ export default class CharacterDisplay {
     }
 
     render(
-        chars: Readonly<Uint8Array | Uint8ClampedArray>,
         bufferSize: Readonly<rect.Size>,
+        background: Readonly<Uint8Array | Uint8ClampedArray>,
+        sprites?: Readonly<Uint8Array | Uint8ClampedArray>,
         colors?: Readonly<Uint8Array | Uint8ClampedArray>,
         time?: number, // in ms
     ) {
-        console.time('render')
+        // console.time('render')
 
         // TODO: modify this.offset if it would cause us to render subpixel tiles
         const {
@@ -140,15 +144,18 @@ export default class CharacterDisplay {
         invariant(ctx, 'No context')
         invariant(font, 'No font')
 
-        const blink = (((time || 0) / blinkPeriod) | 0) % 2
+        const blinkCycle = BRIGHT_BACKGROUNDS
+            ? false
+            : !((((time || 0) / blinkPeriod) | 0) % 2)
+
         const sw = cellSize.width
         const sh = cellSize.height
         const dw = sw
         const dh = sh
 
-        this.offset.x = Math.floor(this.offset.x)
-        this.offset.y = Math.floor(this.offset.y)
-        const { x: offsetX, y: offsetY } = this.offset
+        this.scroll.x = Math.floor(this.scroll.x)
+        this.scroll.y = Math.floor(this.scroll.y)
+        const { x: offsetX, y: offsetY } = this.scroll
 
         // TODO: reimplement fractional scrolling, maybe
         // const offsetX = Math.floor(this.offset.x)
@@ -174,7 +181,7 @@ export default class CharacterDisplay {
                     const contentIdx = rowStart + offsetX + cellX
                     const validIndex =
                         contentIdx >= actualStart && contentIdx < actualEndExclu
-                    const asciiCode = validIndex ? chars[contentIdx] : 0
+                    const asciiCode = validIndex ? background[contentIdx] : 0
 
                     // Ascii code is an index into the font
                     // this assumes cells & glyphs are the same pixel size
@@ -182,24 +189,26 @@ export default class CharacterDisplay {
                     const offsetWithinFont = localY * bytesPerGlyphRow
                     const fontIdx = fontCharStartsAtByte + offsetWithinFont
 
-                    const defaultPaletteEntry = COLOR_WHITE_FG | COLOR_BRIGHT_FG
+                    // Default to medium white on black
+                    const defaultPaletteEntry = COLOR_WHITE_FG
                     const colorBits =
-                        (validIndex && colors
+                        validIndex && colors
                             ? colors[contentIdx]
-                            : defaultPaletteEntry) * 6
-                    if (colorBits === 28 * 6) {
-                    }
-                    const fgColorR = palette[colorBits]
-                    const fgColorG = palette[colorBits + 1]
-                    const fgColorB = palette[colorBits + 2]
+                            : defaultPaletteEntry
+                    const paletteIdx = colorBits * 6
+                    const fgColorR = palette[paletteIdx]
+                    const fgColorG = palette[paletteIdx + 1]
+                    const fgColorB = palette[paletteIdx + 2]
 
-                    const bgColorR = palette[colorBits + 3]
-                    const bgColorG = palette[colorBits + 4]
-                    const bgColorB = palette[colorBits + 5]
+                    const bgColorR = palette[paletteIdx + 3]
+                    const bgColorG = palette[paletteIdx + 4]
+                    const bgColorB = palette[paletteIdx + 5]
+
+                    const hide = blinkCycle && colorBits & COLOR_BLINK
 
                     // Now draw the row!
                     for (let byte = 0; byte < bytesPerGlyphRow; byte++) {
-                        const solidPixel = blink && !!font[fontIdx + byte]
+                        const solidPixel = !hide && !!font[fontIdx + byte]
                         if (solidPixel) {
                             pixelBuffer.data[outIdx] = fgColorR
                             pixelBuffer.data[outIdx + 1] = fgColorG
@@ -218,7 +227,7 @@ export default class CharacterDisplay {
 
         ctx.putImageData(pixelBuffer, 0, 0)
 
-        console.timeEnd('render')
+        // console.timeEnd('render')
     }
 
     /**
@@ -227,7 +236,7 @@ export default class CharacterDisplay {
      * @returns {GVec2} The coordinate of the buffer cell at the given pixel */
     cellAtPixel(x: number, y: number): GVec2 {
         invariant(x >= 0 && y >= 0, 'Coordinate is negative')
-        const { cellSize, magnify, offset } = this
+        const { cellSize, magnify, scroll: offset } = this
 
         return {
             x: Math.floor(x / cellSize.width / magnify + offset.x),
