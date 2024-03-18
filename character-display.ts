@@ -2,6 +2,13 @@ import { GVec2, grid, rect } from 'gamebucket'
 import invariant from 'tiny-invariant'
 import fontImage from './font-12x12'
 
+export interface Sprite {
+    x: number
+    y: number
+    char: number // 0-255
+    color?: number // bitmask, treated as COLOR_WHITE if not specified
+}
+
 // https://www.seasip.info/VintagePC/cga.html
 // Bit 0: Blue foreground
 // Bit 1: Green foreground
@@ -96,13 +103,13 @@ export default class CharacterDisplay {
         this.bytesPerGlyph = rect.area(cellSize)
 
         // Create display
+        // TODO: support resizing the canvas to fit smaller screens, while
+        // keeping aspect ratio
         canvas.width = cellSize.width * viewportSize.width
         canvas.height = cellSize.height * viewportSize.height
         canvas.style.backgroundColor = 'black'
-        canvas.style.width =
-            canvas.width * magnify + 'px'
-        canvas.style.height =
-            canvas.height * magnify + 'px'
+        canvas.style.width = canvas.width * magnify + 'px'
+        canvas.style.height = canvas.height * magnify + 'px'
         canvas.style.imageRendering = 'pixelated'
         canvas.style.margin = '0 auto'
         canvas.style.position = 'inherit'
@@ -130,7 +137,7 @@ export default class CharacterDisplay {
             height: backgroundHeight,
         }: Readonly<rect.Size>,
         background: Readonly<Uint8Array | Uint8ClampedArray>,
-        sprites?: Readonly<Uint8Array | Uint8ClampedArray>,
+        sprites: Readonly<Sprite[]> = [],
         colors?: Readonly<Uint8Array | Uint8ClampedArray>,
         time?: number, // in ms
         border = COLOR_BG_BLACK,
@@ -169,13 +176,10 @@ export default class CharacterDisplay {
         // const fracX = (this.offset.x - offsetX) * dw
         // const fracY = (this.offset.y - offsetY) * dh
 
-        const bufferXstart = scrollX
-
         const charBuffer = new Uint8Array(viewportWidth)
         const colorBuffer = new Uint8Array(viewportWidth)
 
         let outIdx = 0
-        // iterate by cell rows...
         for (let cellY = 0; cellY < viewportHeight; cellY++) {
             const backgroundRowIdx = (cellY + scrollY) * backgroundWidth
             const validRow =
@@ -215,9 +219,61 @@ export default class CharacterDisplay {
             }
         }
 
+        invariant(outIdx === pixelBuffer.data.length)
+
+        const viewport = {
+            origin: { x: 0, y: 0 },
+            size: { width: viewportWidth, height: viewportHeight },
+        }
+
+        // Draw sprites
+        let cellPos = { x: 0, y: 0 }
+        for (let { x, y, char, color } of sprites) {
+            cellPos.x = x - scrollX
+            cellPos.y = y - scrollY
+
+            if (rect.containsPoint(viewport, cellPos)) {
+                this.bltChar(pixelBuffer.data, cellPos, char, color, blinkCycle)
+            }
+        }
+
         ctx.putImageData(pixelBuffer, 0, 0)
 
         // console.timeEnd('render')
+    }
+
+    private bltChar(
+        outputBuffer: Uint8ClampedArray,
+        { x: cellX, y: cellY }: GVec2,
+        asciiCode: number,
+        colorBits: number = COLOR_WHITE,
+        blinkCycle: boolean = false,
+    ) {
+        // DONTYET: this causes overdraw
+        const {
+            canvas,
+            bytesPerGlyph: fontBytesPerGlyph,
+            booleanFont: font,
+            viewportSize: { width: viewportWidth },
+            cellSize,
+        } = this
+
+        let outIdx =
+            cellY * cellSize.height * canvas.width * 4 +
+            cellX * cellSize.width * 4
+
+        for (let localY = 0; localY < cellSize.height; localY++) {
+            this.bltRow(
+                outputBuffer,
+                outIdx,
+                asciiCode,
+                localY,
+                colorBits,
+                blinkCycle,
+            )
+            // move down by a Y
+            outIdx += canvas.width * 4
+        }
     }
 
     private bltRow(
@@ -254,16 +310,21 @@ export default class CharacterDisplay {
     }
 
     /**
+     *
      * @param x An x coordinate within the canvas
      * @param y A y coordinate within the canvas
-     * @returns {GVec2} The coordinate of the buffer cell at the given pixel */
+     * @returns {GVec2} The fractional background coordinate at the given pixel, 
+     * which may not be on the actual background */
     cellAtPixel(x: number, y: number): GVec2 {
-        invariant(x >= 0 && y >= 0, 'Coordinate is negative')
-        const { cellSize, magnify, scroll: offset } = this
+        const {
+            cellSize: { width, height },
+            magnify,
+            scroll,
+        } = this
 
         return {
-            x: Math.floor(x / cellSize.width / magnify + offset.x),
-            y: Math.floor(y / cellSize.height / magnify + offset.y),
+            x: (x - width) / width / magnify + scroll.x,
+            y: (y - height) / height / magnify + scroll.y,
         }
     }
 }
