@@ -16,8 +16,8 @@ export function randomChoice<T>(a: ArrayLike<T>): T {
     return a[(Math.random() * a.length) | 0]
 }
 
-export function roundTo(i: number, places: number) {
-    return Math.round(i * places) / places
+export function roundBy(i: number, increments: number) {
+    return Math.round(i / increments) * increments
 }
 
 export function roundToPlaces(i: number, places: number) {

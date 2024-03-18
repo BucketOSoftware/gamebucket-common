@@ -1,3 +1,4 @@
+import { clamp as scalarClamp } from './math'
 import { GVec2 } from './geometry'
 
 export interface Rect {
@@ -30,6 +31,13 @@ export const intersects = (a: Readonly<Rect>, b: Readonly<Rect>) =>
         a.origin.y + a.size.height - 1 < b.origin.y ||
         b.origin.y + b.size.height - 1 < a.origin.y
     )
+
+/** Clamp the given point to fit within the rect */
+export function clamp(r: Readonly<Rect>, p: GVec2) {
+    p.x = scalarClamp(p.x, r.origin.x, r.origin.x + r.size.width - 1)
+    p.y = scalarClamp(p.y, r.origin.y, r.origin.y + r.size.height - 1)
+    return p
+}
 
 export function expandToInclude(r: Rect, { x, y }: Readonly<GVec2>) {
     r.origin.x = Math.min(r.origin.x, x)

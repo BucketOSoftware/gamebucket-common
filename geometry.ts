@@ -1,5 +1,5 @@
 import { Euler, Quaternion, Vector2 as TVec2, Vector3 as TVec3 } from 'three'
-import { roundToPlaces } from './math'
+import { roundBy, roundToPlaces } from './math'
 
 // This is solely so other code doesn't have to depend on three.js directly
 export type ZVec2 = TVec2
@@ -33,15 +33,27 @@ export function radToDeg(radians: number) {
     return radians * (180 / Math.PI)
 }
 
-/** Squashes v3 onto a ground plane, discarding y, and sets v2 to the squashed vector */
+export function floorVec2(vec2: GVec2): GVec2 {
+    vec2.x = Math.floor(vec2.x)
+    vec2.y = Math.floor(vec2.y)
+
+    return vec2
+}
+
+export function roundVec2(vec2: GVec2, increments = 1): GVec2 {
+    vec2.x = roundBy(vec2.x, increments)
+    vec2.y = roundBy(vec2.y, increments)
+
+    return vec2
+}
+
+/** Squashes `vec3` onto the XZ (ground) plane, discarding y, and sets `vec2`
+ * to the squashed vector */
 export function squashVec3(vec2: GVec2, vec3: GVec3) {
-    /*
-    if (v3.y) {
-        console.warn('Discarding y dimension:', v3.y)
-    }
-    */
     vec2.x = vec3.x
     vec2.y = vec3.z
+
+    return vec2
 }
 
 /**
