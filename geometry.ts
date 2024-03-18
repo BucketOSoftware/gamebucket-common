@@ -112,30 +112,30 @@ export function relativePosition(
 }
 
 export function formatSize2D({ x, y }: Readonly<GVec2>, places = 3) {
-    return '(' + [x, y].map((n) => roundToPlaces(n, places)).join(' × ') + ')'
+    return '[' + [x, y].map((n) => roundToPlaces(n, places)).join(' × ') + ']'
 }
 
 export function formatSize3D({ x, y, z }: Readonly<GVec3>, places = 3) {
     return (
-        '(' + [x, y, z].map((n) => roundToPlaces(n, places)).join(' × ') + ')'
+        '[' + [x, y, z].map((n) => roundToPlaces(n, places)).join(' × ') + ']'
     )
 }
 
 export function formatVec3({ x, y, z }: Readonly<GVec3>, places = 3) {
-    return '{' + [x, y, z].map((n) => roundToPlaces(n, places)).join(', ') + '}'
+    return '(' + [x, y, z].map((n) => roundToPlaces(n, places)).join(', ') + ')'
 }
 
 const formatRotationTempQ = new Quaternion()
 const formatRotationTempEu = new Euler()
-export function formatRotation(rotation: Readonly<GQuat>, places = 1) {
+export function formatRotation(quaternion: Readonly<GQuat>, places = 1) {
     const { x, y, z } = formatRotationTempEu.setFromQuaternion(
-        formatRotationTempQ.copy(rotation as Quaternion),
+        formatRotationTempQ.copy(quaternion as Quaternion),
     )
     return (
-        '[' +
+        '{' +
         [x, y, z]
             .map((n) => `${roundToPlaces(radToDeg(n), places)}°`)
             .join(', ') +
-        ']'
+        '}'
     )
 }
