@@ -1,6 +1,8 @@
-import { Key } from 'w3c-keys'
-import { GVec2, GVec3 } from './geometry'
+// TODO: provide a way to get the current state of all [relevant] inputs
+
+// import { Key } from 'w3c-keys'
 import invariant from 'tiny-invariant'
+import { GVec2, GVec3 } from './geometry'
 
 // codes are at https://w3c.github.io/uievents-code/#code-value-tables
 // https://raw.githubusercontent.com/w3c/uievents-code/gh-pages/impl-report.txt
@@ -37,10 +39,6 @@ export default class Input {
     // ------
 
     private attachedElement: HTMLElement | undefined = undefined
-    /** Last known mouse position, in page coordinates */
-    private mouseLastPagePos: GVec2 = { x: Infinity, y: Infinity } // is this wise
-    private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
-
     /** Saving a reference to the Gamepad object seemed to result in an object that
      * never got updates, at least in Chrome. This method saves the index and gets
      * the gamepads from Navigator each time, which might be slower but it works */
@@ -119,7 +117,7 @@ export default class Input {
     }
 
     private lastUpdateTime = -Infinity
-    update(t = performance.now()) {
+    readDevices(t = performance.now()) {
         performance.now()
         const {
             attachedElement,
@@ -161,6 +159,21 @@ export default class Input {
         // TODO: keys, gamepad
     }
 
+    /** Treat the two keycodes as representing opposite sides of an axis
+     * @returns -1 if `negative` is held down, 1 if `positive` is held down,
+     * 0 if both or neither are held
+     */
+    getAxis(negative: KeyCode, positive: KeyCode) {
+        // TODO: support gamepads
+        const { keyDown } = this
+
+        // TODO: it might be better to use the most recently pressed key
+        return (
+            (keyDown[negative] === undefined ? 0 : -1) +
+            (keyDown[positive] === undefined ? 0 : 1)
+        )
+    }
+
     done() {
         // TODO: clear out values for next frame?
     }
@@ -173,7 +186,8 @@ export default class Input {
      */
     wasHeldFor(key: KeyCode, duration: number, t: number) {
         const pressedAt = this.keyDown[key]
-        return pressedAt ? t - pressedAt > duration : false
+        // probably not so likely that the timestamp would be 0, but...
+        return pressedAt !== undefined ? t - pressedAt > duration : false
     }
 
     private resetState() {
@@ -232,6 +246,8 @@ export default class Input {
     //  Gamepad
     // ---------
 
+    private gamepadDeadZoneSq = 0.1
+
     private handleGamepadDisconnected = (ev: GamepadEvent) => {
         if (ev.gamepad.index === this.gamepadIndex) {
             // Fall back to a previous gamepad if possible
@@ -250,6 +266,8 @@ export default class Input {
     private handleGamepadConnected = (ev: GamepadEvent) => {
         invariant(ev.gamepad, 'No gamepad?!')
 
+        // TODO: haptic
+
         console.debug(
             'Gamepad connected at index %d: %s. %d buttons, %d axes.',
             ev.gamepad.index,
@@ -258,6 +276,12 @@ export default class Input {
             ev.gamepad.axes.length,
         )
 
+        if (this.gamepadIndex !== -1) {
+            console.warn(
+                "Adding another gamepad; this use case isn't well-tested",
+            )
+        }
+
         this.gamepadIndex = ev.gamepad.index
 
         if (ev.gamepad.mapping !== 'standard') {
@@ -265,9 +289,37 @@ export default class Input {
         }
     }
 
+    gamepadAxes(index: number): GVec2 | undefined {
+        // TODO: maybe we need to check whether this function exists
+        const gp = navigator.getGamepads()[this.gamepadIndex]
+        if (!gp) {
+            return
+        }
+
+        const x = gp.axes[index]
+        const y = gp.axes[index + 1]
+        const lengthSq = x * x + y * y
+        return lengthSq >= this.gamepadDeadZoneSq ? { x, y } : { x: 0, y: 0 }
+    }
+
+    gamepadButtonHeld(index: number) {
+        const gp = navigator.getGamepads()[this.gamepadIndex]
+        if (!gp) {
+            return
+        }
+
+        // TODO: need a way to specify where we care about the first press or held down
+        return gp.buttons[index].pressed
+    }
+
     // -------
     //  Mouse
     // -------
+
+    /** Last known mouse position, in page coordinates */
+    private mouseLastPagePos: GVec2 = { x: Infinity, y: Infinity } // is this wise
+    /** Cumulative wheel deltas since last read */
+    private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
 
     private handleMouseDown = (e: MouseEvent) => {
         // TODO: multiple buttons
