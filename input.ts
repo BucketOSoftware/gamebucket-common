@@ -2,6 +2,26 @@ import { Key } from 'w3c-keys'
 import { GVec2, GVec3 } from './geometry'
 import invariant from 'tiny-invariant'
 
+// codes are at https://w3c.github.io/uievents-code/#code-value-tables
+// https://raw.githubusercontent.com/w3c/uievents-code/gh-pages/impl-report.txt
+// awk '/CODE_IMPL / && $3 =="Y" { printf "\"%s\",%s,\"%s\"\n", $2, FNR, $0 }' keys.txt > keys.csv
+// awk 'BEGIN { print "export default {" } END { print "} as const" } /CODE_IMPL / && $3 =="Y" { printf "/** %s *\/\n%s: \"%s\",\n", $0, $2, $2 }' keys.txt
+// curl https://raw.githubusercontent.com/w3c/uievents-code/gh-pages/impl-report.txt | awk 'BEGIN { print "export default {" } END { print "} as const" } /CODE_IMPL / && $3 == "Y" { printf "/** %s *\/\n%s: \"%s\",\n", $0, $2, $2 }'
+import keys from './keys'
+
+// ---------------
+//  Key code type
+// ---------------
+export type KeyCode = keyof typeof keys
+
+function isKeyCode(code: string): code is KeyCode {
+    // @ts-expect-error: uggggh make up your mind
+    return !!keys[code]
+}
+
+/**
+ * General input handler/mapper
+ */
 export default class Input {
     /** Mouse position in pixels relative to the attached element */
     mouseCursor: GVec2 = { x: Infinity, y: Infinity }
@@ -10,10 +30,14 @@ export default class Input {
     /** Wheel movement since last frame */
     mouseWheelDelta: GVec3 = { x: 0, y: 0, z: 0 }
 
-    mouseDown: boolean = false
+    mouseDown = false
+
+    // ------
+    // Internal state
+    // ------
 
     private attachedElement: HTMLElement | undefined = undefined
-
+    /** Last known mouse position, in page coordinates */
     private mouseLastPagePos: GVec2 = { x: Infinity, y: Infinity } // is this wise
     private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
 
@@ -23,13 +47,18 @@ export default class Input {
     private gamepadIndex = -1
 
     // TODO: accept a mapping or something
-    constructor() {}
+    constructor() {
+        // would like to set initial values this way but that's not how it works I guess
+        this.resetState()
+    }
 
     /**
      * Start listening for input
      * @param element Element to attach to -- only relevant for mouse and touch inputs
      */
     attach(element: HTMLElement) {
+        // TODO: don't start the game until the user clicks, which solves lots of problems with initial mouse position, user permissions, etc...
+
         // TODO: should this attach keyboard events to the `element`?
         invariant(this.attachedElement === undefined, 'Already attached')
         // this.attachedElement, ow.undefined)
@@ -42,15 +71,15 @@ export default class Input {
 
         const passive = { passive: true }
 
-        // doc.addEventListener('keydown', this.handleKeyDown)
-        // doc.addEventListener('keyup', this.handleKeyUp)
+        doc.addEventListener('keydown', this.handleKeyDown)
+        doc.addEventListener('keyup', this.handleKeyUp)
 
         doc.addEventListener('focusin', this.handleDocFocusChange)
         doc.addEventListener('focusout', this.handleDocFocusChange)
         doc.addEventListener('visibilitychange', this.handleDocFocusChange)
 
         element.addEventListener('mousedown', this.handleMouseDown)
-        //
+        // we want to know if the user releases the button outside of the canvas
         doc.addEventListener('mouseup', this.handleMouseUp)
         doc.addEventListener('mousemove', this.handleMouseMove)
         element.addEventListener('wheel', this.handleMouseWheel, passive)
@@ -89,7 +118,9 @@ export default class Input {
         this.attachedElement = undefined
     }
 
-    update() {
+    private lastUpdateTime = -Infinity
+    update(t = performance.now()) {
+        performance.now()
         const {
             attachedElement,
             mouseCursor,
@@ -99,6 +130,9 @@ export default class Input {
             mouseWheelAccumulator,
             mouseWheelDelta,
         } = this
+
+        this.keyJustPressed = this.recentKeys
+        this.recentKeys = {}
 
         if (attachedElement) {
             // TODO: ring buffer for smoothing etc.
@@ -130,6 +164,73 @@ export default class Input {
     done() {
         // TODO: clear out values for next frame?
     }
+
+    /**
+     *
+     * @param key
+     * @param duration How long the key should be held to return true
+     * @param t Time in miliseconds
+     */
+    wasHeldFor(key: KeyCode, duration: number, t: number) {
+        const pressedAt = this.keyDown[key]
+        return pressedAt ? t - pressedAt > duration : false
+    }
+
+    private resetState() {
+        console.debug('Releasing input state')
+        this.mouseLastPagePos.x = Infinity
+        this.mouseLastPagePos.y = Infinity
+
+        this.mouseDown = false
+        this.keyDown = {}
+        this.keyJustPressed = {}
+
+        // TODO: mouse? gamepad? keys?
+    }
+
+    // ------
+    //  Keys
+    // ------
+    keyDown: Partial<{ [Property in KeyCode]: number }> = {}
+    keyJustPressed: Partial<{ [Property in KeyCode]: boolean }> = {}
+    private recentKeys: Partial<{ [Property in KeyCode]: boolean }> = {}
+    /** @todo This is not a 1-to-1 mapping, since e.g. shift-A and A are different keys */
+    private keysLocale: Partial<{ [Property in KeyCode]: string }> = {}
+
+    private handleKeyDown = (e: KeyboardEvent) => {
+        // TODO: might want to handle this another way. What if we want to bind keys that have modifiers, etc.
+        const modifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey
+        if (e.repeat) {
+            return
+        }
+
+        invariant(isKeyCode(e.code), 'Not a valid key code?')
+
+        if (true) {
+            if (!(e.code in this.keysLocale)) {
+                console.warn('[!] %s => %s', e.code, e.key)
+            }
+        }
+
+        this.keyDown[e.code] ||= e.timeStamp
+
+        this.keysLocale[e.code] = e.key
+        this.recentKeys[e.code] = true
+
+        // TODO: only prevent default if this key maps to something (?)
+        // e.preventDefault()
+    }
+
+    private handleKeyUp = (e: KeyboardEvent) => {
+        invariant(isKeyCode(e.code), 'Not a valid key code??')
+        delete this.keyDown[e.code]
+
+        // Do we need to prevent default?
+    }
+
+    // ---------
+    //  Gamepad
+    // ---------
 
     private handleGamepadDisconnected = (ev: GamepadEvent) => {
         if (ev.gamepad.index === this.gamepadIndex) {
@@ -164,6 +265,10 @@ export default class Input {
         }
     }
 
+    // -------
+    //  Mouse
+    // -------
+
     private handleMouseDown = (e: MouseEvent) => {
         // TODO: multiple buttons
         if (e.button !== 0) {
@@ -174,11 +279,9 @@ export default class Input {
 
         invariant(target === this.attachedElement)
 
-        // There may not have been a move event before this
         this.mouseDown = true
+        // There may not have been a move event before this
         this.handleMouseMove(e)
-        // const { top, left, width, height } =
-        // this.attachedElement.getBoundingClientRect()
 
         // We don't prevent default so as to let focus happen naturally
     }
@@ -186,7 +289,7 @@ export default class Input {
     private handleMouseUp = (e: MouseEvent) => {
         // invariant(e.target === this.attachedElement)
         if (e.target === this.attachedElement) {
-            console.warn('Up con canvas')
+            // console.warn('Up con canvas')
         }
 
         // TODO: multiple buttons
@@ -212,6 +315,10 @@ export default class Input {
         acc.z += ev.deltaZ
     }
 
+    // -------
+    //  Focus
+    // -------
+
     private handleDocFocusChange = (ev: FocusEvent | Event) => {
         if (ev.type === 'focusout' || document.visibilityState === 'hidden') {
             console.debug(
@@ -221,10 +328,7 @@ export default class Input {
             )
 
             // Clear out any input state, as if user released all inputs
-            this.mouseDown = false
-
-            // TODO: mouse? gamepad? keys?
-            // keysDown.clear()
+            this.resetState()
             return
         }
 

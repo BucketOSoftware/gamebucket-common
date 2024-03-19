@@ -1,4 +1,10 @@
-import { Euler, Quaternion, Vector2 as TVec2, Vector3 as TVec3 } from 'three'
+import {
+    Euler,
+    Object3D,
+    Quaternion,
+    Vector2 as TVec2,
+    Vector3 as TVec3,
+} from 'three'
 import { roundBy, roundToPlaces } from './math'
 
 // This is solely so other code doesn't have to depend on three.js directly
@@ -115,11 +121,7 @@ export function roundDirection(dir: GVec2, increments: number): void {
  * @param b Another object
  * @returns The position of `a` in `b`'s local space
  */
-export function relativePosition(
-    a: THREE.Object3D,
-    b: THREE.Object3D,
-    output: THREE.Vector3,
-) {
+export function relativePosition(a: Object3D, b: Object3D, output: TVec3) {
     return b.worldToLocal(a.getWorldPosition(output))
 }
 

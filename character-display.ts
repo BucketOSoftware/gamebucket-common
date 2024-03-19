@@ -259,8 +259,8 @@ export default class CharacterDisplay {
         } = this
 
         let outIdx =
-            cellY * cellSize.height * canvas.width * 4 +
-            cellX * cellSize.width * 4
+            Math.round(cellY * cellSize.height) * canvas.width * 4 +
+            Math.round(cellX * cellSize.width) * 4
 
         for (let localY = 0; localY < cellSize.height; localY++) {
             this.bltRow(
@@ -313,7 +313,7 @@ export default class CharacterDisplay {
      *
      * @param x An x coordinate within the canvas
      * @param y A y coordinate within the canvas
-     * @returns {GVec2} The fractional background coordinate at the given pixel, 
+     * @returns {GVec2} The fractional background coordinate at the given pixel,
      * which may not be on the actual background */
     cellAtPixel(x: number, y: number): GVec2 {
         const {
