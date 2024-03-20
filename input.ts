@@ -12,19 +12,216 @@ import { GVec2, GVec3 } from './geometry'
 import keys from './keys'
 
 // ---------------
-//  Key code type
+//  Input codes
 // ---------------
+
+type GamepadFriendlyButtonNames = keyof (typeof gamepad)['standard']['buttons']
+type GamepadFriendlyAxisNames = keyof (typeof gamepad)['standard']['axes']
+
+type GamepadButtonCode =
+    (typeof gamepad)['standard']['buttons'][GamepadFriendlyButtonNames]
+type GamepadAxisCode =
+    (typeof gamepad)['standard']['axes'][GamepadFriendlyAxisNames]
 export type KeyCode = keyof typeof keys
+
+type MouseButton = 'MouseLeft' | 'MouseMiddle' | 'MouseRight'
+
+export type InputCode = KeyCode | GamepadButtonCode | GamepadAxisCode
+// | MouseButton
+
+// const v: InputCode = '@GamepadLeftStickAxisX'
+
+export const gamepad = {
+    // https://www.w3.org/TR/gamepad/#remapping
+    standard: {
+        axes: {
+            LeftStickX: '@GamepadLeftStickAxisX',
+            LeftStickY: '@GamepadLeftStickAxisY',
+            RightStickX: '@GamepadRightStickAxisX',
+            RightStickY: '@GamepadRightStickAxisY',
+        },
+        buttons: {
+            // Literal names based on pad location
+            LeftTop: 'GamepadLeftTop',
+            LeftBottom: 'GamepadLeftBottom',
+            LeftLeft: 'GamepadLeftLeft',
+            LeftRight: 'GamepadLeftRight',
+            RightTop: 'GamepadRightTop',
+            RightBottom: 'GamepadRightBottom',
+            RightLeft: 'GamepadRightLeft',
+            RightRight: 'GamepadRightRight',
+            FrontTopLeft: 'GamepadFrontTopLeft',
+            FrontTopRight: 'GamepadFrontTopRight',
+            FrontBottomLeft: 'GamepadFrontBottomLeft',
+            FrontBottomRight: 'GamepadFrontBottomRight',
+            CenterLeft: 'GamepadCenterLeft',
+            CenterRight: 'GamepadCenterRight',
+            LeftStick: 'GamepadLeftStick',
+            RightStick: 'GamepadRightStick',
+            CenterCenter: 'GamepadCenterCenter',
+        },
+    },
+    /** PlayStation-style aliases */
+    ps: {
+        DPadUp: 'GamepadLeftTop',
+        DPadDown: 'GamepadLeftBottom',
+        DPadLeft: 'GamepadLeftLeft',
+        DPadRight: 'GamepadLeftRight',
+        DPadX: ['GamepadLeftLeft', 'GamepadLeftRight'],
+        DPadY: ['GamepadLeftTop', 'GamepadLeftBottom'],
+        Triangle: 'GamepadRightTop',
+        Cross: 'GamepadRightBottom',
+        Square: 'GamepadRightLeft',
+        Circle: 'GamepadRightRight',
+        L1: 'GamepadFrontTopLeft',
+        R1: 'GamepadFrontTopRight',
+        L2: 'GamepadFrontBottomLeft',
+        R2: 'GamepadFrontBottomRight',
+        Select: 'GamepadCenterLeft',
+        Start: 'GamepadCenterRight',
+        L3: 'GamepadLeftStick',
+        R3: 'GamepadRightStick',
+        Menu: 'GamepadCenterCenter',
+    },
+} as const
+
+const gamepadCodeToButtonIndex = {
+    /** D-pad up */
+    GamepadLeftTop: 12,
+    /** D-pad down */
+    GamepadLeftBottom: 13,
+    /** D-pad left */
+    GamepadLeftLeft: 14,
+    /** D-pad right */
+    GamepadLeftRight: 15,
+    /** PlayStation: Triangle, Xbox: Y, Switch: X */
+    GamepadRightTop: 3,
+    /** PlayStation: Cross, Xbox: A, Switch: B */
+    GamepadRightBottom: 0,
+    /** PlayStation: Square, Xbox: X, Switch: Y */
+    GamepadRightLeft: 2,
+    /** PlayStation: Square, Xbox: X, Switch: Y */
+    GamepadRightRight: 1,
+    /** PlayStation: L1, Xbox: LB, Switch: L */
+    GamepadFrontTopLeft: 4,
+    /** PlayStation: R1, Xbox: RB, Switch: R */
+    GamepadFrontTopRight: 5,
+    /** PlayStation: L2, Xbox: LT, Switch: ZL */
+    GamepadFrontBottomLeft: 6,
+    /** PlayStation: R2, Xbox: RT, Switch: ZR */
+    GamepadFrontBottomRight: 7,
+    /** PlayStation: Select, Xbox: Back, Switch: - */
+    GamepadCenterLeft: 8,
+    /** PlayStation: Start, Xbox: Start, Switch: + */
+    GamepadCenterRight: 9,
+    /** PlayStation: L3, Xbox: LS, Switch: ? */
+    GamepadLeftStick: 10,
+    /** PlayStation: R3, Xbox: RS, Switch: ? */
+    GamepadRightStick: 11,
+    /** PlayStation: PS, Xbox: Guide, Switch: Home? */
+    GamepadCenterCenter: 16,
+} as const
+// Gamepad
+// LeftTop: 12,
+// LeftBottom: 13,
+// LeftLeft: 14,
+// LeftRight: 15,
+// RightTop: 3,
+// RightBottom: 0,
+// RightLeft: 2,
+// RightRight: 1,
+// FrontTopLeft: 4,
+// FrontTopRight: 5,
+// FrontBottomLeft: 6,
+// FrontBottomRight: 7,
+// CenterLeft: 8,
+// CenterRight: 9,
+// LeftStick: 10,
+// RightStick: 11,
+// CenterCenter: 16,
+
+const b = {
+    LeftTop: 'GamepadLeftTop',
+    LeftBottom: 'GamepadLeftBottom',
+    LeftLeft: 'GamepadLeftLeft',
+    LeftRight: 'GamepadLeftRight',
+    RightTop: 'GamepadRightTop',
+    RightBottom: 'GamepadRightBottom',
+    RightLeft: 'GamepadRightLeft',
+    RightRight: 'GamepadRightRight',
+    FrontTopLeft: 'GamepadFrontTopLeft',
+    FrontTopRight: 'GamepadFrontTopRight',
+    FrontBottomLeft: 'GamepadFrontBottomLeft',
+    FrontBottomRight: 'GamepadFrontBottomRight',
+    CenterLeft: 'GamepadCenterLeft',
+    CenterRight: 'GamepadCenterRight',
+    LeftStick: 'GamepadLeftStick',
+    RightStick: 'GamepadRightStick',
+    CenterCenter: 'GamepadCenterCenter',
+} as const
+
+const gamepadButtonIdxToCode = {
+    12: 'GamepadLeftTop', // D-Pad Up
+    13: 'GamepadLeftBottom',
+    14: 'GamepadLeftLeft',
+    15: 'GamepadLeftRight',
+    3: 'GamepadRightTop', // Triangle
+    0: 'GamepadRightBottom', // X
+    2: 'GamepadRightLeft', // Square
+    1: 'GamepadRightRight', // Circle
+    4: 'GamepadFrontTopLeft', // L1
+    5: 'GamepadFrontTopRight', // R1
+    6: 'GamepadFrontBottomLeft', // L2
+    7: 'GamepadFrontBottomRight', // R2
+    8: 'GamepadCenterLeft', // Select
+    9: 'GamepadCenterRight', // Start
+    10: 'GamepadLeftStick', // L3
+    11: 'GamepadRightStick', // R3
+    16: 'GamepadCenterCenter', // guide
+} as const
+
+const gamepadAxisToIndex = {
+    standard: [
+        gamepad.standard.axes.LeftStickX,
+        gamepad.standard.axes.LeftStickY,
+        gamepad.standard.axes.RightStickX,
+        gamepad.standard.axes.RightStickY,
+    ],
+}
+
+const gamepadCodeToIndex = {
+    [gamepad.standard.axes.LeftStickX]: 0,
+    [gamepad.standard.axes.LeftStickY]: 1,
+    [gamepad.standard.axes.RightStickX]: 2,
+    [gamepad.standard.axes.RightStickY]: 3,
+} as const
 
 function isKeyCode(code: string): code is KeyCode {
     // @ts-expect-error: uggggh make up your mind
     return !!keys[code]
 }
 
+// This recursive-readonly nightmare is necessary if we want the Intent type to be a string union instead of just 'string'
+export type InputMapping<Intent extends string> = Readonly<
+    Readonly<
+        [
+            InputCode | Readonly<[negative: InputCode, positive: InputCode]>,
+            Intent,
+        ]
+    >[]
+>
+
+const isArray = Array.isArray as <T extends readonly any[]>(
+    obj: unknown,
+) => obj is T
+
 /**
  * General input handler/mapper
  */
-export default class Input {
+export default class Input<Intent extends string> {
+    static readonly gamepad = gamepad
+    static readonly keys = keys
+
     /** Mouse position in pixels relative to the attached element */
     mouseCursor: GVec2 = { x: Infinity, y: Infinity }
     mouseNormalized: GVec2 = { x: Infinity, y: Infinity }
@@ -39,15 +236,25 @@ export default class Input {
     // ------
 
     private attachedElement: HTMLElement | undefined = undefined
-    /** Saving a reference to the Gamepad object seemed to result in an object that
-     * never got updates, at least in Chrome. This method saves the index and gets
-     * the gamepads from Navigator each time, which might be slower but it works */
+
+    /** Saving a reference to the Gamepad object seemed to result in an object
+     * that never got updates, at least in Chrome. Instead, we save the index of
+     * the most recent gamepad and get the object from Navigator each time,
+     * which might(?) be slower but it works */
     private gamepadIndex = -1
 
+    /** Map of intentions and their current value. @todo Privatize */
+    currentIntentions: { [k in Intent]: number | undefined }
+
     // TODO: accept a mapping or something
-    constructor() {
+    // constructor(mapping: { [k: InputCode | [InputCode, InputCode]]: I }) {
+    constructor(public mapping: InputMapping<Intent>) {
         // would like to set initial values this way but that's not how it works I guess
         this.resetState()
+
+        this.currentIntentions = Object.fromEntries(
+            mapping.map(([_, intent]) => [intent, undefined]),
+        ) as unknown as { [k in Intent]: number }
     }
 
     /**
@@ -117,10 +324,13 @@ export default class Input {
     }
 
     private lastUpdateTime = -Infinity
+
+    /** @param [t] Current time in miliseconds */
     readDevices(t = performance.now()) {
-        performance.now()
         const {
             attachedElement,
+            currentIntentions,
+            mapping,
             mouseCursor,
             mouseLastPagePos,
             mouseNormalized,
@@ -129,9 +339,107 @@ export default class Input {
             mouseWheelDelta,
         } = this
 
+        const gamepad = navigator.getGamepads()[this.gamepadIndex]
+
+        for (let intent in currentIntentions) {
+            currentIntentions[intent] = undefined
+        }
+
+        // TODO: we need to figure out the ordering issue. Is the mapping expected to be in priority order, or can we figure it out
+        for (let [code, intent] of mapping) {
+            invariant(intent in currentIntentions)
+            // https://github.com/microsoft/TypeScript/issues/17002
+            if (code instanceof Array) {
+                const [neg, pos] = code
+                // check alll the sources for this code
+                invariant(
+                    typeof neg === 'string' &&
+                        typeof pos === 'string' &&
+                        neg[0] !== '@' &&
+                        pos[0] !== '@',
+                    "Input code pairs can't map to an axis code",
+                )
+
+                let value = 0
+
+                // these codes won't show up in both places, so we're OK
+
+                // keyboard...
+                value = this.keyDown[neg as KeyCode] !== undefined ? -1 : 0
+                value += this.keyDown[pos as KeyCode] !== undefined ? 1 : 0
+
+                // gamepad...
+                if (gamepad) {
+                    const negBtnIndex =
+                        gamepadCodeToButtonIndex[neg as GamepadButtonCode]
+                    const posBtnIndex =
+                        gamepadCodeToButtonIndex[pos as GamepadButtonCode]
+
+                    const negPressed =
+                        negBtnIndex !== undefined
+                            ? gamepad?.buttons[negBtnIndex].pressed
+                            : 0
+                    const posPressed =
+                        posBtnIndex !== undefined
+                            ? gamepad?.buttons[posBtnIndex].pressed
+                            : 0
+
+                    value += (negPressed ? -1 : 0) + (posPressed ? 1 : 0)
+                }
+
+                // mouse...
+                // TODO
+
+                currentIntentions[intent] ||= value
+            } else if (code[0] === '@') {
+                if (gamepad) {
+                    // debugger
+                }
+                // it's an axis! those are all gamepad
+                // FIXME: if we want a circular deadzone we'll need to consider both axes & do linear algebra
+                const axisValue =
+                    gamepad?.axes[
+                        gamepadCodeToIndex[
+                            code as keyof typeof gamepadCodeToIndex
+                        ]
+                    ]
+
+                if (axisValue && Math.abs(axisValue) > 0.001) {
+                    currentIntentions[intent] ||= axisValue
+                }
+            } else {
+                // it's a single button
+                // ugggh but how are we tracking duration with this method
+
+                // keyboard...
+                const pressedKey =
+                    this.keyDown[code as KeyCode] !== undefined ? 1 : 0
+
+                // gamepad...
+                const btnIdx =
+                    gamepadCodeToButtonIndex[code as GamepadButtonCode]
+
+                const pressedGamepad =
+                    btnIdx !== undefined
+                        ? gamepad?.buttons[btnIdx].value
+                        : undefined
+
+                currentIntentions[intent] ||= pressedGamepad ?? pressedKey
+
+                // mouse...
+                // TODO
+            }
+        }
+        // console.log(currentIntentions)
+
+        // KEYBOARD
         this.keyJustPressed = this.recentKeys
         this.recentKeys = {}
 
+        // GAMEPAD
+
+        // MOUSE
+        // -----
         if (attachedElement) {
             // TODO: ring buffer for smoothing etc.
             previousMouseCursor.x = mouseCursor.x
@@ -159,10 +467,28 @@ export default class Input {
         // TODO: keys, gamepad
     }
 
+    /** @returns `true` if the given intent was just activated since the last read. The user will need to release *all* the buttons that map to this intent before it will return true again.  */
+    getMomentary(intent: Intent, player = 0): boolean {
+        throw new Error('uh oh!')
+    }
+
+    /** @returns how long the intent has been held down, in miliseconds, or -Infinity if it isn't */
+    getHeld(intent: Intent, player = 0): number {
+        throw new Error('uh oh!')
+    }
+
+    // getPressure(intent: Intent): number| undefined
+    getIntent(intent: Intent, player = 0) {
+        throw new Error('uh oh!')
+    }
+
+    getAxis(intent: Intent, player = 0) {}
+
     /** Treat the two keycodes as representing opposite sides of an axis
      * @returns -1 if `negative` is held down, 1 if `positive` is held down,
      * 0 if both or neither are held
      */
+    /*
     getAxis(negative: KeyCode, positive: KeyCode) {
         // TODO: support gamepads
         const { keyDown } = this
@@ -173,6 +499,7 @@ export default class Input {
             (keyDown[positive] === undefined ? 0 : 1)
         )
     }
+    */
 
     done() {
         // TODO: clear out values for next frame?
@@ -205,11 +532,12 @@ export default class Input {
     // ------
     //  Keys
     // ------
-    keyDown: Partial<{ [Property in KeyCode]: number }> = {}
-    keyJustPressed: Partial<{ [Property in KeyCode]: boolean }> = {}
-    private recentKeys: Partial<{ [Property in KeyCode]: boolean }> = {}
+
+    keyDown: { [Property in KeyCode]+?: number } = {}
+    keyJustPressed: { [Property in KeyCode]+?: boolean } = {}
+    private recentKeys: { [Property in KeyCode]+?: boolean } = {}
     /** @todo This is not a 1-to-1 mapping, since e.g. shift-A and A are different keys */
-    private keysLocale: Partial<{ [Property in KeyCode]: string }> = {}
+    private keysLocale: { [Property in KeyCode]+?: string } = {}
 
     private handleKeyDown = (e: KeyboardEvent) => {
         // TODO: might want to handle this another way. What if we want to bind keys that have modifiers, etc.
@@ -269,7 +597,7 @@ export default class Input {
         // TODO: haptic
 
         console.debug(
-            'Gamepad connected at index %d: %s. %d buttons, %d axes.',
+            'Gamepad connected at index %d: "%s". %d buttons, %d axes.',
             ev.gamepad.index,
             ev.gamepad.id,
             ev.gamepad.buttons.length,
