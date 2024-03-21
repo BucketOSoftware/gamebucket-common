@@ -1,205 +1,23 @@
-// TODO: provide a way to get the current state of all [relevant] inputs
-
-// import { Key } from 'w3c-keys'
 import invariant from 'tiny-invariant'
 import { GVec2, GVec3 } from './geometry'
+import {
+    InputCode,
+    KeyCode,
+    MouseButtonCode,
+    MouseButtons,
+    gamepad,
+    gamepadButtonIdxToCode,
+    gamepadCodeToIndex,
+    isKeyCode,
+    keys,
+    mouse,
+} from './input/codes'
 
 // codes are at https://w3c.github.io/uievents-code/#code-value-tables
 // https://raw.githubusercontent.com/w3c/uievents-code/gh-pages/impl-report.txt
 // awk '/CODE_IMPL / && $3 =="Y" { printf "\"%s\",%s,\"%s\"\n", $2, FNR, $0 }' keys.txt > keys.csv
 // awk 'BEGIN { print "export default {" } END { print "} as const" } /CODE_IMPL / && $3 =="Y" { printf "/** %s *\/\n%s: \"%s\",\n", $0, $2, $2 }' keys.txt
 // curl https://raw.githubusercontent.com/w3c/uievents-code/gh-pages/impl-report.txt | awk 'BEGIN { print "export default {" } END { print "} as const" } /CODE_IMPL / && $3 == "Y" { printf "/** %s *\/\n%s: \"%s\",\n", $0, $2, $2 }'
-import keys from './keys'
-
-// ---------------
-//  Input codes
-// ---------------
-
-type GamepadFriendlyButtonNames = keyof (typeof gamepad)['standard']['buttons']
-type GamepadFriendlyAxisNames = keyof (typeof gamepad)['standard']['axes']
-
-type GamepadButtonCode =
-    (typeof gamepad)['standard']['buttons'][GamepadFriendlyButtonNames]
-type GamepadAxisCode =
-    (typeof gamepad)['standard']['axes'][GamepadFriendlyAxisNames]
-export type KeyCode = keyof typeof keys
-
-type MouseButton = 'MouseLeft' | 'MouseMiddle' | 'MouseRight'
-
-export type InputCode = KeyCode | GamepadButtonCode | GamepadAxisCode
-// | MouseButton
-
-// const v: InputCode = '@GamepadLeftStickAxisX'
-
-export const gamepad = {
-    // https://www.w3.org/TR/gamepad/#remapping
-    standard: {
-        axes: {
-            LeftStickX: '@GamepadLeftStickAxisX',
-            LeftStickY: '@GamepadLeftStickAxisY',
-            RightStickX: '@GamepadRightStickAxisX',
-            RightStickY: '@GamepadRightStickAxisY',
-        },
-        buttons: {
-            // Literal names based on pad location
-            LeftTop: 'GamepadLeftTop',
-            LeftBottom: 'GamepadLeftBottom',
-            LeftLeft: 'GamepadLeftLeft',
-            LeftRight: 'GamepadLeftRight',
-            RightTop: 'GamepadRightTop',
-            RightBottom: 'GamepadRightBottom',
-            RightLeft: 'GamepadRightLeft',
-            RightRight: 'GamepadRightRight',
-            FrontTopLeft: 'GamepadFrontTopLeft',
-            FrontTopRight: 'GamepadFrontTopRight',
-            FrontBottomLeft: 'GamepadFrontBottomLeft',
-            FrontBottomRight: 'GamepadFrontBottomRight',
-            CenterLeft: 'GamepadCenterLeft',
-            CenterRight: 'GamepadCenterRight',
-            LeftStick: 'GamepadLeftStick',
-            RightStick: 'GamepadRightStick',
-            CenterCenter: 'GamepadCenterCenter',
-        },
-    },
-    /** PlayStation-style aliases */
-    ps: {
-        DPadUp: 'GamepadLeftTop',
-        DPadDown: 'GamepadLeftBottom',
-        DPadLeft: 'GamepadLeftLeft',
-        DPadRight: 'GamepadLeftRight',
-        DPadX: ['GamepadLeftLeft', 'GamepadLeftRight'],
-        DPadY: ['GamepadLeftTop', 'GamepadLeftBottom'],
-        Triangle: 'GamepadRightTop',
-        Cross: 'GamepadRightBottom',
-        Square: 'GamepadRightLeft',
-        Circle: 'GamepadRightRight',
-        L1: 'GamepadFrontTopLeft',
-        R1: 'GamepadFrontTopRight',
-        L2: 'GamepadFrontBottomLeft',
-        R2: 'GamepadFrontBottomRight',
-        Select: 'GamepadCenterLeft',
-        Start: 'GamepadCenterRight',
-        L3: 'GamepadLeftStick',
-        R3: 'GamepadRightStick',
-        Menu: 'GamepadCenterCenter',
-    },
-} as const
-
-const gamepadCodeToButtonIndex = {
-    /** D-pad up */
-    GamepadLeftTop: 12,
-    /** D-pad down */
-    GamepadLeftBottom: 13,
-    /** D-pad left */
-    GamepadLeftLeft: 14,
-    /** D-pad right */
-    GamepadLeftRight: 15,
-    /** PlayStation: Triangle, Xbox: Y, Switch: X */
-    GamepadRightTop: 3,
-    /** PlayStation: Cross, Xbox: A, Switch: B */
-    GamepadRightBottom: 0,
-    /** PlayStation: Square, Xbox: X, Switch: Y */
-    GamepadRightLeft: 2,
-    /** PlayStation: Square, Xbox: X, Switch: Y */
-    GamepadRightRight: 1,
-    /** PlayStation: L1, Xbox: LB, Switch: L */
-    GamepadFrontTopLeft: 4,
-    /** PlayStation: R1, Xbox: RB, Switch: R */
-    GamepadFrontTopRight: 5,
-    /** PlayStation: L2, Xbox: LT, Switch: ZL */
-    GamepadFrontBottomLeft: 6,
-    /** PlayStation: R2, Xbox: RT, Switch: ZR */
-    GamepadFrontBottomRight: 7,
-    /** PlayStation: Select, Xbox: Back, Switch: - */
-    GamepadCenterLeft: 8,
-    /** PlayStation: Start, Xbox: Start, Switch: + */
-    GamepadCenterRight: 9,
-    /** PlayStation: L3, Xbox: LS, Switch: ? */
-    GamepadLeftStick: 10,
-    /** PlayStation: R3, Xbox: RS, Switch: ? */
-    GamepadRightStick: 11,
-    /** PlayStation: PS, Xbox: Guide, Switch: Home? */
-    GamepadCenterCenter: 16,
-} as const
-// Gamepad
-// LeftTop: 12,
-// LeftBottom: 13,
-// LeftLeft: 14,
-// LeftRight: 15,
-// RightTop: 3,
-// RightBottom: 0,
-// RightLeft: 2,
-// RightRight: 1,
-// FrontTopLeft: 4,
-// FrontTopRight: 5,
-// FrontBottomLeft: 6,
-// FrontBottomRight: 7,
-// CenterLeft: 8,
-// CenterRight: 9,
-// LeftStick: 10,
-// RightStick: 11,
-// CenterCenter: 16,
-
-const b = {
-    LeftTop: 'GamepadLeftTop',
-    LeftBottom: 'GamepadLeftBottom',
-    LeftLeft: 'GamepadLeftLeft',
-    LeftRight: 'GamepadLeftRight',
-    RightTop: 'GamepadRightTop',
-    RightBottom: 'GamepadRightBottom',
-    RightLeft: 'GamepadRightLeft',
-    RightRight: 'GamepadRightRight',
-    FrontTopLeft: 'GamepadFrontTopLeft',
-    FrontTopRight: 'GamepadFrontTopRight',
-    FrontBottomLeft: 'GamepadFrontBottomLeft',
-    FrontBottomRight: 'GamepadFrontBottomRight',
-    CenterLeft: 'GamepadCenterLeft',
-    CenterRight: 'GamepadCenterRight',
-    LeftStick: 'GamepadLeftStick',
-    RightStick: 'GamepadRightStick',
-    CenterCenter: 'GamepadCenterCenter',
-} as const
-
-const gamepadButtonIdxToCode = [
-    'GamepadRightBottom', // X
-    'GamepadRightRight', // Circle
-    'GamepadRightLeft', // Square
-    'GamepadRightTop', // Triangle
-    'GamepadFrontTopLeft', // L1
-    'GamepadFrontTopRight', // R1
-    'GamepadFrontBottomLeft', // L2
-    'GamepadFrontBottomRight', // R2
-    'GamepadCenterLeft', // Select
-    'GamepadCenterRight', // Start
-    'GamepadLeftStick', // L3
-    'GamepadRightStick', // R3
-    'GamepadLeftTop', // D-Pad Up
-    'GamepadLeftBottom',
-    'GamepadLeftLeft',
-    'GamepadLeftRight',
-    'GamepadCenterCenter', // guide
-] as const
-
-const gamepadAxisToIndex = {
-    standard: [
-        gamepad.standard.axes.LeftStickX,
-        gamepad.standard.axes.LeftStickY,
-        gamepad.standard.axes.RightStickX,
-        gamepad.standard.axes.RightStickY,
-    ],
-}
-
-const gamepadCodeToIndex = {
-    [gamepad.standard.axes.LeftStickX]: 0,
-    [gamepad.standard.axes.LeftStickY]: 1,
-    [gamepad.standard.axes.RightStickX]: 2,
-    [gamepad.standard.axes.RightStickY]: 3,
-} as const
-
-function isKeyCode(code: string): code is KeyCode {
-    // @ts-expect-error: uggggh make up your mind
-    return !!keys[code]
-}
 
 // This recursive-readonly nightmare is necessary if we want the Intent type to be a string union instead of just 'string'
 export type InputMapping<Intent extends string> = Readonly<
@@ -211,15 +29,12 @@ export type InputMapping<Intent extends string> = Readonly<
     >[]
 >
 
-const isArray = Array.isArray as <T extends readonly any[]>(
-    obj: unknown,
-) => obj is T
-
 /**
  * General input handler/mapper
  */
 export default class Input<Intent extends string> {
     static readonly gamepad = gamepad
+    static readonly mouse = mouse
     static readonly keys = keys
 
     /** Mapping from input code (any device) to when it was pressed */
@@ -234,8 +49,6 @@ export default class Input<Intent extends string> {
     previousMouseCursor: GVec2 = { x: 0, y: 0 }
     /** Wheel movement since last frame */
     mouseWheelDelta: GVec3 = { x: 0, y: 0, z: 0 }
-
-    mouseDown = false
 
     // ------
     // Internal state
@@ -294,10 +107,11 @@ export default class Input<Intent extends string> {
         doc.addEventListener('focusout', this.handleDocFocusChange)
         doc.addEventListener('visibilitychange', this.handleDocFocusChange)
 
-        element.addEventListener('mousedown', this.handleMouseDown)
+        element.addEventListener('mousedown', this.handleMouseButton)
         // we want to know if the user releases the button outside of the canvas
-        doc.addEventListener('mouseup', this.handleMouseUp)
+        doc.addEventListener('mouseup', this.handleMouseButton)
         doc.addEventListener('mousemove', this.handleMouseMove)
+        element.addEventListener('contextmenu', this.handleMouseContext)
         element.addEventListener('wheel', this.handleMouseWheel, passive)
 
         // element.addEventListener('touchstart', this.handleTouch, passive)
@@ -321,10 +135,11 @@ export default class Input<Intent extends string> {
         doc.removeEventListener('focusout', this.handleDocFocusChange)
         doc.removeEventListener('visibilitychange', this.handleDocFocusChange)
 
-        element.removeEventListener('mousedown', this.handleMouseDown)
-        doc.removeEventListener('mouseup', this.handleMouseUp)
+        element.removeEventListener('mousedown', this.handleMouseButton)
+        doc.removeEventListener('mouseup', this.handleMouseButton)
         doc.removeEventListener('mousemove', this.handleMouseMove)
         element.removeEventListener('wheel', this.handleMouseWheel)
+        element.removeEventListener('contextmenu', this.handleMouseContext)
 
         win.removeEventListener('gamepadconnected', this.handleGamepadConnected)
         win.removeEventListener(
@@ -486,7 +301,6 @@ export default class Input<Intent extends string> {
                     current.degree ||= degree
                     current.recent = !lastFrameActiveIntents.has(intent)
                 }
-                // current
             }
         }
         // console.log(currentIntentions)
@@ -557,13 +371,13 @@ export default class Input<Intent extends string> {
 
         return this.intentions[intent]?.degree || 0
     }
+
     // getPressure(intent: Intent): number| undefined
     // getIntent(intent: Intent, player = 0) {
     // throw new Error('uh oh!')
     // }
 
     // getAxis(intent: Intent, player = 0) {
-
     // }
 
     done() {
@@ -596,17 +410,18 @@ export default class Input<Intent extends string> {
             ]),
         ) as Input<Intent>['intentions']
 
+        this.recentKeys = {}
+
         this.mouseLastPagePos.x = Infinity
         this.mouseLastPagePos.y = Infinity
-        this.mouseDown = false
-        // TODO: mouse? gamepad? keys?
     }
 
     // ------
     //  Keys
     // ------
 
-    private recentKeys: { [Property in KeyCode]+?: boolean } = {}
+    private recentKeys: { [Property in KeyCode | MouseButtonCode]+?: boolean } =
+        {}
     /** @todo This is not a 1-to-1 mapping, since e.g. shift-A and A are different keys */
     private keysLocale: { [Property in KeyCode]+?: string } = {}
 
@@ -625,7 +440,7 @@ export default class Input<Intent extends string> {
             }
         }
 
-        this.allDeviceButtonDownAt[e.code] ||= e.timeStamp
+        this.allDeviceButtonDownAt[e.code] ??= e.timeStamp
         // this.keysLocale[e.code] = e.key
 
         this.recentKeys[e.code] = true
@@ -723,37 +538,38 @@ export default class Input<Intent extends string> {
     /** Cumulative wheel deltas since last read */
     private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
 
-    private handleMouseDown = (e: MouseEvent) => {
-        // TODO: multiple buttons
-        if (e.button !== 0) {
-            return
+    private handleMouseButton = (e: MouseEvent) => {
+        const { allDeviceButtonDownAt, recentKeys } = this
+
+        for (let i = 0; i < 3; i++) {
+            const bitmask = 1 << i
+            const pressed = e.buttons & bitmask
+            const code = MouseButtons[bitmask as keyof typeof MouseButtons]
+
+            if (pressed) {
+                invariant(code)
+                const alreadyPressed = allDeviceButtonDownAt[code] !== undefined
+                // console.log('Button %s: ', code, true, alreadyPressed)
+
+                allDeviceButtonDownAt[code] ??= e.timeStamp
+                recentKeys[code] = true
+            } else {
+                delete allDeviceButtonDownAt[code]
+            }
         }
 
-        invariant(e.target === this.attachedElement)
+        invariant(e.type === 'mouseup' || e.target === this.attachedElement)
 
-        // TODO: just make it a dang button
-        this.mouseDown = true
         // There may not have been a move event before this
         this.handleMouseMove(e)
 
         // We don't prevent default so as to let focus happen naturally
     }
 
-    private handleMouseUp = (e: MouseEvent) => {
-        // invariant(e.target === this.attachedElement)
-        if (e.target === this.attachedElement) {
-            // console.warn('Up con canvas')
-        }
-
-        // TODO: multiple buttons
-        if (e.button !== 0) {
-            return
-        }
-
-        this.mouseDown = false
-        this.handleMouseMove(e) // update position
+    private handleMouseContext = (e: MouseEvent) => {
+        // If the context menu opens we'll get a mousedown event for the right button but not a mouseup!
+        e.preventDefault()
     }
-
     private handleMouseMove = (e: MouseEvent) => {
         // Don't normalize the coordinates yet
         this.mouseLastPagePos.x = e.pageX //(pageX - left) / width
