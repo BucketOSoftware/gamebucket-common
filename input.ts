@@ -223,8 +223,10 @@ export default class Input<Intent extends string> {
     static readonly keys = keys
 
     /** Mapping from input code (any device) to when it was pressed */
-    allDeviceButtonDownAt: { [Property in InputCode]+?: number } = {}
-    allDeviceButtonJustPressed: { [Property in InputCode]+?: boolean } = {}
+    private allDeviceButtonDownAt: { [Property in InputCode]+?: number } = {}
+    private allDeviceButtonPressure: { [Property in InputCode]+?: number } = {}
+    private allDeviceButtonJustPressed: { [Property in InputCode]+?: boolean } =
+        {}
 
     /** Mouse position in pixels relative to the attached element */
     mouseCursor: GVec2 = { x: Infinity, y: Infinity }
@@ -247,18 +249,24 @@ export default class Input<Intent extends string> {
      * which might(?) be slower but it works */
     private gamepadIndex = -1
 
-    /** Map of intentions and their current value. @todo Privatize */
-    currentIntentions: { [k in Intent]: number | undefined }
+    /** Map of intentions and their current value. @todo Privatize. @todo Multiplayer */
+    // intentions: { [k in Intent]: number | undefined }
+    intentions!: {
+        [k in Intent]: {
+            /** Timestamp (ms) at which the intention was invoked */
+            start: number | undefined
+            /** Current degree of the input. [0, 1] for triggers/pressure buttons, [-1, 1] for axes */
+            degree: number
+            /** True if the intent was invoked since the last call to `readDevices` */
+            recent: boolean
+        }
+    }
 
-    // TODO: accept a mapping or something
-    // constructor(mapping: { [k: InputCode | [InputCode, InputCode]]: I }) {
+    // private lastFrameIntentions: { [k in Intent]: number | undefined }
+
     constructor(public mapping: InputMapping<Intent>) {
         // would like to set initial values this way but that's not how it works I guess
         this.resetState()
-
-        this.currentIntentions = Object.fromEntries(
-            mapping.map(([_, intent]) => [intent, undefined]),
-        ) as unknown as { [k in Intent]: number }
     }
 
     /**
@@ -270,7 +278,6 @@ export default class Input<Intent extends string> {
 
         // TODO: should this attach keyboard events to the `element`?
         invariant(this.attachedElement === undefined, 'Already attached')
-        // this.attachedElement, ow.undefined)
 
         this.attachedElement = element
         const doc = element.ownerDocument
@@ -307,8 +314,8 @@ export default class Input<Intent extends string> {
         const doc = element.ownerDocument
         const win = doc.defaultView!
 
-        // doc.removeEventListener('keydown', this.handleKeyDown)
-        // doc.removeEventListener('keyup', this.handleKeyUp)
+        doc.removeEventListener('keydown', this.handleKeyDown)
+        doc.removeEventListener('keyup', this.handleKeyUp)
 
         doc.removeEventListener('focusin', this.handleDocFocusChange)
         doc.removeEventListener('focusout', this.handleDocFocusChange)
@@ -331,10 +338,14 @@ export default class Input<Intent extends string> {
 
     /** @param [t] Current time in miliseconds */
     readDevices(t = performance.now()) {
+        this.allDeviceButtonJustPressed = {}
+
         const {
             allDeviceButtonDownAt,
+            allDeviceButtonPressure,
+            allDeviceButtonJustPressed,
             attachedElement,
-            currentIntentions,
+            intentions,
             mapping,
             mouseCursor,
             gamepadIndex,
@@ -345,22 +356,33 @@ export default class Input<Intent extends string> {
             mouseWheelDelta,
         } = this
 
-        for (let intent in currentIntentions) {
-            currentIntentions[intent] = undefined
-        }
+        const lastFrameActiveIntents = new Set<Intent>()
 
-        this.allDeviceButtonJustPressed = {}
+        for (let intent in intentions) {
+            const record = intentions[intent]
+            invariant(
+                !!record.degree === (record.start !== undefined),
+                'Input state is out of sync',
+            )
+
+            if (intentions[intent].degree) {
+                lastFrameActiveIntents.add(intent)
+            }
+            // we don't want to lose the timestamps, so we'll reset all of these
+            // to 0 and figure out the status of the timestamps/recency later
+            intentions[intent].degree = 0
+        }
 
         // KEYBOARD
 
+        // the events have already updated DownAt, so we just need to copy the just-pressed status
         for (let code in this.recentKeys) {
             if (this.recentKeys[code as KeyCode]) {
-                this.allDeviceButtonJustPressed[code as KeyCode] = true
+                allDeviceButtonJustPressed[code as KeyCode] = true
             } else {
-                delete this.allDeviceButtonJustPressed[code as KeyCode]
+                delete allDeviceButtonJustPressed[code as KeyCode]
             }
         }
-
         this.recentKeys = {}
 
         // GAMEPAD
@@ -381,7 +403,8 @@ export default class Input<Intent extends string> {
 
                 const justPressed = currentlyDown && !previouslyDown
 
-                this.allDeviceButtonJustPressed[code] = justPressed
+                allDeviceButtonJustPressed[code] = justPressed
+                allDeviceButtonPressure[code] = currentValue
 
                 if (justPressed) {
                     allDeviceButtonDownAt[code] = t
@@ -389,18 +412,20 @@ export default class Input<Intent extends string> {
 
                 if (!currentlyDown) {
                     delete allDeviceButtonDownAt[code]
-                    // delete this.allDeviceButtonJustPressed[code]
+                    delete allDeviceButtonPressure[code]
                 }
             }
         }
 
-        if (Object.keys(this.allDeviceButtonJustPressed).length > 0) {
-            console.log(this.allDeviceButtonJustPressed)
-        }
+        // if (Object.keys(this.allDeviceButtonJustPressed).length > 0) {
+        // console.log(this.allDeviceButtonJustPressed)
+        // }
 
+        // Map held keys/buttons to intents
         // TODO: we need to figure out the ordering issue. Is the mapping expected to be in priority order, or can we figure it out
         for (let [code, intent] of mapping) {
-            invariant(intent in currentIntentions)
+            invariant(intent in intentions)
+            const current = intentions[intent]
 
             // https://github.com/microsoft/TypeScript/issues/17002
             if (code instanceof Array) {
@@ -416,10 +441,17 @@ export default class Input<Intent extends string> {
                 const negPressed = allDeviceButtonDownAt[neg] ?? -Infinity
                 const posPressed = allDeviceButtonDownAt[pos] ?? -Infinity
 
+                let degree = 0
                 if (negPressed > posPressed) {
-                    currentIntentions[intent] = -1
+                    degree = -(allDeviceButtonPressure[neg] || 1)
                 } else if (negPressed < posPressed) {
-                    currentIntentions[intent] = 1
+                    degree = allDeviceButtonPressure[pos] || 1
+                }
+
+                if (degree) {
+                    current.start ??= t
+                    current.degree ||= degree
+                    current.recent = !lastFrameActiveIntents.has(intent)
                 }
             } else if (code[0] === '@') {
                 // it's an axis! those are all gamepad right
@@ -431,16 +463,30 @@ export default class Input<Intent extends string> {
                         ]
                     ]
 
+                invariant(!axisValue || (axisValue >= -1 && axisValue <= 1))
+
                 if (axisValue && Math.abs(axisValue) > 0.001) {
-                    currentIntentions[intent] ||= axisValue
+                    // currentIntentions[intent] ||= axisValue
+                    current.start ??= t
+                    current.degree ||= axisValue
+                    current.recent = !lastFrameActiveIntents.has(intent)
                 }
 
                 // TODO: map mouse delta to an axis (only if mouse is captured?)
             } else {
                 // it's a single button
-
                 const pressed = allDeviceButtonDownAt[code]
-                currentIntentions[intent] ||= pressed
+                const degree =
+                    allDeviceButtonPressure[code] || (pressed ? 1 : 0)
+
+                if (pressed) {
+                    // set the start of the event. do we actually need lastFrameActiveIntents?
+                    current.start ??= t
+                    // if a higher-priority binding already set the degree, don't override it
+                    current.degree ||= degree
+                    current.recent = !lastFrameActiveIntents.has(intent)
+                }
+                // current
             }
         }
         // console.log(currentIntentions)
@@ -472,27 +518,53 @@ export default class Input<Intent extends string> {
         mouseWheelAccumulator.y = 0
         mouseWheelAccumulator.z = 0
         // TODO: keys, gamepad
+
+        // Cleanup: clear start timestamps
+        for (let intent in intentions) {
+            const record = intentions[intent]
+            if (!record.degree) {
+                record.start = undefined
+            }
+        }
     }
 
     /** @returns `true` if the given intent was just activated since the last read. The user will need to release *all* the buttons that map to this intent before it will return true again.  */
-    getMomentary(intent: Intent, player = 0): boolean {
-        throw new Error('uh oh!')
+    recentlyActivated(intent: Intent, player = 0): boolean {
+        // throw new Error('uh oh!')
+        return this.intentions[intent].recent
     }
 
-    /** @returns how long the intent has been held down, in miliseconds, or -Infinity if it isn't */
-    getHeld(intent: Intent, player = 0): number {
+    isActivated(intent: Intent, player = 0): boolean {
+        return this.intentions[intent]?.start !== undefined
+    }
+
+    /** @returns how long the intent has been held down, in miliseconds, or 0 if it isn't */
+    getHeld(intent: Intent, now: number, player = 0): number {
         // throw new Error('uh oh!')
         // const pressedAt = this.keyDown[key]
         // probably not so likely that the timestamp would be 0, but...
-        // return pressedAt !== undefined ? t - pressedAt > duration : false
+        // return pressedAt !== undefined ? t - pressedAt > duration : falsed
+        const duration = now - (this.intentions[intent]?.start ?? Infinity)
+        return duration > 0 ? duration : 0
     }
 
+    /** @returns the intent's analog value: 0 or 1 for digital inputs, [0, 1] for analog, [-1, 1] for an axis */
+    getValue(intent: Intent, player = 0): number {
+        invariant(
+            !!this.intentions[intent]?.degree ===
+                !!this.intentions[intent]?.start,
+        )
+
+        return this.intentions[intent]?.degree || 0
+    }
     // getPressure(intent: Intent): number| undefined
-    getIntent(intent: Intent, player = 0) {
-        throw new Error('uh oh!')
-    }
+    // getIntent(intent: Intent, player = 0) {
+    // throw new Error('uh oh!')
+    // }
 
-    getAxis(intent: Intent, player = 0) {}
+    // getAxis(intent: Intent, player = 0) {
+
+    // }
 
     done() {
         // TODO: clear out values for next frame?
@@ -517,6 +589,12 @@ export default class Input<Intent extends string> {
 
         this.allDeviceButtonDownAt = {}
         this.allDeviceButtonJustPressed = {}
+        this.intentions = Object.fromEntries(
+            this.mapping.map(([_, intent]) => [
+                intent,
+                { start: undefined, degree: 0, recent: false },
+            ]),
+        ) as Input<Intent>['intentions']
 
         this.mouseLastPagePos.x = Infinity
         this.mouseLastPagePos.y = Infinity
@@ -651,10 +729,9 @@ export default class Input<Intent extends string> {
             return
         }
 
-        const { target, pageX, pageY } = e
+        invariant(e.target === this.attachedElement)
 
-        invariant(target === this.attachedElement)
-
+        // TODO: just make it a dang button
         this.mouseDown = true
         // There may not have been a move event before this
         this.handleMouseMove(e)
