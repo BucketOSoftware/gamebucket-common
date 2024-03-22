@@ -7,7 +7,7 @@ import {
     MouseButtons,
     gamepad,
     gamepadButtonIdxToCode,
-    gamepadCodeToIndex,
+    gamepadCodeToAxisIndex,
     isKeyCode,
     keys,
     mouse,
@@ -124,7 +124,11 @@ export default class Input<Intent extends string> {
     }
 
     detach() {
-        const element = this.attachedElement!
+        invariant(
+            this.attachedElement,
+            'detach() called, but input manager is not attached',
+        )
+        const element = this.attachedElement
         const doc = element.ownerDocument
         const win = doc.defaultView!
 
@@ -149,21 +153,15 @@ export default class Input<Intent extends string> {
         this.attachedElement = undefined
     }
 
-    private lastUpdateTime = -Infinity
-
     /** @param [t] Current time in miliseconds */
     readDevices(t = performance.now()) {
         this.allDeviceButtonJustPressed = {}
 
         const {
-            allDeviceButtonDownAt,
-            allDeviceButtonPressure,
             allDeviceButtonJustPressed,
             attachedElement,
             intentions,
-            mapping,
             mouseCursor,
-            gamepadIndex,
             mouseLastPagePos,
             mouseNormalized,
             previousMouseCursor,
@@ -188,122 +186,25 @@ export default class Input<Intent extends string> {
             intentions[intent].degree = 0
         }
 
-        // KEYBOARD
-
-        // the events have already updated DownAt, so we just need to copy the just-pressed status
-        for (let code in this.recentKeys) {
-            if (this.recentKeys[code as KeyCode]) {
+        // event-based recent pressed: the events have already updated DownAt,
+        // so we just need to copy the just-pressed status
+        for (let code in this.recentPresses) {
+            if (this.recentPresses[code as KeyCode]) {
                 allDeviceButtonJustPressed[code as KeyCode] = true
             } else {
                 delete allDeviceButtonJustPressed[code as KeyCode]
             }
         }
-        this.recentKeys = {}
+        this.recentPresses = {}
 
         // GAMEPAD
 
-        // TODO: multiple gamepads
-        const gamepad = navigator.getGamepads()[gamepadIndex]
-
-        // poll gamepad
-        if (gamepad) {
-            for (let btn = 0; btn < gamepad?.buttons.length; btn++) {
-                const code = gamepadButtonIdxToCode[btn]
-                const currentValue = gamepad.buttons[btn].value
-
-                const previouslyDown = Number.isFinite(
-                    allDeviceButtonDownAt[code],
-                )
-                const currentlyDown = currentValue > 0
-
-                const justPressed = currentlyDown && !previouslyDown
-
-                allDeviceButtonJustPressed[code] = justPressed
-                allDeviceButtonPressure[code] = currentValue
-
-                if (justPressed) {
-                    allDeviceButtonDownAt[code] = t
-                }
-
-                if (!currentlyDown) {
-                    delete allDeviceButtonDownAt[code]
-                    delete allDeviceButtonPressure[code]
-                }
-            }
-        }
-
-        // if (Object.keys(this.allDeviceButtonJustPressed).length > 0) {
-        // console.log(this.allDeviceButtonJustPressed)
-        // }
+        const gamepad = this.pollGamepads(t)
 
         // Map held keys/buttons to intents
+
         // TODO: we need to figure out the ordering issue. Is the mapping expected to be in priority order, or can we figure it out
-        for (let [code, intent] of mapping) {
-            invariant(intent in intentions)
-            const current = intentions[intent]
-
-            // https://github.com/microsoft/TypeScript/issues/17002
-            if (code instanceof Array) {
-                const [neg, pos] = code
-                invariant(
-                    typeof neg === 'string' &&
-                        typeof pos === 'string' &&
-                        neg[0] !== '@' &&
-                        pos[0] !== '@',
-                    "Input code pairs can't map to an axis code",
-                )
-
-                const negPressed = allDeviceButtonDownAt[neg] ?? -Infinity
-                const posPressed = allDeviceButtonDownAt[pos] ?? -Infinity
-
-                let degree = 0
-                if (negPressed > posPressed) {
-                    degree = -(allDeviceButtonPressure[neg] || 1)
-                } else if (negPressed < posPressed) {
-                    degree = allDeviceButtonPressure[pos] || 1
-                }
-
-                if (degree) {
-                    current.start ??= t
-                    current.degree ||= degree
-                    current.recent = !lastFrameActiveIntents.has(intent)
-                }
-            } else if (code[0] === '@') {
-                // it's an axis! those are all gamepad right
-                // FIXME: if we want a circular deadzone we'll need to consider both axes & do linear algebra
-                const axisValue =
-                    gamepad?.axes[
-                        gamepadCodeToIndex[
-                            code as keyof typeof gamepadCodeToIndex
-                        ]
-                    ]
-
-                invariant(!axisValue || (axisValue >= -1 && axisValue <= 1))
-
-                if (axisValue && Math.abs(axisValue) > 0.001) {
-                    // currentIntentions[intent] ||= axisValue
-                    current.start ??= t
-                    current.degree ||= axisValue
-                    current.recent = !lastFrameActiveIntents.has(intent)
-                }
-
-                // TODO: map mouse delta to an axis (only if mouse is captured?)
-            } else {
-                // it's a single button
-                const pressed = allDeviceButtonDownAt[code]
-                const degree =
-                    allDeviceButtonPressure[code] || (pressed ? 1 : 0)
-
-                if (pressed) {
-                    // set the start of the event. do we actually need lastFrameActiveIntents?
-                    current.start ??= t
-                    // if a higher-priority binding already set the degree, don't override it
-                    current.degree ||= degree
-                    current.recent = !lastFrameActiveIntents.has(intent)
-                }
-            }
-        }
-        // console.log(currentIntentions)
+        this.mapInputsToIntents(t, lastFrameActiveIntents, gamepad)
 
         // MOUSE
         // -----
@@ -324,16 +225,21 @@ export default class Input<Intent extends string> {
             console.warn('Input is not attached')
         }
 
-        // TODO?: when do X and Z come into play? Gestures? Mobile?
+        // TODO?: when does Z come into play? Gestures? Mobile?
         mouseWheelDelta.x = mouseWheelAccumulator.x
         mouseWheelDelta.y = mouseWheelAccumulator.y
         mouseWheelDelta.z = mouseWheelAccumulator.z
         mouseWheelAccumulator.x = 0
         mouseWheelAccumulator.y = 0
         mouseWheelAccumulator.z = 0
-        // TODO: keys, gamepad
 
-        // Cleanup: clear start timestamps
+        for (let intent in intentions) {
+            if (intentions[intent].recent) {
+                console.warn('[!] ', intent)
+            }
+        }
+
+        // Cleanup: clear start timestamps for released intentions
         for (let intent in intentions) {
             const record = intentions[intent]
             if (!record.degree) {
@@ -362,6 +268,13 @@ export default class Input<Intent extends string> {
         return duration > 0 ? duration : 0
     }
 
+    heldFor(intent: Intent, now: number, minimumDuration: number, player = 0) {
+        return (
+            now - (this.intentions[intent]?.start ?? Infinity) >=
+            minimumDuration
+        )
+    }
+
     /** @returns the intent's analog value: 0 or 1 for digital inputs, [0, 1] for analog, [-1, 1] for an axis */
     getValue(intent: Intent, player = 0): number {
         invariant(
@@ -372,31 +285,130 @@ export default class Input<Intent extends string> {
         return this.intentions[intent]?.degree || 0
     }
 
-    // getPressure(intent: Intent): number| undefined
-    // getIntent(intent: Intent, player = 0) {
-    // throw new Error('uh oh!')
-    // }
+    private mapInputsToIntents(
+        t: number,
+        lastFrameActiveIntents: Set<Intent>,
+        gamepad?: Gamepad,
+    ) {
+        const SINGLE_AXIS_DEADZONE = 0.001
 
-    // getAxis(intent: Intent, player = 0) {
-    // }
+        const { mapping, intentions } = this
 
-    done() {
-        // TODO: clear out values for next frame?
+        const temp = {
+            start: undefined,
+            degree: 0,
+            // recent: !lastFrameActiveIntents.has(intent),
+        }
+
+        for (let [code, intent] of mapping) {
+            invariant(intent in intentions)
+            const intentInfo = intentions[intent]
+
+            // Fields we need to fill out:
+            let degree = 0
+
+            // https://github.com/microsoft/TypeScript/issues/17002
+            if (code instanceof Array) {
+                const [neg, pos] = code
+                invariant(
+                    typeof neg === 'string' &&
+                        typeof pos === 'string' &&
+                        neg[0] !== '@' &&
+                        pos[0] !== '@',
+                    "Input code pairs can't map to an axis code",
+                )
+
+                const { start: negStart = -Infinity, degree: negDegree } =
+                    this.getStatusByCode(temp, neg)
+                const { start: posStart = -Infinity, degree: posDegree } =
+                    this.getStatusByCode(temp, pos)
+
+                // use the more recently pressed button
+                if (negStart > posStart) {
+                    degree = -(negDegree || 1)
+                } else if (negStart < posStart) {
+                    degree = posDegree || 1
+                }
+            } else if (code[0] === '@') {
+                // TODO: map mouse delta to an axis (?only if mouse is captured?)
+                // it's an axis! those are all gamepad right
+                // FIXME: if we want a circular deadzone we'll need to consider both axes & do linear algebra
+                const axisValue =
+                    gamepad?.axes[
+                        gamepadCodeToAxisIndex[
+                            code as keyof typeof gamepadCodeToAxisIndex
+                        ]
+                    ] || 0
+                invariant(axisValue >= -1 && axisValue <= 1)
+
+                degree =
+                    Math.abs(axisValue) > SINGLE_AXIS_DEADZONE ? axisValue : 0
+            } else {
+                // it's a single button
+                degree = this.getStatusByCode(temp, code).degree
+            }
+
+            // if the intent isn't active, and the input has a nonzero degree, mark it as starting now
+            intentInfo.start = intentInfo.start ?? (degree ? t : undefined)
+            // if a higher-priority binding already set the degree, don't override it
+            intentInfo.degree ||= degree
+            // recent if the input is nonzero AND the intent wasn't held last frame
+            intentInfo.recent =
+                degree !== 0 && !lastFrameActiveIntents.has(intent)
+        }
     }
 
-    /**
-     *
-     * @param key
-     * @param duration How long the key should be held to return true
-     * @param t Time in miliseconds
-     */
-    /*
-    wasHeldFor(key: InputCode, duration: number, t: number) {
-        const pressedAt = this.keyDown[key]
-        // probably not so likely that the timestamp would be 0, but...
-        return pressedAt !== undefined ? t - pressedAt > duration : false
+    private pollGamepads(t: number) {
+        const {
+            gamepadIndex,
+            allDeviceButtonJustPressed,
+            allDeviceButtonPressure,
+            allDeviceButtonDownAt,
+        } = this
+
+        // TODO: multiple gamepads
+        const gamepad = navigator.getGamepads()[gamepadIndex]
+
+        // poll gamepad
+        if (gamepad) {
+            invariant(gamepad.connected)
+            for (let btn = 0; btn < gamepad?.buttons.length; btn++) {
+                const code = gamepadButtonIdxToCode[btn]
+                const currentValue = gamepad.buttons[btn].value
+
+                const prevDown = Number.isFinite(allDeviceButtonDownAt[code])
+                const currentlyDown = currentValue > 0
+
+                const justPressed = currentlyDown && !prevDown
+
+                allDeviceButtonJustPressed[code] = justPressed
+                allDeviceButtonPressure[code] = currentValue
+
+                if (justPressed) {
+                    allDeviceButtonDownAt[code] = t
+                }
+
+                if (!currentlyDown) {
+                    delete allDeviceButtonDownAt[code]
+                    delete allDeviceButtonPressure[code]
+                }
+            }
+        }
+
+        return gamepad || undefined
     }
-    */
+
+    private getStatusByCode(
+        output: { start: number | undefined; degree: number },
+        code: InputCode,
+    ) {
+        output.start = this.allDeviceButtonDownAt[code]
+        output.degree =
+            this.allDeviceButtonPressure[code] ||
+            (output.start !== undefined ? 1 : 0)
+
+        return output
+    }
 
     private resetState() {
         console.debug('Releasing input state')
@@ -410,7 +422,7 @@ export default class Input<Intent extends string> {
             ]),
         ) as Input<Intent>['intentions']
 
-        this.recentKeys = {}
+        this.recentPresses = {}
 
         this.mouseLastPagePos.x = Infinity
         this.mouseLastPagePos.y = Infinity
@@ -420,8 +432,9 @@ export default class Input<Intent extends string> {
     //  Keys
     // ------
 
-    private recentKeys: { [Property in KeyCode | MouseButtonCode]+?: boolean } =
-        {}
+    private recentPresses: {
+        [Property in KeyCode | MouseButtonCode]+?: boolean
+    } = {}
     /** @todo This is not a 1-to-1 mapping, since e.g. shift-A and A are different keys */
     private keysLocale: { [Property in KeyCode]+?: string } = {}
 
@@ -443,7 +456,7 @@ export default class Input<Intent extends string> {
         this.allDeviceButtonDownAt[e.code] ??= e.timeStamp
         // this.keysLocale[e.code] = e.key
 
-        this.recentKeys[e.code] = true
+        this.recentPresses[e.code] = true
 
         // TODO: only prevent default if this key maps to something (?)
         // e.preventDefault()
@@ -459,9 +472,6 @@ export default class Input<Intent extends string> {
     // ---------
     //  Gamepad
     // ---------
-
-    // gamepadButtonDown: (number | null)[] = new Array(17)
-    // gamepadButtonDownAt: (number | null)[] = new Array(17)
 
     private gamepadDeadZoneSq = 0.1
 
@@ -491,6 +501,7 @@ export default class Input<Intent extends string> {
             ev.gamepad.id,
             ev.gamepad.buttons.length,
             ev.gamepad.axes.length,
+            ev.gamepad.hapticActuators,
         )
 
         if (this.gamepadIndex !== -1) {
@@ -506,29 +517,6 @@ export default class Input<Intent extends string> {
         }
     }
 
-    gamepadAxes(index: number): GVec2 | undefined {
-        // TODO: maybe we need to check whether this function exists
-        const gp = navigator.getGamepads()[this.gamepadIndex]
-        if (!gp) {
-            return
-        }
-
-        const x = gp.axes[index]
-        const y = gp.axes[index + 1]
-        const lengthSq = x * x + y * y
-        return lengthSq >= this.gamepadDeadZoneSq ? { x, y } : { x: 0, y: 0 }
-    }
-
-    gamepadButtonHeld(index: number) {
-        const gp = navigator.getGamepads()[this.gamepadIndex]
-        if (!gp) {
-            return
-        }
-
-        // TODO: need a way to specify where we care about the first press or held down
-        return gp.buttons[index].pressed
-    }
-
     // -------
     //  Mouse
     // -------
@@ -539,7 +527,7 @@ export default class Input<Intent extends string> {
     private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
 
     private handleMouseButton = (e: MouseEvent) => {
-        const { allDeviceButtonDownAt, recentKeys } = this
+        const { allDeviceButtonDownAt, recentPresses } = this
 
         for (let i = 0; i < 3; i++) {
             const bitmask = 1 << i
@@ -548,11 +536,9 @@ export default class Input<Intent extends string> {
 
             if (pressed) {
                 invariant(code)
-                const alreadyPressed = allDeviceButtonDownAt[code] !== undefined
-                // console.log('Button %s: ', code, true, alreadyPressed)
 
                 allDeviceButtonDownAt[code] ??= e.timeStamp
-                recentKeys[code] = true
+                recentPresses[code] = true
             } else {
                 delete allDeviceButtonDownAt[code]
             }
