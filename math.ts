@@ -141,3 +141,14 @@ export function vhash(x: number, y: number) {
 export function setBit(accumulator: number, item: number) {
     return accumulator | (1 << item)
 }
+
+// https://stackoverflow.com/a/43053803/72141
+type MapCartesian<T extends any[][]> = {
+    [P in keyof T]: T[P] extends Array<infer U> ? U : never
+}
+
+/** Given multiple arrays, return an array with every permutation of the individual array elements */
+export const cartesianProduct = <T extends any[][]>(
+    ...collections: T
+): MapCartesian<T>[] =>
+    collections.reduce((a, b) => a.flatMap((d) => b.map((e) => [d, e].flat())))

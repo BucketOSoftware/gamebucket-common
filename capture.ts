@@ -1,4 +1,5 @@
 import { downloadWithMime, CanvasRecorderOpts } from '@thi.ng/dl-asset'
+import { cartesianProduct } from './math'
 
 // Depending on the browser, the video produced may not be seekable or in a widely available format. You can transcode it with ffmpeg:
 //
@@ -27,20 +28,6 @@ const codecs = [
     'mp4a',
     '',
 ]
-
-// https://stackoverflow.com/a/43053803/72141
-type MapCartesian<T extends any[][]> = {
-    [P in keyof T]: T[P] extends Array<infer U> ? U : never
-}
-const cartesianProduct =
-    <T extends any[][]>(...collections: T): MapCartesian<T>[] =>
-        collections.reduce(
-            (a, b) => a.flatMap(
-                d => b.map(
-                    e => [d, e].flat()
-                )
-            )
-        )
 
 
 function determineBestCodec() {
