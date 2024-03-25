@@ -145,7 +145,7 @@ export const gamepadButtonIdxToCode = [
     'GamepadCenterCenter', // guide
 ] as const
 
-export const gamepadAxisToIndex = {
+ const gamepadAxisToIndex = {
     standard: [
         gamepad.standard.axes.LeftStickX,
         gamepad.standard.axes.LeftStickY,
@@ -154,7 +154,7 @@ export const gamepadAxisToIndex = {
     ],
 }
 
-export const gamepadCodeToIndex = {
+export const gamepadCodeToAxisIndex = {
     [gamepad.standard.axes.LeftStickX]: 0,
     [gamepad.standard.axes.LeftStickY]: 1,
     [gamepad.standard.axes.RightStickX]: 2,
