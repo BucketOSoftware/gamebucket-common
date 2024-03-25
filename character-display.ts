@@ -19,32 +19,35 @@ export interface Sprite {
 // Bit 6: Red background
 // Bit 7: Bright background; or blinking text
 
-export const COLOR_BLUE = 1 << 0
-export const COLOR_GREEN = 1 << 1
-export const COLOR_RED = 1 << 2
-export const COLOR_BRIGHT = 1 << 3
-export const COLOR_BG_BLUE = 1 << 4
-export const COLOR_BG_GREEN = 1 << 5
-export const COLOR_BG_RED = 1 << 6
-export const COLOR_BLINK = 1 << 7
+export const COLOR_BLUE = 1 << 0 // 1
+export const COLOR_GREEN = 1 << 1 // 2
+export const COLOR_RED = 1 << 2 // 4
+export const COLOR_BRIGHT = 1 << 3 // 8
+export const COLOR_BG_BLUE = 1 << 4 // 16
+export const COLOR_BG_GREEN = 1 << 5 // 32
+export const COLOR_BG_RED = 1 << 6 // 64
+export const COLOR_BLINK = 1 << 7 // 128
 export const COLOR_BRIGHT_BG = 1 << 7
 
-export const COLOR_WHITE = COLOR_BLUE | COLOR_RED | COLOR_GREEN
+export const COLOR_CYAN = COLOR_BLUE | COLOR_GREEN // 3
+export const COLOR_PURPLE = COLOR_BLUE | COLOR_RED // 5
+export const COLOR_YELLOW = COLOR_GREEN | COLOR_RED // 6
+export const COLOR_WHITE = COLOR_BLUE | COLOR_RED | COLOR_GREEN // 7
+
 export const COLOR_BG_WHITE = COLOR_BG_BLUE | COLOR_BG_RED | COLOR_BG_GREEN
 
 export const COLOR_BG_BLACK = 0
 
 /** If true, slightly reduce the brightness of backgrounds -- not accurate to
  *  CGA hardware but easier on the eyes  */
-let TAME_BG_COLORS = true
+let TAME_BG_COLORS = false
 /** If true, the BLINK/BRIGHT_BG bit makes backgroundds brighter; if false, it makes the foreground blink */
 let BRIGHT_BACKGROUNDS = false
 
 const palette = new Uint8Array(256 * 6)
 {
-    const intensityMed = 170
-    const intensityLow = 85
-    const intensityBg = TAME_BG_COLORS ? 127 : 170
+    const intensityMed = 0xaa
+    const intensityLow = 0x55
 
     for (let colorbits = 0; colorbits <= 0xffff; colorbits++) {
         const idx = colorbits * 6
