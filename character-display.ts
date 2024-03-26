@@ -1,4 +1,4 @@
-import { GVec2, grid, rect } from 'gamebucket'
+import { GVec2, clamp, grid, rect } from 'gamebucket'
 import invariant from 'tiny-invariant'
 import fontImage from './font-12x12'
 
@@ -48,6 +48,7 @@ const palette = new Uint8Array(256 * 6)
 {
     const intensityMed = 0xaa
     const intensityLow = 0x55
+    const intensityBg = intensityMed
 
     for (let colorbits = 0; colorbits <= 0xffff; colorbits++) {
         const idx = colorbits * 6
@@ -129,6 +130,43 @@ export default class CharacterDisplay {
                 return ary
             }),
         ])
+    }
+
+    centerViewOn(p: GVec2) {
+        const { scroll, viewportSize, worldBounds } = this
+        let { x, y } = scroll
+        x = p.x - viewportSize.width / 2
+        y = p.y - viewportSize.height / 2
+
+        x = clamp(x, worldBounds.x, worldBounds.width - viewportSize.width)
+        y = clamp(y, worldBounds.y, worldBounds.height - viewportSize.height)
+
+        // TODO: fractional scrolling
+        scroll.x = Math.round(x)
+        scroll.y = Math.round(y)
+    }
+
+    scrollIntoView(p: GVec2, margin: GVec2 = { x: 0, y: 0 }) {
+        const { scroll, viewportSize, worldBounds } = this
+
+        let { x, y } = scroll
+        // if point is too far to the left
+        x = Math.min(x, p.x - margin.x)
+        // if point is too far to the right
+        // we need the x coordinate rather than one beyond it, so add 1
+        x = Math.max(x, p.x + margin.x + 1 - viewportSize.width)
+
+        // and again, with the y coordinate
+        y = Math.min(y, p.y - margin.y)
+        y = Math.max(y, p.y + margin.y + 1 - viewportSize.height)
+
+        // don't go outside the renderable area
+        x = clamp(x, worldBounds.x, worldBounds.width - viewportSize.width)
+        y = clamp(y, worldBounds.y, worldBounds.height - viewportSize.height)
+
+        // TODO: fractional scrolling
+        scroll.x = Math.round(x)
+        scroll.y = Math.round(y)
     }
 
     render(
