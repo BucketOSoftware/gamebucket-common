@@ -83,10 +83,7 @@ export default class CharacterDisplay {
     /** Tile coordinate to display in the top-left. Not limited to the bounds of the board */
     scroll = { x: 0, y: 0 }
 
-    private worldBounds = {
-        origin: { x: 0, y: 0 },
-        size: { width: 0, height: 0 },
-    }
+    private worldBounds = rect.build(0, 0, 0, 0)
     ready: Promise<any[]>
     booleanFont?: Uint8Array
 
@@ -158,8 +155,8 @@ export default class CharacterDisplay {
             blinkPeriod,
         } = this
         // worldBounds.size = { ...backgroundSize }
-        worldBounds.size.width = backgroundWidth
-        worldBounds.size.height = backgroundHeight
+        worldBounds.width = backgroundWidth
+        worldBounds.height = backgroundHeight
         invariant(ctx, 'No context')
         invariant(font, 'No font')
 
@@ -224,10 +221,7 @@ export default class CharacterDisplay {
 
         invariant(outIdx === pixelBuffer.data.length)
 
-        const viewport = {
-            origin: { x: 0, y: 0 },
-            size: { width: viewportWidth, height: viewportHeight },
-        }
+        const viewport = rect.build(0, 0, viewportWidth, viewportHeight)
 
         // Draw sprites
         let cellPos = { x: 0, y: 0 }
