@@ -1,24 +1,35 @@
+import { produce } from 'immer'
+import debounce from 'lodash-es/debounce'
 import {
     ChangeEvent,
     JSXElementConstructor,
     MutableRefObject,
     PropsWithChildren,
+    ReactNode,
     StrictMode,
+    // StyleHTMLAttributes,
     createContext,
+    forwardRef,
     useCallback,
     useContext,
     useEffect,
     useRef,
     useState,
+    useSyncExternalStore,
 } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { Matrix3 } from 'three'
-
-import { rect } from 'gamebucket'
 import invariant from 'tiny-invariant'
+import { DragGesture, HoverGesture, MoveGesture } from '@use-gesture/vanilla'
+
+import { rect, roundToPlaces } from 'gamebucket'
+
+type Resource = MapResource
 
 /** Metadata for resources that can be edited as map layers */
 type MapResource = TileMapResource | ContinuousMapResource | ObjectListResource
+
+type ResourceType = Resource['type']
 
 /** Specifies what values are valid for a property, allowing us to build a UI around it */
 type TypeSpec = IntegerSpec
@@ -114,52 +125,6 @@ type ObjectPropertyDict<Rec> = { [name: string]: ObjectProperty<Rec> }
 type ObjectProperty<Rec> =
     | TypeSpec
     | [condition: (record: Rec) => boolean, properties: ObjectPropertyDict<Rec>]
-
-export default class DesignerUI {
-    createdAt = performance.now()
-    resourcesToOpen: MapResource[] = []
-
-    openResources = (res: MapResource[]) => {
-        this.resourcesToOpen = res
-    }
-    viewportCanvas: MutableRefObject<HTMLCanvasElement | null> = {
-        current: null,
-    }
-
-    private root: Root | undefined
-
-    constructor(
-        public readonly domElement: HTMLElement,
-        private readonly app: JSXElementConstructor<{}>,
-    ) {
-        this.root = this.mount()
-    }
-
-    mount() {
-        invariant(!this.root, 'Already mounted')
-        const root = createRoot(this.domElement)
-        console.warn('Here we go!', root)
-        root.render(
-            <StrictMode>
-                <AppWrapper liaison={this}>
-                    <this.app />
-                </AppWrapper>
-            </StrictMode>,
-        )
-        return root
-    }
-
-    unmount() {
-        invariant(this.root, 'App not mounted')
-
-        this.root.unmount()
-        this.root = undefined
-    }
-}
-export function useDesignerState() {
-    return useContext(DesignerContext)
-}
-
 interface DesignerState {
     openResources: MapResource[]
     currentLayer: MapResource | undefined
@@ -168,69 +133,154 @@ interface DesignerState {
     viewportCanvas: MutableRefObject<HTMLCanvasElement | null>
 }
 
-const DesignerContext = createContext<DesignerState>({} as DesignerState)
+function defaultState() {
+    return {
+        openResources: [] as Resource[],
+        activeResource: undefined as Resource | undefined,
 
-function AppWrapper(props: PropsWithChildren<{ liaison: DesignerUI }>) {
-    const { liaison, children } = props
-    const [openResources, setOpenResources] = useState<MapResource[]>(
-        liaison.resourcesToOpen,
-    )
-    const [selectedLayer, selectLayer] = useState<string>(
-        openResources[0]?.label,
-    )
-    const viewportCanvas = useRef<HTMLCanvasElement | null>(null)
-    liaison.viewportCanvas = viewportCanvas
+        // currentLayer: '',
+        // currentTool: {} as Record<ResourceType, ToolID>,
+        currentTool: {
+            object_list: 'select',
+            tile_map: 'draw',
+        } as Record<ResourceType, ToolID>,
 
-    useEffect(() => {
-        console.warn('We are done I guess!', liaison)
+        canvas: null as HTMLCanvasElement | null,
+    }
+}
+type DesignerStateType = ReturnType<typeof defaultState>
+
+export class StateStore {
+    private state = produce(defaultState(), () => {})
+
+    get canvas() {
+        return this.state.canvas
+    }
+
+    subscribers = new Set<() => void>()
+
+    subscribe = (onStoreChange: () => void) => {
+        this.subscribers.add(onStoreChange)
+        console.warn('Adding subscriber', onStoreChange)
+
         return () => {
-            console.warn('tearin down', liaison)
+            this.subscribers.delete(onStoreChange)
         }
-    }, [liaison])
-
-    liaison.openResources = (r: MapResource[]) => {
-        setOpenResources(r)
     }
 
-    const context = {
-        openResources,
-        selectedLayer,
-        selectLayer,
-        currentLayer: openResources.find((res) => res.label === selectedLayer),
-        viewportCanvas,
+    getSnapshot = () => this.state
+
+    createSelector<T = unknown>(selector: (st: DesignerStateType) => T) {
+        // const defaultedSelector = selector ?? ((i: DesignerStateType) => i)
+        return () => selector(this.state)
     }
 
-    return (
-        <DesignerContext.Provider value={context}>
-            {children}
-        </DesignerContext.Provider>
+    update = (
+        callback: (draft: DesignerStateType) => void | DesignerStateType,
+    ) => {
+        // TODO?: rollback to old state if the validation fails
+        // const oldState = this.state
+        this.state = produce(this.state, callback)
+        validate(this.state)
+        this.notify()
+    }
+
+    private notify = debounce(() => {
+        for (let s of this.subscribers) {
+            s()
+        }
+    }, 1000 / 60)
+}
+
+export const DesignerState = createContext(new StateStore())
+// const getAll = (st: DesignerStateType) => st
+
+export function useAll() {
+    return useDesignerState((x) => x)
+}
+
+export function useDesignerState<T>(selector: (st: DesignerStateType) => T) {
+    const store = useContext(DesignerState)
+    return useSyncExternalStore(
+        store.subscribe,
+        store.createSelector(selector),
+        // selector ? store.createSelector(selector) : store.getSnapshot,
     )
 }
 
-/*
-function Viewport(props: unknown) {
-    return (
-        <section>
-            <h1>Viewport</h1>
-            <canvas style={{ background: 'black' }}></canvas>
-        </section>
-    )
+export function useDesignerUpdate() {
+    return useContext(DesignerState).update
 }
-*/
 
 const defaultPanelProps: React.CSSProperties = {
-    border: '1px dashed black',
+    border: '3px double black',
+    borderRadius: '3px',
+
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    backdropFilter: 'blur(3px)',
+
+    width: '100%',
+    height: '100%',
+
+    overflow: 'scroll',
 }
 
 export function Panel(
-    props: PropsWithChildren<{ style?: React.CSSProperties }>,
+    props: PropsWithChildren<{
+        style?: React.CSSProperties
+        title?: ReactNode
+        draggable?: boolean
+        windowshade?: boolean
+        innerRef?: MutableRefObject<HTMLElement | null>
+    }>,
 ) {
+    const [open, setOpen] = useState(true)
+
+    const onWindowshade = useCallback(() => {
+        if (props.windowshade) {
+            setOpen((currentValue) => !currentValue)
+        }
+    }, [props.windowshade])
+
     return (
-        <section style={{ ...defaultPanelProps, ...(props.style ?? {}) }}>
-            {props.children}
+        <section
+            style={{ ...defaultPanelProps, ...(props.style ?? {}) }}
+            ref={props.innerRef}
+        >
+            {props.title && (
+                <Panel.TitleBar
+                    draggable={props.draggable}
+                    // windowshade={props.windowshade ? onWindowshade : undefined}
+                >
+                    {props.title}
+                </Panel.TitleBar>
+            )}
+            {open && props.children}
         </section>
     )
 }
+
+export function PanelTitleBar(props: {
+    draggable?: boolean
+    children: ReactNode
+}) {
+    return (
+        <header
+            className={props.draggable ? 'drag-handle' : ''}
+            style={{
+                backgroundColor: 'black',
+                color: 'white',
+                cursor: 'pointer',
+                userSelect: 'none',
+            }}
+        >
+            <h1 style={{ margin: '0', padding: '0.333rem' }}>
+                {props.children}
+            </h1>
+        </header>
+    )
+}
+Panel.TitleBar = PanelTitleBar
 
 export function Toolbar(props: PropsWithChildren) {
     // TODO: selected tool is specific to layer type:
@@ -241,28 +291,40 @@ export function Toolbar(props: PropsWithChildren) {
     // 5. user selects a tile layer again
     // 6. Draw tool is automatically selected
     return (
-        <Panel>
-            <header>
-                <h1>Tools</h1>
-            </header>
+        <Panel draggable title="Tools">
             {props.children}
         </Panel>
     )
 }
 
 export function LayerBox(props: unknown) {
-    const { openResources } = useDesignerState()
+    const update = useDesignerUpdate()
+    const { openResources, activeResource } = useAll()
 
-    const { selectLayer, selectedLayer } = useDesignerState()
+    useEffect(() => {
+        console.debug('Got new  resources!!')
+        update((draft) => {
+            if (activeResource && openResources.includes(activeResource)) {
+                // TODO: test that this works
+            } else {
+                draft.activeResource = openResources[0]
+            }
+        })
+    }, [openResources])
 
     const onOptionChange = useCallback((ev: ChangeEvent<HTMLInputElement>) => {
-        // console.log('eeebo!', ev)
-        selectLayer(ev.target.value)
+        update((draft) => {
+            // TODO: label isn't going to be unique very long
+            const next = draft.openResources.find(
+                (r) => r.label === ev.target.value,
+            )
+            invariant(next, 'Oh no!')
+            draft.activeResource = next
+        })
     }, [])
 
     return (
-        <Panel>
-            <h1>Layers</h1>
+        <Panel draggable title="Layers">
             {openResources.map((res) => (
                 <div key={res.label}>
                     <input
@@ -270,7 +332,7 @@ export function LayerBox(props: unknown) {
                         name="layer"
                         value={res.label}
                         id={`layer-box-${res.label}`}
-                        checked={selectedLayer === res.label}
+                        checked={activeResource?.label === res.label}
                         onChange={onOptionChange}
                     />
                     <label htmlFor={`layer-box-${res.label}`}>
@@ -283,7 +345,7 @@ export function LayerBox(props: unknown) {
 }
 
 interface PaletteEntryImage {
-    icon: undefined
+    icon?: undefined
     // src for an image of the thing, intended to be displayed as large as reasonable
     img: string
     // name of the thing, for tooltip
@@ -293,14 +355,14 @@ interface PaletteEntryImage {
 interface PaletteEntryIcon {
     // src for an icon used to represent the thing
     icon: string
-    img: undefined
+    img?: undefined
     // name of the thing, for tooltip
     label?: string
 }
 
 interface PaletteEntryText {
-    icon: undefined
-    img: undefined
+    icon?: undefined
+    img?: undefined
     label: string
 }
 
@@ -311,9 +373,7 @@ export function PaletteBox(props: {
     // TODO: real keys
     return (
         <Panel>
-            <header>
-                <h1>Palette</h1>
-            </header>
+            <Panel.TitleBar draggable>Palette</Panel.TitleBar>
             {props.choices.map((res, idx) => (
                 <div key={idx}>
                     <input
@@ -321,9 +381,6 @@ export function PaletteBox(props: {
                         name="palette"
                         value={res.label}
                         id={`palette-box-${res.label}`}
-                        // checked={selectedLayer === res.label}
-                        // checked={topping === 'Regular'}
-                        // onChange={onOptionChange}
                     />
                     <label htmlFor={`palette-box-${res.label}`}>
                         {res.label}
@@ -334,28 +391,198 @@ export function PaletteBox(props: {
     )
 }
 
+export function Viewport() {
+    const update = useDesignerUpdate()
+    const resource = useDesignerState((state) => state.activeResource)
+    const ref = useRef<HTMLCanvasElement>(null)
+
+    useEffect(() => {
+        const canvas = ref.current
+        invariant(canvas)
+        // canvas.style.touchAction = 'none'
+
+        const type = resource && resource.type
+        let regCursor = ''
+        if (type === 'tile_map') {
+            regCursor = 'crosshair'
+        }
+
+        canvas.style.cursor = regCursor
+
+        update((draft) => {
+            draft.canvas = canvas
+        })
+
+        /*
+        const drag = new DragGesture(
+            canvas,
+            (sass) => {
+                const { left, top, width, height } = (
+                    sass.target as HTMLElement
+                ).getBoundingClientRect()
+                const x = roundToPlaces((sass.values[0] - left) / width, 2)
+                const y = roundToPlaces((sass.values[1] - top) / height, 2)
+                if (resource && 'plot' in resource) {
+                    // console.log(x, y)
+                    resource.plot(x, y, 97)
+                }
+
+                if (sass.last) {
+                    console.log(sass.tap, sass.swipe, sass.axis)
+                }
+                // console.log(sass.active, sass.last, sass.tap, sass.swipe, sass.axis)
+            },
+            { threshold: 0 },
+        )
+
+        const move = new MoveGesture(
+            canvas,
+            (sus) => {
+                console.log(sus.xy)
+                if (sus.xy[0] > 100 && sus.xy[0] < 200) {
+                    canvas.style.cursor = 'help'
+                } else {
+                    canvas.style.cursor = regCursor
+                }
+            },
+            {},
+        )
+*/
+
+        return () => {
+            // drag.destroy()
+            // move.destroy()
+            update((draft) => {
+                draft.canvas = null
+            })
+        }
+    }, [ref.current, resource])
+
+    return (
+        <Panel draggable title="Viewport">
+            <Canvy ref={ref} />
+        </Panel>
+    )
+}
+
+function LeaveMeAlone(p: PropsWithChildren) {
+    useEffect(() => {}, [])
+
+    return <>{p.children}</>
+}
+
+const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
+    return (
+        <LeaveMeAlone>
+            <canvas
+                style={{
+                    width: '100%',
+                    backgroundColor: 'black',
+                    borderRadius: '5px',
+                    touchAction: 'none',
+                }}
+                ref={ref}
+            />
+        </LeaveMeAlone>
+    )
+})
+
+// const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
+//     useEffect(() => {}, [])
+
+//     return (
+//         <canvas
+//             style={{
+//                 width: '100%',
+//                 backgroundColor: 'black',
+//                 borderRadius: '5px',
+//             }}
+//             ref={ref}
+//         />
+//     )
+// })
+
+const selectors = {
+    activeResource: {
+        is: (type: string) => {
+            return useDesignerState((st) => st.activeResource?.type) === type
+        },
+    },
+
+    // activeResourceType: () => {},
+    // (st: DesignerStateType) =>
+}
+
+type ToolID = 'select' | 'marquee' | 'draw' | 'line'
+
+function ToolButton(
+    props: PropsWithChildren<{ id: ToolID; disabled?: boolean }>,
+) {
+    const tool = useDesignerState(
+        // @ts-expect-error: maybe we make NONE a key?
+        (st) => st.currentTool[st.activeResource?.type],
+    )
+    const update = useDesignerUpdate()
+
+    if (props.disabled) return null
+
+    const prefix = tool === props.id ? '!!' : ''
+    return (
+        <button
+            disabled={props.disabled}
+            onClick={() => {
+                update((draft) => {
+                    //@ts-expect-error
+                    draft.currentTool[draft.activeResource?.type] = props.id
+                })
+            }}
+        >
+            {prefix} {props.children}
+        </button>
+    )
+}
 export function SelectTool(props: unknown) {
-    const { currentLayer } = useDesignerState()
-    const enabled = currentLayer?.type === 'object_list'
-    return <button disabled={!enabled}>Select</button>
+    return (
+        <ToolButton
+            id="select"
+            disabled={!selectors.activeResource.is('object_list')}
+        >
+            Select
+        </ToolButton>
+    )
 }
 
 export function MarqueeTool() {
-    const { currentLayer } = useDesignerState()
-    return <button>Marquee</button>
+    // const currentLayerType = useDesignerState((d) => d.currentLayer?.type)
+    // const currentLayer = useDesignerState((d) => d.currentLayer)
+    return <ToolButton id="marquee">Marquee</ToolButton>
 }
 
 export function DrawTool(props: unknown) {
-    const { currentLayer } = useDesignerState()
+    // const currentLayer } = useDesignerState()
 
-    const enabled = currentLayer?.type === 'tile_map'
-    return <button disabled={!enabled}>Draw</button>
+    // const currentLayerType = useDesignerState((d) => d.currentLayer?.type)
+    const enabled = selectors.activeResource.is('tile_map')
+    return (
+        <ToolButton id="draw" disabled={!enabled}>
+            Draw
+        </ToolButton>
+    )
 }
 
 export function LineTool(props: unknown) {
-    return <button>Line</button>
+    return <ToolButton id="line">Line</ToolButton>
 }
 
 export function FileMenu(props: unknown) {
     return <button>File...</button>
+}
+
+function validate(state: DesignerStateType) {
+    const labels = state.openResources.map((n) => n.label)
+    const uniqLabels = new Set(labels)
+    invariant(
+        labels.length === uniqLabels.size,
+        "Isn't it time we came up with a unique ID system",
+    )
 }
