@@ -35,8 +35,6 @@ export class StateStore {
 
     subscribe = (onStoreChange: () => void) => {
         this.subscribers.add(onStoreChange)
-        console.warn('Adding subscriber', onStoreChange)
-
         return () => {
             this.subscribers.delete(onStoreChange)
         }
@@ -45,7 +43,6 @@ export class StateStore {
     getSnapshot = () => this.state
 
     createSelector<T = unknown>(selector: (st: DesignerState) => T) {
-        // const defaultedSelector = selector ?? ((i: DesignerStateType) => i)
         return () => selector(this.state)
     }
 

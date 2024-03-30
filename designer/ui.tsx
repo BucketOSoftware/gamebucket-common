@@ -1,17 +1,24 @@
 import {
-    ChangeEvent,
-    MutableRefObject,
+    BlueprintProvider,
+    Button,
+    ButtonGroup,
+    Card,
+    CardList,
+    Section,
+    SectionCard,
+    Tooltip,
+} from '@blueprintjs/core'
+import {
     PropsWithChildren,
     ReactNode,
     StrictMode,
     forwardRef,
-    useCallback,
     useEffect,
     useRef,
-    useState,
 } from 'react'
 import { Root, createRoot } from 'react-dom/client'
 import invariant from 'tiny-invariant'
+
 import {
     DesignerContext,
     StateStore,
@@ -19,20 +26,80 @@ import {
     useStore,
     useUpdate,
 } from './state'
-import { ToolID } from './types'
+import { Resource, ToolID } from './types'
 
-const defaultPanelProps: React.CSSProperties = {
-    border: '3px double black',
-    borderRadius: '3px',
+import '@blueprintjs/core/lib/css/blueprint.css'
+import 'normalize.css'
+// include blueprint-icons.css for icon font support
+import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    backdropFilter: 'blur(3px)',
+////// SCHEMING
 
-    width: '100%',
-    height: '100%',
+// export const playerSchema = z
+//     .object({
+//         id: z.number().int().min(1).max(10).readonly(),
+//         respawn: z.boolean().default(false).describe('Should respawn?'),
+//         facing: z.array(z.number().optional()).length(2),
+//         // myUnion: z.union([z.number(), z.boolean()]),
+//     })
+//     .describe('My neat object schema')
 
-    overflow: 'scroll',
+// const jsonSchema = zodToJsonSchema(playerSchema, 'mySchema')
+// console.log('HI!', jsonSchema)
+const jsonSchema = {
+    $ref: '#/definitions/player',
+    definitions: {
+        player: {
+            type: 'object',
+            properties: {
+                id: {
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 10,
+                },
+                respawn: {
+                    type: 'boolean',
+                    default: false,
+                    title: 'Should respawn?',
+                },
+                facing: {
+                    type: 'array',
+                    items: {
+                        type: 'number',
+                    },
+                    minItems: 2,
+                    maxItems: 2,
+                },
+            },
+            required: ['id', 'facing'],
+            additionalProperties: false,
+            title: 'Player',
+            description: 'Just some player',
+        },
+    },
+    $schema: 'http://json-schema.org/draft-07/schema#',
 }
+/*
+['id', Integer.primary.readonly],
+// position will be a GVec2 object, or else maybe _x? and can be changed via the translation tool
+['respawn', Boolean.default(false).label("Should respawn")],
+['position', Vector(2).for(WORLD_POSITION)],
+
+// mark this property as being affected by the rotate tool? since it's a unit vector we can work with it as just an angle of rotation away from whatever reference vector
+['facing', Vector(2).unit.for(WORLD_ORIENTATION)],
+// show a code editor with JS highlighting, maybe. could be in the panel or a separate panel / popout?
+['script', Text.code('javascript').multiline],
+// Show a numbers-only input box and a slider with stops on 0,5,10,...
+['health', Integer.range(0, 100).step(5).default(100)],
+
+['type', String.of('pickup', 'enemy', 'player')],
+
+// these properties only apply (i.e. will only be shown/edited) if the function that takes the whole record returns true
+[(record => record.type === 'enemy'),
+    ['behavior', String.of('lion', 'tiger', 'ruffian')],
+
+]
+*/
 
 export function create(
     domElement: HTMLElement,
@@ -43,58 +110,19 @@ export function create(
     const root = createRoot(domElement)
     root.render(
         <StrictMode>
-            <DesignerContext.Provider value={store}>
-                {App}
-            </DesignerContext.Provider>
+            <BlueprintProvider>
+                <DesignerContext.Provider value={store}>
+                    {App}
+                </DesignerContext.Provider>
+            </BlueprintProvider>
         </StrictMode>,
     )
 
     return [store, root]
 }
 
-export function Panel(
-    props: PropsWithChildren<{
-        style?: React.CSSProperties
-        title?: ReactNode
-        draggable?: boolean
-        innerRef?: MutableRefObject<HTMLElement | null>
-    }>,
-) {
-    return (
-        <section
-            style={{ ...defaultPanelProps, ...(props.style ?? {}) }}
-            ref={props.innerRef}
-        >
-            {props.title && (
-                <Panel.TitleBar draggable={props.draggable}>
-                    {props.title}
-                </Panel.TitleBar>
-            )}
-            {props.children}
-        </section>
-    )
-}
-
-Panel.TitleBar = (props: { draggable?: boolean; children: ReactNode }) => (
-    <header
-        className={props.draggable ? 'drag-handle' : ''}
-        style={{
-            backgroundColor: 'black',
-            color: 'white',
-            cursor: 'pointer',
-            userSelect: 'none',
-        }}
-    >
-        <h1 style={{ margin: '0', padding: '0.333rem' }}>{props.children}</h1>
-    </header>
-)
-
 export function Toolbar(props: PropsWithChildren) {
-    return (
-        <Panel draggable title="Tools">
-            {props.children}
-        </Panel>
-    )
+    return <ButtonGroup>{props.children}</ButtonGroup>
 }
 
 export function LayerBox(props: unknown) {
@@ -102,7 +130,6 @@ export function LayerBox(props: unknown) {
     const { openResources, activeResource } = useStore()
 
     useEffect(() => {
-        console.debug('Got new  resources!!')
         update((draft) => {
             if (activeResource && openResources.includes(activeResource)) {
                 // TODO: test that this works
@@ -112,35 +139,34 @@ export function LayerBox(props: unknown) {
         })
     }, [openResources])
 
-    const onOptionChange = useCallback((ev: ChangeEvent<HTMLInputElement>) => {
-        update((draft) => {
-            // TODO: label isn't going to be unique very long
-            const next = draft.openResources.find(
-                (r) => r.label === ev.target.value,
-            )
-            invariant(next, 'Oh no!')
-            draft.activeResource = next
-        })
-    }, [])
+    function handleClick(seek: Resource) {
+        return () => {
+            update((draft) => {
+                draft.activeResource = openResources.find((res) => res === seek)
+            })
+        }
+    }
 
     return (
-        <Panel draggable title="Layers">
-            {openResources.map((res) => (
-                <div key={res.label}>
-                    <input
-                        type="radio"
-                        name="layer"
-                        value={res.label}
-                        id={`layer-box-${res.label}`}
-                        checked={activeResource?.label === res.label}
-                        onChange={onOptionChange}
-                    />
-                    <label htmlFor={`layer-box-${res.label}`}>
-                        {res.label}
-                    </label>
-                </div>
-            ))}
-        </Panel>
+        <Section compact elevation={1} title="Layers" className="sidebar-panel">
+            <SectionCard padded={false} className="scroll-it">
+                <CardList compact bordered={false}>
+                    {openResources.map((res) => {
+                        return (
+                            <Card
+                                key={res.label}
+                                compact
+                                interactive
+                                selected={res === activeResource}
+                                onClick={handleClick(res)}
+                            >
+                                {res.label}
+                            </Card>
+                        )
+                    })}
+                </CardList>
+            </SectionCard>
+        </Section>
     )
 }
 
@@ -170,24 +196,43 @@ interface PaletteEntryText {
 export function PaletteBox(props: {
     choices: PaletteEntryImage[] | PaletteEntryIcon[] | PaletteEntryText[]
 }) {
+    function getIcon(
+        choice: PaletteEntryImage | PaletteEntryIcon | PaletteEntryText,
+    ) {
+        if (choice.icon) {
+            return (
+                <img
+                    src={choice.icon}
+                    width={24}
+                    height={24}
+                    title={choice.label}
+                />
+            )
+        }
+        return <div>Hi</div>
+    }
+
     // TODO: real keys
     return (
-        <Panel>
-            <Panel.TitleBar draggable>Palette</Panel.TitleBar>
-            {props.choices.map((res, idx) => (
-                <div key={idx}>
-                    <input
-                        type="radio"
-                        name="palette"
-                        value={res.label}
-                        id={`palette-box-${res.label}`}
-                    />
-                    <label htmlFor={`palette-box-${res.label}`}>
-                        {res.label}
-                    </label>
+        <Section compact elevation={1} style={{ overflowY: 'scroll' }}>
+            <SectionCard padded className="docs-section-card-limited-height">
+                <div
+                    style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '5px',
+                        justifyContent: 'space-between',
+                    }}
+                >
+                    {props.choices.map((choice, idx) => (
+                        <Button
+                            icon={getIcon(choice)}
+                            style={{ padding: '3px' }}
+                        />
+                    ))}
                 </div>
-            ))}
-        </Panel>
+            </SectionCard>
+        </Section>
     )
 }
 
@@ -199,7 +244,6 @@ export function Viewport() {
     useEffect(() => {
         const canvas = ref.current
         invariant(canvas)
-        // canvas.style.touchAction = 'none'
 
         const type = resource && resource.type
         let regCursor = ''
@@ -212,6 +256,11 @@ export function Viewport() {
         update((draft) => {
             draft.canvas = canvas
         })
+
+        const onMouseMove = (ev: MouseEvent) => {
+            console.log(ev.offsetX, ev.offsetY)
+        }
+        canvas.addEventListener('mousemove', onMouseMove, { passive: true })
 
         /*
         const drag = new DragGesture(
@@ -250,6 +299,8 @@ export function Viewport() {
 */
 
         return () => {
+            canvas.removeEventListener('mousemove', onMouseMove)
+
             // drag.destroy()
             // move.destroy()
             update((draft) => {
@@ -259,9 +310,9 @@ export function Viewport() {
     }, [ref.current, resource])
 
     return (
-        <Panel draggable title="Viewport">
+        <Section compact title="Viewport">
             <Canvy ref={ref} />
-        </Panel>
+        </Section>
     )
 }
 
@@ -276,9 +327,10 @@ const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
         <LeaveMeAlone>
             <canvas
                 style={{
+                    margin: '5px',
                     width: '100%',
                     backgroundColor: 'black',
-                    borderRadius: '5px',
+                    borderRadius: '3px',
                     touchAction: 'none',
                 }}
                 ref={ref}
@@ -286,21 +338,6 @@ const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
         </LeaveMeAlone>
     )
 })
-
-// const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
-//     useEffect(() => {}, [])
-
-//     return (
-//         <canvas
-//             style={{
-//                 width: '100%',
-//                 backgroundColor: 'black',
-//                 borderRadius: '5px',
-//             }}
-//             ref={ref}
-//         />
-//     )
-// })
 
 const selectors = {
     activeResource: {
@@ -314,7 +351,12 @@ const selectors = {
 }
 
 function ToolButton(
-    props: PropsWithChildren<{ id: ToolID; disabled?: boolean }>,
+    props: PropsWithChildren<{
+        id: ToolID
+        icon: BlueprintIcons_16Id
+        disabled?: boolean
+        children: string | JSX.Element
+    }>,
 ) {
     const tool = useSelector(
         // @ts-expect-error: maybe we make NONE a key?
@@ -324,25 +366,33 @@ function ToolButton(
 
     if (props.disabled) return null
 
-    const prefix = tool === props.id ? '!!' : ''
     return (
-        <button
-            disabled={props.disabled}
-            onClick={() => {
-                update((draft) => {
-                    //@ts-expect-error
-                    draft.currentTool[draft.activeResource?.type] = props.id
-                })
-            }}
+        <Tooltip
+            openOnTargetFocus={false}
+            placement="right"
+            usePortal={false}
+            content={<span>{props.id}</span>}
         >
-            {prefix} {props.children}
-        </button>
+            <Button
+                icon={props.icon}
+                large
+                intent={tool === props.id ? 'primary' : 'none'}
+                // disabled={props.disabled}
+                onClick={() => {
+                    update((draft) => {
+                        //@ts-expect-error
+                        draft.currentTool[draft.activeResource?.type] = props.id
+                    })
+                }}
+            />
+        </Tooltip>
     )
 }
 export function SelectTool(props: unknown) {
     return (
         <ToolButton
             id="select"
+            icon="hand-up"
             disabled={!selectors.activeResource.is('object_list')}
         >
             Select

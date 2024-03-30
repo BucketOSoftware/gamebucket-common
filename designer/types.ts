@@ -64,6 +64,9 @@ export interface ContinuousMapResource extends ResourceCommon {
     plot: (viewport_x: number, viewport_y: number, value: number) => void
 }
 
+
+// https://json-schema.org/implementations
+
 // TODO: ugh. this wants to be a unique value that identifies an object
 /** A list of object properties  */
 export interface ObjectListResource<
