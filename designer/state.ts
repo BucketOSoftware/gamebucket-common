@@ -4,6 +4,7 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
 import { Resource, ResourceType, ToolID } from './types'
+import { GesturePhase } from './gestures'
 
 function defaultState() {
     return {
@@ -51,10 +52,12 @@ export class StateStore {
         // const oldState = this.state
         this.state = produce(this.state, callback)
         validate(this.state)
-        this.notify()
+        this.notifySubscribers()
     }
 
-    private notify = debounce(() => {
+    handleMouseInput = mouseInput.bind(this)
+
+    private notifySubscribers = debounce(() => {
         for (let s of this.subscribers) {
             s()
         }
@@ -68,6 +71,16 @@ function validate(state: DesignerState) {
         labels.length === uniqLabels.size,
         "Isn't it time we came up with a unique ID system",
     )
+}
+
+function mouseInput(
+    this: StateStore,
+    phase: GesturePhase,
+    viewport_x: number,
+    viewport_y: number,
+    originalEvent: MouseEvent,
+) {
+    // console.log('INPUT', phase, viewport_x, viewport_y)
 }
 
 export const DesignerContext = createContext(new StateStore())
@@ -84,4 +97,8 @@ export function useSelector<T>(selector: (st: DesignerState) => T) {
 
 export function useUpdate() {
     return useContext(DesignerContext).update
+}
+
+export function useMouse() {
+    return useContext(DesignerContext).handleMouseInput
 }

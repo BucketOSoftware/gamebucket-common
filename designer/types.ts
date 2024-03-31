@@ -1,5 +1,6 @@
 import type { Matrix3 } from 'three'
 import type { rect } from 'gamebucket'
+import { PlotHandler } from './gestures'
 
 export const TOOLS = ['select', 'create', 'marquee', 'draw', 'line'] as const
 export type ToolID = (typeof TOOLS)[number]
@@ -16,6 +17,7 @@ export type ResourceType = Resource['type']
 /** Specifies what values are valid for a property, allowing us to build a UI around it */
 type TypeSpec = IntegerSpec
 
+// TODO: replace with JSON schema
 export interface IntegerSpec {
     type: 'Integer'
     // if not specified as `true`, this value is required
@@ -48,10 +50,7 @@ export interface TileMapResource extends ResourceCommon {
     type: 'tile_map'
     elementType: TypeSpec
 
-    /** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1)?, which layer is selected, and the value that's been plotted.
-     * @todo what could the return value mean?
-     */
-    plot: (viewport_x: number, viewport_y: number, value: number) => void
+    plot: PlotHandler<number>
 }
 
 export interface ContinuousMapResource extends ResourceCommon {
@@ -63,7 +62,6 @@ export interface ContinuousMapResource extends ResourceCommon {
     /** @todo Mostly same as tilemap. But does it apply? */
     plot: (viewport_x: number, viewport_y: number, value: number) => void
 }
-
 
 // https://json-schema.org/implementations
 

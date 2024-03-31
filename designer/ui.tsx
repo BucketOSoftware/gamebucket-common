@@ -9,6 +9,7 @@ import {
     SectionCard,
     Tooltip,
 } from '@blueprintjs/core'
+import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
 import {
     PropsWithChildren,
     ReactNode,
@@ -23,6 +24,7 @@ import invariant from 'tiny-invariant'
 import {
     DesignerContext,
     StateStore,
+    useMouse,
     useSelector,
     useStore,
     useUpdate,
@@ -33,6 +35,7 @@ import '@blueprintjs/core/lib/css/blueprint.css'
 import 'normalize.css'
 // include blueprint-icons.css for icon font support
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
+import { recognizeGestures } from './gestures'
 
 ////// SCHEMING
 
@@ -224,6 +227,8 @@ export function PaletteBox(props: {
 export function Viewport() {
     const update = useUpdate()
     const resource = useSelector((state) => state.activeResource)
+    const mouse = useMouse()
+
     const ref = useRef<HTMLCanvasElement>(null)
 
     useEffect(() => {
@@ -242,52 +247,9 @@ export function Viewport() {
             draft.canvas = canvas
         })
 
-        const onMouseMove = (ev: MouseEvent) => {
-            console.log(ev.offsetX, ev.offsetY)
-        }
-        canvas.addEventListener('mousemove', onMouseMove, { passive: true })
-
-        /*
-        const drag = new DragGesture(
-            canvas,
-            (sass) => {
-                const { left, top, width, height } = (
-                    sass.target as HTMLElement
-                ).getBoundingClientRect()
-                const x = roundToPlaces((sass.values[0] - left) / width, 2)
-                const y = roundToPlaces((sass.values[1] - top) / height, 2)
-                if (resource && 'plot' in resource) {
-                    // console.log(x, y)
-                    resource.plot(x, y, 97)
-                }
-
-                if (sass.last) {
-                    console.log(sass.tap, sass.swipe, sass.axis)
-                }
-                // console.log(sass.active, sass.last, sass.tap, sass.swipe, sass.axis)
-            },
-            { threshold: 0 },
-        )
-
-        const move = new MoveGesture(
-            canvas,
-            (sus) => {
-                console.log(sus.xy)
-                if (sus.xy[0] > 100 && sus.xy[0] < 200) {
-                    canvas.style.cursor = 'help'
-                } else {
-                    canvas.style.cursor = regCursor
-                }
-            },
-            {},
-        )
-*/
-
+        const detachGestures = recognizeGestures(canvas, mouse)
         return () => {
-            canvas.removeEventListener('mousemove', onMouseMove)
-
-            // drag.destroy()
-            // move.destroy()
+            detachGestures()
             update((draft) => {
                 draft.canvas = null
             })
@@ -443,8 +405,6 @@ export function LineTool(props: unknown) {
 export function FileMenu(props: unknown) {
     return <button>File...</button>
 }
-
-import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
 
 export function PropertiesBox(props: unknown) {
     // const schema: RJSFSchema = {
