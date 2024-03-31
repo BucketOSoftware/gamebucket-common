@@ -1,7 +1,7 @@
 import type { Matrix3 } from 'three'
 import type { rect } from 'gamebucket'
 
-export const TOOLS = ['select', 'marquee', 'draw', 'line'] as const
+export const TOOLS = ['select', 'create', 'marquee', 'draw', 'line'] as const
 export type ToolID = (typeof TOOLS)[number]
 
 type TODO = any

@@ -4,6 +4,7 @@ import {
     ButtonGroup,
     Card,
     CardList,
+    CardProps,
     Section,
     SectionCard,
     Tooltip,
@@ -121,10 +122,6 @@ export function create(
     return [store, root]
 }
 
-export function Toolbar(props: PropsWithChildren) {
-    return <ButtonGroup>{props.children}</ButtonGroup>
-}
-
 export function LayerBox(props: unknown) {
     const update = useUpdate()
     const { openResources, activeResource } = useStore()
@@ -149,7 +146,7 @@ export function LayerBox(props: unknown) {
 
     return (
         <Section compact elevation={1} title="Layers" className="sidebar-panel">
-            <SectionCard padded={false} className="scroll-it">
+            <SectionCard padded={false}>
                 <CardList compact bordered={false}>
                     {openResources.map((res) => {
                         return (
@@ -214,23 +211,11 @@ export function PaletteBox(props: {
 
     // TODO: real keys
     return (
-        <Section compact elevation={1} style={{ overflowY: 'scroll' }}>
-            <SectionCard padded className="docs-section-card-limited-height">
-                <div
-                    style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '5px',
-                        justifyContent: 'space-between',
-                    }}
-                >
-                    {props.choices.map((choice, idx) => (
-                        <Button
-                            icon={getIcon(choice)}
-                            style={{ padding: '3px' }}
-                        />
-                    ))}
-                </div>
+        <Section title="Palette" compact elevation={1}>
+            <SectionCard padded className="palette-grid">
+                {props.choices.map((choice, idx) => (
+                    <Button key={idx} icon={getIcon(choice)} />
+                ))}
             </SectionCard>
         </Section>
     )
@@ -311,7 +296,9 @@ export function Viewport() {
 
     return (
         <Section compact title="Viewport">
-            <Canvy ref={ref} />
+            <SectionCard>
+                <Canvy ref={ref} />
+            </SectionCard>
         </Section>
     )
 }
@@ -330,7 +317,7 @@ const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
                     margin: '5px',
                     width: '100%',
                     backgroundColor: 'black',
-                    borderRadius: '3px',
+                    // borderRadius: '3px',
                     touchAction: 'none',
                 }}
                 ref={ref}
@@ -348,6 +335,16 @@ const selectors = {
 
     // activeResourceType: () => {},
     // (st: DesignerStateType) =>
+}
+
+export function Toolbar(
+    props: PropsWithChildren<{ className: CardProps['className'] }>,
+) {
+    return (
+        <Card compact elevation={3} className={props.className}>
+            <ButtonGroup>{props.children}</ButtonGroup>
+        </Card>
+    )
 }
 
 function ToolButton(
@@ -368,10 +365,11 @@ function ToolButton(
 
     return (
         <Tooltip
-            openOnTargetFocus={false}
-            placement="right"
+            openOnTargetFocus={true}
+            placement="bottom"
             usePortal={false}
-            content={<span>{props.id}</span>}
+            content={props.id}
+            className="flex-shrink" // For some reason the tooltip enlarges the button area in the stock CSS
         >
             <Button
                 icon={props.icon}
@@ -386,6 +384,18 @@ function ToolButton(
                 }}
             />
         </Tooltip>
+    )
+}
+
+export function CreateTool(props: unknown) {
+    return (
+        <ToolButton
+            id="create"
+            icon="new-object"
+            disabled={!selectors.activeResource.is('object_list')}
+        >
+            New Entity
+        </ToolButton>
     )
 }
 export function SelectTool(props: unknown) {
@@ -403,7 +413,11 @@ export function SelectTool(props: unknown) {
 export function MarqueeTool() {
     // const currentLayerType = useSelector((d) => d.currentLayer?.type)
     // const currentLayer = useSelector((d) => d.currentLayer)
-    return <ToolButton id="marquee">Marquee</ToolButton>
+    return (
+        <ToolButton id="marquee" icon="select">
+            Marquee
+        </ToolButton>
+    )
 }
 
 export function DrawTool(props: unknown) {
@@ -412,16 +426,52 @@ export function DrawTool(props: unknown) {
     // const currentLayerType = useSelector((d) => d.currentLayer?.type)
     const enabled = selectors.activeResource.is('tile_map')
     return (
-        <ToolButton id="draw" disabled={!enabled}>
+        <ToolButton id="draw" icon="draw" disabled={!enabled}>
             Draw
         </ToolButton>
     )
 }
 
 export function LineTool(props: unknown) {
-    return <ToolButton id="line">Line</ToolButton>
+    return (
+        <ToolButton id="line" icon="edit">
+            Line
+        </ToolButton>
+    )
 }
 
 export function FileMenu(props: unknown) {
     return <button>File...</button>
+}
+
+import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
+
+export function PropertiesBox(props: unknown) {
+    // const schema: RJSFSchema = {
+    //     title: 'Todo',
+    //     type: 'object',
+    //     required: ['title'],
+    //     properties: {
+    //       title: { type: 'string', title: 'Title', default: 'A new task' },
+    //       done: { type: 'boolean', title: 'Done?', default: false },
+    //     },
+    //   };
+
+    const formData = { id: 'abc', respawn: true }
+    const log = (type: any) => console.log.bind(console, type)
+
+    return (
+        <Section compact elevation={1} title="Entity">
+            <SectionCard>
+                {/* <Form
+                    schema={jsonSchema}
+                    validator={validator}
+                    onSubmit={log('submitted')}
+                    onError={log('errors')}
+                    formData={formData}
+                    onChange={(e) => console.warn('CHG', e.formData)}
+                /> */}
+            </SectionCard>
+        </Section>
+    )
 }
