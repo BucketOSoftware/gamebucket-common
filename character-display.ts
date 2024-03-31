@@ -1,6 +1,21 @@
-import { GVec2, clamp, grid, rect } from 'gamebucket'
+import { GVec2, clamp, grid, rect, roundBy } from 'gamebucket'
 import invariant from 'tiny-invariant'
 import fontImage from './font-12x12'
+
+/*
+// WebGL renderer
+
+1. pass in:
+    * background tiles
+    * background colors,
+    * scroll (which tile is in the top left corner)
+    * sprite attributes: which palette to use (for 1-bit, each color is a palette?)
+    * palettes (as a LUT texture?)
+    * font cell size in (pixels? % of texture?)
+2. render the whole background into a texture (?, if it's big enough?) by blitting from the font texture
+3. render that texture to the screen using scroll and clipping info
+4. and then I guess the individual glyphs, but should they be done as a big screen again?
+*/
 
 export interface Sprite {
     x: number
@@ -73,13 +88,24 @@ const palette = new Uint8Array(256 * 6)
     }
 }
 
+interface Options {
+    viewportSize?: rect.Size
+    magnify?: number
+    tryGL?: boolean
+    // font: string | HTMLImageElement
+    // glyphSize:
+}
+
 export default class CharacterDisplay {
     // TODO?: Is this accurate?
     readonly blinkPeriod = 800
     readonly cellSize = { width: 12, height: 12 }
 
     private font: HTMLImageElement
-    private ctx: CanvasRenderingContext2D | null
+
+    private drawTarget!: HTMLCanvasElement
+    private ctx!: CanvasRenderingContext2D
+    private pixelBuffer!: ImageData
 
     /** Tile coordinate to display in the top-left. Not limited to the bounds of the board */
     scroll = { x: 0, y: 0 }
@@ -88,38 +114,31 @@ export default class CharacterDisplay {
     ready: Promise<any[]>
     booleanFont?: Uint8Array
 
-    private pixelBuffer: ImageData
     private bytesPerGlyph: number
 
+    public readonly viewportSize: rect.Size
+    public readonly magnify: number
+
     constructor(
-        public readonly canvas: HTMLCanvasElement,
-        public readonly viewportSize: rect.Size = { width: 80, height: 25 },
-        public readonly magnify = 1,
+        canvas: HTMLCanvasElement,
+        public readonly options: Options,
     ) {
+        this.viewportSize = options.viewportSize ?? { width: 80, height: 25 }
+        this.magnify = options.magnify ?? 1
+
+        const tryGL = options.tryGL ?? true
+
         const { cellSize } = this
 
-        document.body.style.backgroundColor = 'black'
         this.font = document.createElement('img')
         this.font.src = fontImage
         this.bytesPerGlyph = rect.area(cellSize)
 
         // Create display
+        this.canvas = canvas
         // TODO: support resizing the canvas to fit smaller screens, while
         // keeping aspect ratio
-        canvas.width = cellSize.width * viewportSize.width
-        canvas.height = cellSize.height * viewportSize.height
-        canvas.style.backgroundColor = 'black'
-        canvas.style.width = canvas.width * magnify + 'px'
-        canvas.style.height = canvas.height * magnify + 'px'
-        canvas.style.imageRendering = 'pixelated'
-        canvas.style.margin = '0 auto'
-        canvas.style.position = 'inherit'
-        canvas.style.display = 'block'
-
-        this.pixelBuffer = new ImageData(canvas.width, canvas.height)
-        this.pixelBuffer.data.fill(255)
-
-        this.ctx = canvas.getContext('2d', { alpha: false })
+        // this.setCanvas(canvas)
 
         this.ready = Promise.all([
             extractMonoFont(this.font, {
@@ -129,21 +148,61 @@ export default class CharacterDisplay {
                 this.booleanFont = ary
                 return ary
             }),
+            // TODO: switch to GL
+            // getDrawContext(tryGL).then(() => {
+            // })
         ])
     }
 
-    centerViewOn(p: GVec2) {
+    get canvas() {
+        return this.drawTarget
+    }
+
+    set canvas(canvas: HTMLCanvasElement) {
+        invariant(canvas)
+        console.warn('setting', canvas)
+        this.drawTarget = canvas
+        // this.cellSize = cellSize
+        const w = this.cellSize.width * this.viewportSize.width
+        const h = this.cellSize.height * this.viewportSize.height
+        canvas.width = w
+        canvas.height = h
+        canvas.style.backgroundColor = 'black'
+        if (false) {
+            // TODO
+            canvas.style.width = w * this.magnify + 'px'
+            canvas.style.height = h * this.magnify + 'px'
+        }
+        canvas.style.imageRendering = 'pixelated'
+        canvas.style.margin = '0 auto'
+        canvas.style.position = 'inherit'
+        canvas.style.display = 'block'
+
+        this.pixelBuffer = new ImageData(canvas.width, canvas.height)
+        this.pixelBuffer.data.fill(255)
+
+        this.ctx = canvas.getContext('2d', { alpha: false })!
+        invariant(this.ctx, "Couldn't get a drawing context")
+    }
+
+    setMagnify(magnify: number) {
+        const canvas = this.drawTarget
+        canvas.style.width = canvas.width * this.magnify + 'px'
+        canvas.style.height = canvas.height * this.magnify + 'px'
+    }
+    /** Scroll the given point into the center of the screen, clipped against renderable area */
+    centerView(target: GVec2) {
         const { scroll, viewportSize, worldBounds } = this
         let { x, y } = scroll
-        x = p.x - viewportSize.width / 2
-        y = p.y - viewportSize.height / 2
+
+        x = target.x - viewportSize.width / 2
+        y = target.y - viewportSize.height / 2
 
         x = clamp(x, worldBounds.x, worldBounds.width - viewportSize.width)
         y = clamp(y, worldBounds.y, worldBounds.height - viewportSize.height)
 
-        // TODO: fractional scrolling
-        scroll.x = Math.round(x)
-        scroll.y = Math.round(y)
+        scroll.x = x
+        scroll.y = y
     }
 
     scrollIntoView(p: GVec2, margin: GVec2 = { x: 0, y: 0 }) {
@@ -165,8 +224,8 @@ export default class CharacterDisplay {
         y = clamp(y, worldBounds.y, worldBounds.height - viewportSize.height)
 
         // TODO: fractional scrolling
-        scroll.x = Math.round(x)
-        scroll.y = Math.round(y)
+        scroll.x = x
+        scroll.y = y
     }
 
     render(
@@ -205,11 +264,11 @@ export default class CharacterDisplay {
         // const defaultPaletteEntry =
 
         // TODO: reimplement fractional scrolling, maybe
-        this.scroll.x = Math.floor(this.scroll.x)
-        this.scroll.y = Math.floor(this.scroll.y)
+        this.scroll.x = roundBy(this.scroll.x, 1 / 12)
+        this.scroll.y = roundBy(this.scroll.y, 1 / 12)
         const { x: scrollX, y: scrollY } = this.scroll
 
-        // const offsetX = Math.floor(this.offset.x)
+        // const offsetX = roundBy(this.offset.x)
         // const offsetY = Math.floor(this.offset.y)
         // const fracX = (this.offset.x - offsetX) * dw
         // const fracY = (this.offset.y - offsetY) * dh
@@ -345,6 +404,7 @@ export default class CharacterDisplay {
     }
 
     /**
+     * @todo: this won't work if we've CSS reworked our shit!
      *
      * @param x An x coordinate within the canvas
      * @param y A y coordinate within the canvas
@@ -362,7 +422,25 @@ export default class CharacterDisplay {
             y: (y - height) / height / magnify + scroll.y,
         }
     }
+
+    /**
+     *
+     * @param x Normalized coordinate, 0..1
+     * @param y Normalized coordinate, 0..1
+     */
+    cellAtCoordinate(x: number, y: number): GVec2 {
+        const { viewportSize, cellSize } = this
+        invariant(x >= 0 && x < 1)
+        invariant(y >= 0 && y < 1)
+
+        return {
+            x: Math.floor((x * viewportSize.width) / cellSize.width),
+            y: Math.floor((y * viewportSize.height) / cellSize.height),
+        }
+    }
 }
+
+// Stuff that doesn't need to be in the class
 
 async function extractMonoFont(img: HTMLImageElement, glyphSize: rect.Size) {
     await img.decode()
