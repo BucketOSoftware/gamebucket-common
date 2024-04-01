@@ -3,13 +3,16 @@ import debounce from 'lodash-es/debounce'
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
-import { Resource, ResourceType, ToolID } from './types'
+import * as rect from '../rect'
 import { GesturePhase } from './gestures'
+import { Resource, ResourceType, ToolID } from './types'
 
-function defaultState() {
+import { TSchema } from '@sinclair/typebox'
+
+function defaultState<P extends TSchema>() {
     return {
-        openResources: [] as Resource[],
-        activeResource: undefined as Resource | undefined,
+        openResources: [] as Resource<P>[],
+        activeResource: undefined as Resource<P> | undefined,
 
         // currentLayer: '',
         // currentTool: {} as Record<ResourceType, ToolID>,
@@ -55,7 +58,49 @@ export class StateStore {
         this.notifySubscribers()
     }
 
-    handleMouseInput = mouseInput.bind(this)
+    handleMouseInput = (
+        phase: GesturePhase,
+        viewport_x: number,
+        viewport_y: number,
+        begin_x: number,
+        begin_y: number,
+        originalEvent: MouseEvent,
+    ) => {
+        const { activeResource, currentTool } = this.state
+        if (!activeResource) {
+            return console.warn(
+                'No layer selected and/or no tool selected',
+                originalEvent,
+            )
+        }
+
+        const tool = currentTool[activeResource.type]
+        if (!tool) {
+            return console.warn('No tool selected', originalEvent)
+        }
+
+        const item = 97
+        const dragArea = rect.fromCorners(
+            viewport_x,
+            viewport_y,
+            Number.isNaN(begin_x) ? viewport_x : begin_x,
+            Number.isNaN(begin_y) ? viewport_y : begin_y,
+        )
+
+        switch (tool) {
+            case 'draw':
+                invariant('plot' in activeResource)
+                // TODO: draw a line from the last point to this one
+                activeResource.plot(phase, viewport_x, viewport_y, item)
+                break
+            case 'select':
+                invariant('select' in activeResource)
+                console.log(activeResource.select(phase, dragArea))
+                break
+            default:
+                console.warn('TODO:', tool)
+        }
+    }
 
     private notifySubscribers = debounce(() => {
         for (let s of this.subscribers) {
@@ -71,16 +116,6 @@ function validate(state: DesignerState) {
         labels.length === uniqLabels.size,
         "Isn't it time we came up with a unique ID system",
     )
-}
-
-function mouseInput(
-    this: StateStore,
-    phase: GesturePhase,
-    viewport_x: number,
-    viewport_y: number,
-    originalEvent: MouseEvent,
-) {
-    // console.log('INPUT', phase, viewport_x, viewport_y)
 }
 
 export const DesignerContext = createContext(new StateStore())
@@ -101,4 +136,12 @@ export function useUpdate() {
 
 export function useMouse() {
     return useContext(DesignerContext).handleMouseInput
+}
+
+export const selectors = {
+    activeResource: {
+        is: (type: ResourceType) => {
+            return useSelector((st) => st.activeResource?.type) === type
+        },
+    },
 }

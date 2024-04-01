@@ -5,6 +5,9 @@ import {
     Card,
     CardList,
     CardProps,
+    ControlGroup,
+    FormGroup,
+    InputGroup,
     Section,
     SectionCard,
     Tooltip,
@@ -20,6 +23,15 @@ import {
 } from 'react'
 import { Root, createRoot } from 'react-dom/client'
 import invariant from 'tiny-invariant'
+import {
+    Type,
+    type Static,
+    SchemaOptions,
+    TSchema,
+    TObject,
+    TTuple,
+    TArray,
+} from '@sinclair/typebox'
 
 import {
     DesignerContext,
@@ -28,9 +40,9 @@ import {
     useSelector,
     useStore,
     useUpdate,
+    selectors,
 } from './state'
-import { Resource, ToolID } from './types'
-
+import { TVec2, type Resource, type ToolID } from './types'
 import '@blueprintjs/core/lib/css/blueprint.css'
 import 'normalize.css'
 // include blueprint-icons.css for icon font support
@@ -39,6 +51,27 @@ import { recognizeGestures } from './gestures'
 
 ////// SCHEMING
 
+const playerSchema = Type.Object({
+    id: Type.Readonly(Type.Integer({ minimum: 1 })),
+    respawn: Type.Optional(
+        Type.Boolean({
+            default: false,
+            description: 'Whether it should respawn',
+            title: 'Respawn?',
+        }),
+    ),
+    position: TVec2({ title: 'Position' }),
+})
+
+const tileMapSchema = Type.Number({
+    minimum: 0,
+    maximum: 57,
+    description: 'Index into tilemap',
+})
+
+type PlayerSchema = Static<typeof playerSchema>
+
+// console.warn('SCHEMA', playerSchema, tileMapSchema)
 // export const playerSchema = z
 //     .object({
 //         id: z.number().int().min(1).max(10).readonly(),
@@ -50,6 +83,7 @@ import { recognizeGestures } from './gestures'
 
 // const jsonSchema = zodToJsonSchema(playerSchema, 'mySchema')
 // console.log('HI!', jsonSchema)
+/*
 const jsonSchema = {
     $ref: '#/definitions/player',
     definitions: {
@@ -83,6 +117,7 @@ const jsonSchema = {
     },
     $schema: 'http://json-schema.org/draft-07/schema#',
 }
+*/
 /*
 ['id', Integer.primary.readonly],
 // position will be a GVec2 object, or else maybe _x? and can be changed via the translation tool
@@ -125,103 +160,10 @@ export function create(
     return [store, root]
 }
 
-export function LayerBox(props: unknown) {
-    const update = useUpdate()
-    const { openResources, activeResource } = useStore()
+function LeaveMeAlone(p: PropsWithChildren) {
+    useEffect(() => {}, [])
 
-    useEffect(() => {
-        update((draft) => {
-            if (activeResource && openResources.includes(activeResource)) {
-                // TODO: test that this works
-            } else {
-                draft.activeResource = openResources[0]
-            }
-        })
-    }, [openResources])
-
-    function handleClick(seek: Resource) {
-        return () => {
-            update((draft) => {
-                draft.activeResource = openResources.find((res) => res === seek)
-            })
-        }
-    }
-
-    return (
-        <Section compact elevation={1} title="Layers" className="sidebar-panel">
-            <SectionCard padded={false}>
-                <CardList compact bordered={false}>
-                    {openResources.map((res) => {
-                        return (
-                            <Card
-                                key={res.label}
-                                compact
-                                interactive
-                                selected={res === activeResource}
-                                onClick={handleClick(res)}
-                            >
-                                {res.label}
-                            </Card>
-                        )
-                    })}
-                </CardList>
-            </SectionCard>
-        </Section>
-    )
-}
-
-interface PaletteEntryImage {
-    icon?: undefined
-    // src for an image of the thing, intended to be displayed as large as reasonable
-    img: string
-    // name of the thing, for tooltip
-    label?: string
-}
-
-interface PaletteEntryIcon {
-    // src for an icon used to represent the thing
-    icon: string
-    img?: undefined
-    // name of the thing, for tooltip
-    label?: string
-}
-
-interface PaletteEntryText {
-    icon?: undefined
-    img?: undefined
-    label: string
-}
-
-/** Display a selection of possible  */
-export function PaletteBox(props: {
-    choices: PaletteEntryImage[] | PaletteEntryIcon[] | PaletteEntryText[]
-}) {
-    function getIcon(
-        choice: PaletteEntryImage | PaletteEntryIcon | PaletteEntryText,
-    ) {
-        if (choice.icon) {
-            return (
-                <img
-                    src={choice.icon}
-                    width={24}
-                    height={24}
-                    title={choice.label}
-                />
-            )
-        }
-        return <div>Hi</div>
-    }
-
-    // TODO: real keys
-    return (
-        <Section title="Palette" compact elevation={1}>
-            <SectionCard padded className="palette-grid">
-                {props.choices.map((choice, idx) => (
-                    <Button key={idx} icon={getIcon(choice)} />
-                ))}
-            </SectionCard>
-        </Section>
-    )
+    return <>{p.children}</>
 }
 
 export function Viewport() {
@@ -265,10 +207,106 @@ export function Viewport() {
     )
 }
 
-function LeaveMeAlone(p: PropsWithChildren) {
-    useEffect(() => {}, [])
+export function LayerBox(props: unknown) {
+    const update = useUpdate()
+    const { openResources, activeResource } = useStore()
 
-    return <>{p.children}</>
+    useEffect(() => {
+        update((draft) => {
+            if (activeResource && openResources.includes(activeResource)) {
+                // TODO: test that this works
+            } else {
+                draft.activeResource = openResources[0]
+            }
+        })
+    }, [openResources])
+
+    function selectLayer(seek: Resource<any>) {
+        return () => {
+            update((draft) => {
+                draft.activeResource = openResources.find((res) => res === seek)
+            })
+        }
+    }
+
+    return (
+        <Section compact elevation={1} title="Layers" className="sidebar-panel">
+            <SectionCard padded={false}>
+                <CardList compact bordered={false}>
+                    {openResources.map((res) => {
+                        return (
+                            <Card
+                                key={res.label}
+                                compact
+                                interactive
+                                selected={res === activeResource}
+                                onClick={selectLayer(res)}
+                            >
+                                {res.label}
+                            </Card>
+                        )
+                    })}
+                </CardList>
+            </SectionCard>
+        </Section>
+    )
+}
+
+interface PaletteEntryImage {
+    icon?: undefined
+    // src for an image of the thing, intended to be displayed as large as reasonable
+    img: string
+    // name of the thing, for tooltip
+    label?: string
+}
+
+interface PaletteEntryIcon {
+    // src for an icon used to represent the thing
+    icon: string
+    img?: undefined
+    // name of the thing, for tooltip
+    label?: string
+}
+
+interface PaletteEntryText {
+    icon?: undefined
+    img?: undefined
+    label: string
+}
+
+/** Display a selection of possible  */
+export function PaletteBox(props: {
+    choices: PaletteEntryImage[] | PaletteEntryIcon[] | PaletteEntryText[]
+}) {
+    const isTileMap = selectors.activeResource.is('tile_map')
+    if (!isTileMap) return null
+
+    function getIcon(
+        choice: PaletteEntryImage | PaletteEntryIcon | PaletteEntryText,
+    ) {
+        if (choice.icon) {
+            return (
+                <img
+                    src={choice.icon}
+                    width={24}
+                    height={24}
+                    title={choice.label}
+                />
+            )
+        }
+        return <div>Hi</div>
+    }
+
+    // TODO: real keys
+    return (
+        <Section title="Palette" compact elevation={1}>
+            <SectionCard padded className="palette-grid">
+                {props.choices.map((choice, idx) => (
+                    <Button key={idx} icon={getIcon(choice)} />
+                ))}
+            </SectionCard>
+        </Section>
+    )
 }
 
 const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
@@ -288,16 +326,8 @@ const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
     )
 })
 
-const selectors = {
-    activeResource: {
-        is: (type: string) => {
-            return useSelector((st) => st.activeResource?.type) === type
-        },
-    },
-
-    // activeResourceType: () => {},
-    // (st: DesignerStateType) =>
-}
+// activeResourceType: () => {},
+// (st: DesignerStateType) =>
 
 export function Toolbar(
     props: PropsWithChildren<{ className: CardProps['className'] }>,
@@ -372,6 +402,7 @@ export function SelectTool(props: unknown) {
     )
 }
 
+/*
 export function MarqueeTool() {
     // const currentLayerType = useSelector((d) => d.currentLayer?.type)
     // const currentLayer = useSelector((d) => d.currentLayer)
@@ -381,6 +412,7 @@ export function MarqueeTool() {
         </ToolButton>
     )
 }
+*/
 
 export function DrawTool(props: unknown) {
     // const currentLayer } = useSelector()
@@ -393,7 +425,7 @@ export function DrawTool(props: unknown) {
         </ToolButton>
     )
 }
-
+/*
 export function LineTool(props: unknown) {
     return (
         <ToolButton id="line" icon="edit">
@@ -401,28 +433,37 @@ export function LineTool(props: unknown) {
         </ToolButton>
     )
 }
+*/
 
 export function FileMenu(props: unknown) {
     return <button>File...</button>
 }
 
 export function PropertiesBox(props: unknown) {
-    // const schema: RJSFSchema = {
-    //     title: 'Todo',
-    //     type: 'object',
-    //     required: ['title'],
-    //     properties: {
-    //       title: { type: 'string', title: 'Title', default: 'A new task' },
-    //       done: { type: 'boolean', title: 'Done?', default: false },
-    //     },
-    //   };
+    const res = useSelector(
+        (st) => st.activeResource?.type === 'object_list' && st.activeResource,
+    )
+
+    if (!res) {
+        return null
+    }
 
     const formData = { id: 'abc', respawn: true }
     const log = (type: any) => console.log.bind(console, type)
 
+    // TODO: would be very nice to have the real type on this
+    const schema = res.properties as TSchema
+
     return (
         <Section compact elevation={1} title="Entity">
             <SectionCard>
+                <form>
+                    <FormControl
+                        name="Entity?"
+                        schema={schema}
+                        data={formData}
+                    />
+                </form>
                 {/* <Form
                     schema={jsonSchema}
                     validator={validator}
@@ -434,4 +475,69 @@ export function PropertiesBox(props: unknown) {
             </SectionCard>
         </Section>
     )
+}
+
+function FormControl<T extends TSchema>(props: {
+    schema: T
+    name: string
+    data: Static<T>
+    readonly?: boolean
+}) {
+    const { schema } = props
+    console.warn('schema', schema.type, schema)
+
+    switch (schema.type) {
+        case 'object': {
+            const data = props.data as { [k: string]: any }
+            return Object.entries(
+                (schema as unknown as TObject).properties,
+            ).map(([name, subschema]: [string, TSchema]) => {
+                return (
+                    <FormControl
+                        key={name}
+                        name={name}
+                        schema={subschema}
+                        readonly={schema.required.includes(name)}
+                        data={data[name]}
+                    />
+                )
+            })
+        }
+        case 'array': {
+            const ary = schema as unknown as TArray
+            const isTuple = ary.minItems === ary.maxItems
+
+            if (isTuple) {
+                return (
+                    <FormGroup label={schema.title}>
+                        <ControlGroup>
+                            <InputGroup type="number"></InputGroup>
+                            <InputGroup type="number"></InputGroup>
+                        </ControlGroup>
+                    </FormGroup>
+                )
+            }
+            // console.warn('ARRAY', schema)
+            // invariant(schema
+            break
+        }
+        case 'string': {
+            const data = props.data
+            invariant(typeof data === 'string')
+            return (
+                <FormGroup inline label={schema.title}>
+                    <InputGroup
+                        key={props.name}
+                        value={data}
+                        disabled={props.readonly}
+                    ></InputGroup>
+                </FormGroup>
+            )
+        }
+        default:
+            return null
+    }
+
+    return null
+    // switch (schema.$schema)
 }

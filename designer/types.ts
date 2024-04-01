@@ -1,92 +1,105 @@
 import type { Matrix3 } from 'three'
-import type { rect } from 'gamebucket'
-import { PlotHandler } from './gestures'
+import {
+    type TSchema,
+    type Static,
+    type SchemaOptions,
+    Type,
+} from '@sinclair/typebox'
 
-export const TOOLS = ['select', 'create', 'marquee', 'draw', 'line'] as const
+import type { rect } from 'gamebucket'
+
+import type { PlotHandler, SelectHandler } from './gestures'
+
+export const TOOLS = [
+    'select',
+    'create',
+    /*'marquee',*/ 'draw' /*'line'*/,
+] as const
 export type ToolID = (typeof TOOLS)[number]
 
 type TODO = any
 
-export type Resource = MapResource
+export type Resource<P extends TSchema> = MapResource<P>
 
 /** Metadata for resources that can be edited as map layers */
-type MapResource = TileMapResource | ContinuousMapResource | ObjectListResource
+type MapResource<P extends TSchema> =
+    | TileMapResource<P>
+    | ContinuousMapResource<P>
+    | ObjectListResource<P, string>
 
-export type ResourceType = Resource['type']
+export type ResourceType = Resource<any>['type']
 
-/** Specifies what values are valid for a property, allowing us to build a UI around it */
-type TypeSpec = IntegerSpec
+// -----
+// Extra stuff
+// -----
 
-// TODO: replace with JSON schema
-export interface IntegerSpec {
-    type: 'Integer'
-    // if not specified as `true`, this value is required
-    optional?: boolean
-
-    // if type is Integer, the value of each element is an index into an array
-    indexInto?: (string | number)[]
-    range?: [
-        min: number | undefined,
-        max: number | undefined,
-        step?: number | undefined,
-    ]
-    default?: number
+export function TVec2(opts?: SchemaOptions) {
+    return Type.Tuple([Type.Number(), Type.Number()], opts)
 }
 
+// -----
+//
+// -----
 interface ResourceCommon {
     /** Label shown in the editor. Must be unique.
      * @todo Make one up if it's not given?
      */
     label: string
 
-    /** Matrix to transform the map's local coordinates into world coordinates, suitable for arranging maps in a larger space*/
-    worldTransform?: Matrix3
+    /** Matrix to transform the map's local coordinates into world coordinates, suitable for arranging maps in a larger space. TODO: is it necessary? */
+    // worldTransform?: Matrix3
 
     /** Size of the map in local coordinates */
     size: rect.Size
 }
 
-export interface TileMapResource extends ResourceCommon {
-    type: 'tile_map'
-    elementType: TypeSpec
+interface TileSet {}
 
-    plot: PlotHandler<number>
+export interface TileMapResource<P extends TSchema> extends ResourceCommon {
+    type: 'tile_map'
+    elementType: P
+
+    palette?: TileSet[]
+
+    plot: PlotHandler<P>
 }
 
-export interface ContinuousMapResource extends ResourceCommon {
+/** TODO: this is kind of theoretical, mostly meant as a look-ahead  */
+export interface ContinuousMapResource<P extends TSchema>
+    extends ResourceCommon {
     type: 'continuous_map'
-
-    /** Matrix to transform the map's local coordinates into world coordinates, suitable for arranging maps in a larger space*/
-    worldTransform?: Matrix3
+    elementType: P
 
     /** @todo Mostly same as tilemap. But does it apply? */
-    plot: (viewport_x: number, viewport_y: number, value: number) => void
+    plot: PlotHandler<P>
 }
 
 // https://json-schema.org/implementations
 
 // TODO: ugh. this wants to be a unique value that identifies an object
 /** A list of object properties  */
-export interface ObjectListResource<
-    Key extends string = string,
-    Rec extends object = { [k: string]: any },
-> extends ResourceCommon {
+export interface ObjectListResource<P extends TSchema, K extends string>
+    extends ResourceCommon {
     type: 'object_list'
 
     /** property name that identifies an object */
-    key: TODO
-    properties: ObjectPropertyDict<Rec>
-
+    // key: TODO
+    // properties: TSchema
+    properties: P
+    key: K
+    /*
     create: (
         viewport_x: number,
         viewport_y: number,
         object_type: string,
     ) => void
+*/
 
+    select: SelectHandler<P>
     /** Called when the user wants to remove an object from the dataset */
-    delete: (id: Key) => void
+    // delete: (id: K) => void
 
-    get: (id: Key) => Rec
+    // /    get: (id: K) => Static<P>
 
     /**
      * Callback when the user modified an object property.
@@ -95,11 +108,5 @@ export interface ObjectListResource<
      * @param property Which property has been changed
      * @param value The new value for the property
      */
-    set: (id: Key, property: string, value: any) => void
+    // set: (id: K, property: string, value: any) => void
 }
-// TODO: mapped type
-type ObjectPropertyDict<Rec> = { [name: string]: ObjectProperty<Rec> }
-/** A string is the title of a group of related properties */
-type ObjectProperty<Rec> =
-    | TypeSpec
-    | [condition: (record: Rec) => boolean, properties: ObjectPropertyDict<Rec>]

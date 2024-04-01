@@ -1,6 +1,7 @@
-import { rect } from 'gamebucket'
+import { GVec2, rect } from 'gamebucket'
 import { Resource, ToolID } from './types'
 import invariant from 'tiny-invariant'
+import { Static, TSchema } from '@sinclair/typebox'
 
 export const GESTURE_PHASE = {
     START: 'gesture.start',
@@ -15,21 +16,21 @@ export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
 //
 
 /** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1)?, and the value that's been plotted.
- * @todo what could the return value mean? */
-export type PlotHandler<V = number> = (
+ * @todo what could the return value mean?
+ * @todo make this a two-point thing
+ */
+export type PlotHandler<V extends TSchema> = (
     phase: Omit<GesturePhase, typeof GESTURE_PHASE.CANCEL>,
     x: number,
     y: number,
-    value: V,
+    value: Static<V>,
 ) => void
 
-//
-
 /** @returns An iterable of items within the rect */
-export type SelectHandler<V> = (
-    phase: Omit<GesturePhase, typeof GESTURE_PHASE.HOVER>,
+export type SelectHandler<V extends TSchema> = (
+    phase: GesturePhase,
     selectionArea: rect.Rect,
-) => Iterable<V>
+) => Iterable<Static<V>> | void
 
 const mouseEvents = ['mousedown', 'mousemove', 'mouseup'] as const
 
@@ -39,10 +40,17 @@ export function recognizeGestures(
         phase: GesturePhase,
         viewport_x: number,
         viewport_y: number,
+        begin_x: number,
+        begin_y: number,
         originalEvent: MouseEvent,
     ) => void,
 ) {
     let leftButtonDown = false
+    let begin_x = NaN
+    let begin_y = NaN
+    let last_x = 0
+    let last_y = 0
+    // let beginDragAt: GVec2= {x:0, y:0}
 
     function mouseHandler(ev: MouseEvent) {
         const viewport_x = ev.offsetX / dom.offsetWidth
@@ -53,7 +61,16 @@ export function recognizeGestures(
                 if (ev.buttons === 1) {
                     invariant(!leftButtonDown)
                     leftButtonDown = true
-                    mouseInput(GESTURE_PHASE.START, viewport_x, viewport_y, ev)
+                    begin_x = viewport_x
+                    begin_y = viewport_y
+                    mouseInput(
+                        GESTURE_PHASE.START,
+                        viewport_x,
+                        viewport_y,
+                        begin_x,
+                        begin_y,
+                        ev,
+                    )
                 }
                 break
             case 'mousemove':
@@ -64,29 +81,47 @@ export function recognizeGestures(
                         GESTURE_PHASE.CONTINUE,
                         viewport_x,
                         viewport_y,
+                        begin_x,
+                        begin_y,
                         ev,
                     )
                 } else if (ev.buttons === 0) {
                     // hover
-                    mouseInput(GESTURE_PHASE.HOVER, viewport_x, viewport_y, ev)
+                    mouseInput(
+                        GESTURE_PHASE.HOVER,
+                        viewport_x,
+                        viewport_y,
+                        NaN,
+                        NaN,
+                        ev,
+                    )
                 }
                 break
             case 'mouseup':
                 invariant((ev.buttons & 1) === 0)
+                mouseInput(
+                    GESTURE_PHASE.COMMIT,
+                    viewport_x,
+                    viewport_y,
+                    begin_x,
+                    begin_y,
+                    ev,
+                )
                 leftButtonDown = false
-                mouseInput(GESTURE_PHASE.COMMIT, viewport_x, viewport_y, ev)
+                begin_x = NaN
+                begin_y = NaN
                 break
         }
     }
 
     for (let eventType of mouseEvents) {
-        console.log('Attaching', eventType)
+        // console.log('Attaching', eventType)
         dom.addEventListener(eventType, mouseHandler)
     }
 
     return () => {
         for (let eventType of mouseEvents) {
-            console.log('Removing', eventType)
+            // console.log('Removing', eventType)
             dom.removeEventListener(eventType, mouseHandler)
         }
     }

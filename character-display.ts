@@ -424,18 +424,18 @@ export default class CharacterDisplay {
     }
 
     /**
-     *
+     * @todo Don't round
      * @param x Normalized coordinate, 0..1
      * @param y Normalized coordinate, 0..1
      */
     cellAtCoordinate(x: number, y: number): GVec2 {
-        const { viewportSize, cellSize } = this
+        const { viewportSize, scroll } = this
         invariant(x >= 0 && x < 1)
         invariant(y >= 0 && y < 1)
 
         return {
-            x: Math.floor((x * viewportSize.width) / cellSize.width),
-            y: Math.floor((y * viewportSize.height) / cellSize.height),
+            x: x * viewportSize.width + scroll.x,
+            y: y * viewportSize.height + scroll.y,
         }
     }
 }
