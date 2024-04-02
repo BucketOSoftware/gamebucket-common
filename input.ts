@@ -233,12 +233,6 @@ export default class Input<Intent extends string> {
         mouseWheelAccumulator.y = 0
         mouseWheelAccumulator.z = 0
 
-        for (let intent in intentions) {
-            if (intentions[intent].recent) {
-                console.warn('[!] ', intent)
-            }
-        }
-
         // Cleanup: clear start timestamps for released intentions
         for (let intent in intentions) {
             const record = intentions[intent]
@@ -576,17 +570,9 @@ export default class Input<Intent extends string> {
 
     private handleDocFocusChange = (ev: FocusEvent | Event) => {
         if (ev.type === 'focusout' || document.visibilityState === 'hidden') {
-            console.debug(
-                'Document lost focus or was hidden: ',
-                document.visibilityState,
-                ev,
-            )
-
             // Clear out any input state, as if user released all inputs
             this.resetState()
             return
         }
-
-        // console.debug('Other focus event:', ev)
     }
 }

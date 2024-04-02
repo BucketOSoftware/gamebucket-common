@@ -48,10 +48,7 @@ import { Palette, PaletteID, TVec2, type Resource, type ToolID } from './types'
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import { recognizeGestures } from './gestures'
 
-export function create(
-    domElement: HTMLElement,
-    App: ReactNode,
-): [StateStore, Root] {
+export function create(domElement: HTMLElement, App: ReactNode) {
     const store = new StateStore()
 
     const root = createRoot(domElement)
@@ -65,7 +62,12 @@ export function create(
         </StrictMode>,
     )
 
-    return [store, root]
+    return [
+        store,
+        () => {
+            root.unmount()
+        },
+    ] as const
 }
 
 function LeaveMeAlone(p: PropsWithChildren) {

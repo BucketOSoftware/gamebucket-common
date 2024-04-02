@@ -3,10 +3,8 @@ import { expect, test, vi } from 'vitest'
 import * as machine from './machine'
 
 test('exists', async () => {
-    const prom = machine.create()
-    const goTo = await prom
+    const goTo = machine.create()
 
-    expect(prom).toBeInstanceOf(Promise)
     expect(goTo).toBeInstanceOf(Function)
 })
 
@@ -59,7 +57,8 @@ test('handles asynchronous setups', async () => {
     })
 
     let goTo = await machine.start(mode)
-    return goTo(machine.halt)
+    await goTo(machine.halt)
+    expect(teardown).not.toHaveBeenCalled
 })
 
 test('can be shut down', async () => {
@@ -82,7 +81,7 @@ function nullMode(): machine.Mode {
     return vi.fn((teardown) => teardown())
 }
 
-function wait(n: number = 50) {
+function wait(n: number = 1) {
     return new Promise<void>((resolve) => {
         setTimeout(() => {
             resolve()

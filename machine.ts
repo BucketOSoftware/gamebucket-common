@@ -11,18 +11,20 @@ type OptionallyAsync<T> = T | Promise<T>
  * @returns A teardown function to be called when switching to the next mode, or nothing if no teardown is necessary. The teardown function can be asynchronous if the next mode can start before the cleanup is finished.
  */
 export type Mode = (
-    teardown: TeardownFn,
-) => OptionallyAsync<TeardownFn | void | undefined>
+    teardown: Teardown,
+) => OptionallyAsync<Teardown | void | undefined>
 
-type TeardownFn = () => OptionallyAsync<undefined | void>
+export type Teardown = () => OptionallyAsync<undefined | void>
+
+type GoTo = (mode: Mode) => Promise<GoTo>
 
 // -----
 
-async function switchMode(nextMode: Mode, teardown?: TeardownFn | void) {
+async function switchMode(nextMode: Mode, teardown?: Teardown | void) {
     let teardownRun = false
 
     // Wrap the teardown function so we can confirm it was run
-    const wrappedTeardown: TeardownFn = teardown
+    const wrappedTeardown: Teardown = teardown
         ? async () => {
               await teardown()
               teardownRun = true
@@ -47,8 +49,10 @@ async function switchMode(nextMode: Mode, teardown?: TeardownFn | void) {
     }
 }
 
-export async function create() {
-    return await switchMode(halt, undefined)
+export function create(): GoTo {
+    return async (laterMode: Mode) => {
+        return switchMode(laterMode, undefined)
+    }
 }
 
 /**
@@ -56,7 +60,7 @@ export async function create() {
  * @param mode A function that performs some setup
  * @returns
  */
-export async function start(mode: Mode) {
+export async function start(mode: Mode): Promise<GoTo> {
     return await switchMode(mode, undefined)
 }
 
