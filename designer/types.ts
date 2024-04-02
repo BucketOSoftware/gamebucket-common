@@ -1,8 +1,4 @@
-import {
-    Type,
-    type SchemaOptions,
-    type TSchema
-} from '@sinclair/typebox'
+import { Type, type SchemaOptions, type TSchema } from '@sinclair/typebox'
 
 import type { rect } from 'gamebucket'
 
@@ -12,20 +8,18 @@ import type { PlotHandler, SelectHandler } from './gestures'
 export const TOOLS = [
     'select',
     'create',
-    /*'marquee',*/ 'draw' /*'line'*/,
+    'draw',
+    /*'line'*/
+    /*'marquee',*/
 ] as const
+
 export type ToolID = (typeof TOOLS)[number]
-
-type TODO = any
-
-// export type Resource<S extends TSchema> = MapResource<S>
 
 /** Metadata for resources that can be edited as map layers */
 export type Resource<S extends TSchema> =
     | TileMapResource<S>
     | ContinuousMapResource<S>
     | EntityListResource<S>
-// type MapResource = Resource
 
 export type ResourceType = Resource<any>['type']
 
@@ -38,6 +32,7 @@ export function TVec2(opts?: SchemaOptions) {
 }
 
 /** Constructor functions for typescript */
+
 // -----
 //
 // -----
@@ -69,12 +64,8 @@ export function tileMap<P extends TSchema>(r: TileMapResource<P>) {
     return r
 }
 
-// export function entityList<P extends TSchema>(e: EntityListResource<P>) {
-// return e
-// }
 /** TODO: this is kind of theoretical, mostly meant as a look-ahead  */
-export interface ContinuousMapResource<P extends TSchema>
-    extends ResourceCommon {
+interface ContinuousMapResource<P extends TSchema> extends ResourceCommon {
     type: 'continuous_map'
     element: P
     // palette: Palette
@@ -84,7 +75,7 @@ export interface ContinuousMapResource<P extends TSchema>
 }
 
 /** A list of object properties  */
-export interface EntityListResource<P extends TSchema> extends ResourceCommon {
+interface EntityListResource<P extends TSchema> extends ResourceCommon {
     type: 'object_list'
     element: P
 

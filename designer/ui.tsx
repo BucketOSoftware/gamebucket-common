@@ -353,7 +353,7 @@ export function SpawnPointBox(props: unknown) {
                     <FormControl
                         name="Entity?"
                         schema={schema}
-                        data={formData}
+                        value={formData}
                     />
                 </form>
             </SectionCard>
@@ -364,16 +364,16 @@ export function SpawnPointBox(props: unknown) {
 function FormControl<T extends TSchema>(props: {
     schema: T
     name: string
-    data: Static<T>
+    value: Static<T>
     readonly?: boolean
 }) {
-    const { schema, name, data } = props
+    const { schema, name, value } = props
     invariant(typeof schema.type === 'string', schema.type)
     console.warn('schema', schema.type, schema)
 
     switch (schema.type) {
         case 'object': {
-            const data = props.data as { [k: string]: any }
+            const data = value as { [k: string]: any }
             return Object.entries(
                 (schema as unknown as TObject).properties,
             ).map(([name, subschema]: [string, TSchema]) => {
@@ -383,23 +383,23 @@ function FormControl<T extends TSchema>(props: {
                         name={name}
                         schema={subschema}
                         readonly={schema.required.includes(name)}
-                        data={data[name]}
+                        value={data[name]}
                     />
                 )
             })
         }
         case 'boolean':
-            invariant(typeof data === 'boolean' || typeof data === 'undefined')
+            invariant(
+                typeof value === 'boolean' || typeof value === 'undefined',
+            )
             return (
                 <Switch
                     label={schema.title}
-                    checked={false}
                     alignIndicator={Alignment.RIGHT}
-                    onChange={(e) => console.warn('TODO', e)}
+                    checked={false}
+                    onChange={(e) => console.warn('TODO', name, e)}
                 />
-                // </FormGroup>
             )
-            break
         case 'number':
         case 'integer':
             if ('minimum' in schema && 'maximum' in schema) {
@@ -417,7 +417,7 @@ function FormControl<T extends TSchema>(props: {
                     </FormGroup>
                 )
             }
-            break
+            throw new Error("Can't do it")
         case 'array': {
             const ary = schema as unknown as TArray
             const isTuple = ary.minItems === ary.maxItems
@@ -435,7 +435,7 @@ function FormControl<T extends TSchema>(props: {
             break
         }
         case 'string': {
-            const data = props.data
+            const data = props.value
             invariant(typeof data === 'string')
             return (
                 <FormGroup inline label={schema.title}>
@@ -447,9 +447,7 @@ function FormControl<T extends TSchema>(props: {
                 </FormGroup>
             )
         }
-        default:
-            return null
     }
 
-    return null
+    throw new Error("Can't do it")
 }
