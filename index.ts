@@ -4,6 +4,7 @@ export * from './threez'
 export * as grid from './grid'
 export * as rect from './rect'
 export * as machine from './machine'
+export * from './browser'
 
 export { default as Input } from './input'
 export { default as Capture } from './capture'
