@@ -243,7 +243,6 @@ export default class Input<Intent extends string> {
             previousMouseCursor.x = mouseCursor.x
             previousMouseCursor.y = mouseCursor.y
 
-            /*
             const { top, left, width, height } =
                 attachedElement.getBoundingClientRect()
 
@@ -252,7 +251,6 @@ export default class Input<Intent extends string> {
             mouseCursor.y = mouseLastPagePos.y - top
             mouseNormalized.x = mouseCursor.x / width
             mouseNormalized.y = mouseCursor.y / height
-            */
         } else {
             console.warn('Input is not attached')
         }
