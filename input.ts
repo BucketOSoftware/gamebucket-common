@@ -50,11 +50,23 @@ export default class Input<Intent extends string> {
     /** Wheel movement since last frame */
     mouseWheelDelta: GVec3 = { x: 0, y: 0, z: 0 }
 
+    // -----
+    // Settings
+    // -----
+
+    // TODO: maybe make "idle" into a built-in intention?
+    idleThreshold = 1_000 * 60
+
     // ------
     // Internal state
     // ------
 
     private attachedElement: HTMLElement | undefined = undefined
+
+    /** Timestamp in (ms) of last input */
+    private lastInteraction = Infinity
+
+    private lastRead: number
 
     /** Saving a reference to the Gamepad object seemed to result in an object
      * that never got updates, at least in Chrome. Instead, we save the index of
@@ -64,7 +76,7 @@ export default class Input<Intent extends string> {
 
     /** Map of intentions and their current value. @todo Privatize. @todo Multiplayer */
     // intentions: { [k in Intent]: number | undefined }
-    intentions!: {
+    private intentions!: {
         [k in Intent]: {
             /** Timestamp (ms) at which the intention was invoked */
             start: number | undefined
@@ -80,6 +92,7 @@ export default class Input<Intent extends string> {
     constructor(public mapping: InputMapping<Intent>) {
         // would like to set initial values this way but that's not how it works I guess
         this.resetState()
+        this.lastRead = this.lastInteraction = performance.now()
     }
 
     /**
@@ -153,8 +166,25 @@ export default class Input<Intent extends string> {
         this.attachedElement = undefined
     }
 
+    get idleTime() {
+        const duration = this.lastRead - this.lastInteraction
+        // invariant(Number.isFinite(duration))
+        // invariant(duration >= 0)
+        if (duration < 0) {
+            console.error('Duration ', duration)
+            return 0
+        }
+        if (duration > this.idleThreshold) {
+            return duration
+        } else {
+            return 0
+        }
+    }
+
     /** @param [t] Current time in miliseconds */
     readDevices(t = performance.now()) {
+        // console.log(t, this.lastRead, this.lastInteraction)
+        this.lastRead = Math.max(t, this.lastRead)
         this.allDeviceButtonJustPressed = {}
 
         const {
@@ -213,6 +243,7 @@ export default class Input<Intent extends string> {
             previousMouseCursor.x = mouseCursor.x
             previousMouseCursor.y = mouseCursor.y
 
+            /*
             const { top, left, width, height } =
                 attachedElement.getBoundingClientRect()
 
@@ -221,6 +252,7 @@ export default class Input<Intent extends string> {
             mouseCursor.y = mouseLastPagePos.y - top
             mouseNormalized.x = mouseCursor.x / width
             mouseNormalized.y = mouseCursor.y / height
+            */
         } else {
             console.warn('Input is not attached')
         }
@@ -360,6 +392,8 @@ export default class Input<Intent extends string> {
             allDeviceButtonDownAt,
         } = this
 
+        let anyInteractions = false
+
         // TODO: multiple gamepads
         const gamepad = navigator.getGamepads()[gamepadIndex]
 
@@ -372,6 +406,7 @@ export default class Input<Intent extends string> {
 
                 const prevDown = Number.isFinite(allDeviceButtonDownAt[code])
                 const currentlyDown = currentValue > 0
+                anyInteractions ||= currentlyDown
 
                 const justPressed = currentlyDown && !prevDown
 
@@ -387,6 +422,10 @@ export default class Input<Intent extends string> {
                     delete allDeviceButtonPressure[code]
                 }
             }
+        }
+
+        if (anyInteractions) {
+            this.lastInteraction = t
         }
 
         return gamepad || undefined
@@ -433,6 +472,8 @@ export default class Input<Intent extends string> {
     private keysLocale: { [Property in KeyCode]+?: string } = {}
 
     private handleKeyDown = (e: KeyboardEvent) => {
+        this.lastInteraction = e.timeStamp
+
         // TODO: might want to handle this another way. What if we want to bind keys that have modifiers, etc.
         const modifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey
         if (e.repeat) {
@@ -443,20 +484,23 @@ export default class Input<Intent extends string> {
 
         if (false) {
             if (!(e.code in this.keysLocale)) {
-                console.warn('[!] %s => %s', e.code, e.key)
+                console.log('[!] %s => %s', e.code, e.key)
+                // this.keysLocale[e.code] = e.key
             }
         }
 
         this.allDeviceButtonDownAt[e.code] ??= e.timeStamp
-        // this.keysLocale[e.code] = e.key
 
         this.recentPresses[e.code] = true
 
         // TODO: only prevent default if this key maps to something (?)
+        // we probably don't want to block stuff like reloading the page, right
         // e.preventDefault()
     }
 
     private handleKeyUp = (e: KeyboardEvent) => {
+        this.lastInteraction = e.timeStamp
+
         invariant(isKeyCode(e.code), 'Not a valid key code??')
         delete this.allDeviceButtonDownAt[e.code]
 
@@ -485,6 +529,7 @@ export default class Input<Intent extends string> {
     }
 
     private handleGamepadConnected = (ev: GamepadEvent) => {
+        this.lastInteraction = ev.timeStamp
         invariant(ev.gamepad, 'No gamepad?!')
 
         // TODO: haptic
@@ -521,6 +566,7 @@ export default class Input<Intent extends string> {
     private mouseWheelAccumulator: GVec3 = { x: 0, y: 0, z: 0 }
 
     private handleMouseButton = (e: MouseEvent) => {
+        this.lastInteraction = e.timeStamp
         const { allDeviceButtonDownAt, recentPresses } = this
 
         for (let i = 0; i < 3; i++) {
@@ -551,12 +597,16 @@ export default class Input<Intent extends string> {
         e.preventDefault()
     }
     private handleMouseMove = (e: MouseEvent) => {
+        this.lastInteraction = e.timeStamp
+
         // Don't normalize the coordinates yet
         this.mouseLastPagePos.x = e.pageX //(pageX - left) / width
         this.mouseLastPagePos.y = e.pageY //(pageY - top) / height
     }
 
     private handleMouseWheel = (ev: WheelEvent) => {
+        this.lastInteraction = ev.timeStamp
+
         // TODO: sensitivity?
         const acc: GVec3 = this.mouseWheelAccumulator
         acc.x += ev.deltaX
@@ -569,6 +619,11 @@ export default class Input<Intent extends string> {
     // -------
 
     private handleDocFocusChange = (ev: FocusEvent | Event) => {
+        console.warn('FOK', ev.type, ev.target)
+
+        if (ev.type === 'focusin') {
+            this.lastInteraction = ev.timeStamp
+        }
         if (ev.type === 'focusout' || document.visibilityState === 'hidden') {
             // Clear out any input state, as if user released all inputs
             this.resetState()
