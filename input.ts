@@ -270,6 +270,11 @@ export default class Input<Intent extends string> {
                 record.start = undefined
             }
         }
+
+        if (Object.keys(this.allDeviceButtonDownAt).length) {
+            // If anything is being held down, the user is not idle
+            this.lastInteraction = Math.max(t, this.lastInteraction)
+        }
     }
 
     /** @returns `true` if the given intent was just activated since the last read. The user will need to release *all* the buttons that map to this intent before it will return true again.  */
