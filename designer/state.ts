@@ -4,23 +4,26 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
 import * as rect from '../rect'
-import { GesturePhase } from './gestures'
-import { Resource, ResourceType, ToolID } from './types'
+import { GESTURE_PHASE, GesturePhase } from './gestures'
+import { Palette, PaletteID, Resource, ResourceType, ToolID } from './types'
 
 import { TSchema } from '@sinclair/typebox'
 
-function defaultState<P extends TSchema>() {
+function defaultState() {
     return {
-        openResources: [] as Resource<P>[],
-        activeResource: undefined as Resource<P> | undefined,
+        openResources: [] as Resource<TSchema>[],
+        activeResource: undefined as Resource<TSchema> | undefined,
 
-        // currentLayer: '',
-        // currentTool: {} as Record<ResourceType, ToolID>,
+        activePaletteItem: null as PaletteID | null,
+
         currentTool: {
             object_list: 'select',
             tile_map: 'draw',
             continuous_map: 'draw',
         } as Record<ResourceType, ToolID>,
+
+        //
+        // selection: null as Resource<TSchema> | null,
 
         canvas: null as HTMLCanvasElement | null,
     }
@@ -66,7 +69,7 @@ export class StateStore {
         begin_y: number,
         originalEvent: MouseEvent,
     ) => {
-        const { activeResource, currentTool } = this.state
+        const { activeResource, currentTool, activePaletteItem } = this.state
         if (!activeResource) {
             return console.warn(
                 'No layer selected and/or no tool selected',
@@ -79,7 +82,7 @@ export class StateStore {
             return console.warn('No tool selected', originalEvent)
         }
 
-        const item = 97
+        // TODO: this seems to work wrong with inverted rects
         const dragArea = rect.fromCorners(
             viewport_x,
             viewport_y,
@@ -90,12 +93,37 @@ export class StateStore {
         switch (tool) {
             case 'draw':
                 invariant('plot' in activeResource)
+                invariant(
+                    activePaletteItem,
+                    'TODO: disable tool cursor / show feedback if no item is selected',
+                )
                 // TODO: draw a line from the last point to this one
-                activeResource.plot(phase, viewport_x, viewport_y, item)
+                activeResource.plot(
+                    phase,
+                    viewport_x,
+                    viewport_y,
+                    activePaletteItem,
+                )
                 break
             case 'select':
                 invariant('select' in activeResource)
-                console.log(activeResource.select(phase, dragArea))
+                // TODO: select or show entity tooltip
+                // console.log(activeResource.select(phase, dragArea))
+                break
+            case 'create':
+                invariant('create' in activeResource)
+                invariant(
+                    activePaletteItem,
+                    'TODO: disable tool cursor/whatever when no item is selected',
+                )
+
+                if (phase === GESTURE_PHASE.START) {
+                    activeResource.create(
+                        viewport_x,
+                        viewport_y,
+                        activePaletteItem,
+                    )
+                }
                 break
             default:
                 console.warn('TODO:', tool)
@@ -141,7 +169,13 @@ export function useMouse() {
 export const selectors = {
     activeResource: {
         is: (type: ResourceType) => {
-            return useSelector((st) => st.activeResource?.type) === type
+            return useSelector((state) => state.activeResource?.type) === type
+        },
+        palette: () => {
+            return useSelector((state) => {
+                // @ts-expect-error
+                return state.activeResource?.palette as Palette | undefined
+            })
         },
     },
 }

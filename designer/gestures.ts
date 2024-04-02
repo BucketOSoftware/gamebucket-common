@@ -1,7 +1,6 @@
-import { GVec2, rect } from 'gamebucket'
-import { Resource, ToolID } from './types'
-import invariant from 'tiny-invariant'
 import { Static, TSchema } from '@sinclair/typebox'
+import { rect } from 'gamebucket'
+import invariant from 'tiny-invariant'
 
 export const GESTURE_PHASE = {
     START: 'gesture.start',
@@ -19,17 +18,17 @@ export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
  * @todo what could the return value mean?
  * @todo make this a two-point thing
  */
-export type PlotHandler<V extends TSchema> = (
+export type PlotHandler<PK> = (
     phase: Omit<GesturePhase, typeof GESTURE_PHASE.CANCEL>,
     x: number,
     y: number,
-    value: Static<V>,
+    value: PK,
 ) => void
 
 /** @returns An iterable of items within the rect */
 export type SelectHandler<V extends TSchema> = (
-    phase: GesturePhase,
-    selectionArea: rect.Rect,
+    phase: GesturePhase | undefined,
+    selectionArea: rect.Rect | 'all',
 ) => Iterable<Static<V>> | void
 
 const mouseEvents = ['mousedown', 'mousemove', 'mouseup'] as const
@@ -50,7 +49,6 @@ export function recognizeGestures(
     let begin_y = NaN
     let last_x = 0
     let last_y = 0
-    // let beginDragAt: GVec2= {x:0, y:0}
 
     function mouseHandler(ev: MouseEvent) {
         const viewport_x = ev.offsetX / dom.offsetWidth

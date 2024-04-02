@@ -1,144 +1,52 @@
 import {
+    Alignment,
     BlueprintProvider,
     Button,
     ButtonGroup,
     Card,
     CardList,
     CardProps,
-    ControlGroup,
     FormGroup,
     InputGroup,
+    NumericInput,
     Section,
     SectionCard,
+    Slider,
+    Switch,
+    Tag,
     Tooltip,
 } from '@blueprintjs/core'
 import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
+import { TArray, TObject, TSchema, Type, type Static } from '@sinclair/typebox'
 import {
+    MouseEventHandler,
     PropsWithChildren,
     ReactNode,
     StrictMode,
     forwardRef,
+    useCallback,
     useEffect,
     useRef,
+    useState,
 } from 'react'
 import { Root, createRoot } from 'react-dom/client'
 import invariant from 'tiny-invariant'
-import {
-    Type,
-    type Static,
-    SchemaOptions,
-    TSchema,
-    TObject,
-    TTuple,
-    TArray,
-} from '@sinclair/typebox'
 
+import '@blueprintjs/core/lib/css/blueprint.css'
+import 'normalize.css'
 import {
     DesignerContext,
     StateStore,
+    selectors,
     useMouse,
     useSelector,
     useStore,
     useUpdate,
-    selectors,
 } from './state'
-import { TVec2, type Resource, type ToolID } from './types'
-import '@blueprintjs/core/lib/css/blueprint.css'
-import 'normalize.css'
+import { Palette, PaletteID, TVec2, type Resource, type ToolID } from './types'
 // include blueprint-icons.css for icon font support
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import { recognizeGestures } from './gestures'
-
-////// SCHEMING
-
-const playerSchema = Type.Object({
-    id: Type.Readonly(Type.Integer({ minimum: 1 })),
-    respawn: Type.Optional(
-        Type.Boolean({
-            default: false,
-            description: 'Whether it should respawn',
-            title: 'Respawn?',
-        }),
-    ),
-    position: TVec2({ title: 'Position' }),
-})
-
-const tileMapSchema = Type.Number({
-    minimum: 0,
-    maximum: 57,
-    description: 'Index into tilemap',
-})
-
-type PlayerSchema = Static<typeof playerSchema>
-
-// console.warn('SCHEMA', playerSchema, tileMapSchema)
-// export const playerSchema = z
-//     .object({
-//         id: z.number().int().min(1).max(10).readonly(),
-//         respawn: z.boolean().default(false).describe('Should respawn?'),
-//         facing: z.array(z.number().optional()).length(2),
-//         // myUnion: z.union([z.number(), z.boolean()]),
-//     })
-//     .describe('My neat object schema')
-
-// const jsonSchema = zodToJsonSchema(playerSchema, 'mySchema')
-// console.log('HI!', jsonSchema)
-/*
-const jsonSchema = {
-    $ref: '#/definitions/player',
-    definitions: {
-        player: {
-            type: 'object',
-            properties: {
-                id: {
-                    type: 'integer',
-                    minimum: 1,
-                    maximum: 10,
-                },
-                respawn: {
-                    type: 'boolean',
-                    default: false,
-                    title: 'Should respawn?',
-                },
-                facing: {
-                    type: 'array',
-                    items: {
-                        type: 'number',
-                    },
-                    minItems: 2,
-                    maxItems: 2,
-                },
-            },
-            required: ['id', 'facing'],
-            additionalProperties: false,
-            title: 'Player',
-            description: 'Just some player',
-        },
-    },
-    $schema: 'http://json-schema.org/draft-07/schema#',
-}
-*/
-/*
-['id', Integer.primary.readonly],
-// position will be a GVec2 object, or else maybe _x? and can be changed via the translation tool
-['respawn', Boolean.default(false).label("Should respawn")],
-['position', Vector(2).for(WORLD_POSITION)],
-
-// mark this property as being affected by the rotate tool? since it's a unit vector we can work with it as just an angle of rotation away from whatever reference vector
-['facing', Vector(2).unit.for(WORLD_ORIENTATION)],
-// show a code editor with JS highlighting, maybe. could be in the panel or a separate panel / popout?
-['script', Text.code('javascript').multiline],
-// Show a numbers-only input box and a slider with stops on 0,5,10,...
-['health', Integer.range(0, 100).step(5).default(100)],
-
-['type', String.of('pickup', 'enemy', 'player')],
-
-// these properties only apply (i.e. will only be shown/edited) if the function that takes the whole record returns true
-[(record => record.type === 'enemy'),
-    ['behavior', String.of('lion', 'tiger', 'ruffian')],
-
-]
-*/
 
 export function create(
     domElement: HTMLElement,
@@ -252,61 +160,77 @@ export function LayerBox(props: unknown) {
     )
 }
 
-interface PaletteEntryImage {
-    icon?: undefined
-    // src for an image of the thing, intended to be displayed as large as reasonable
-    img: string
-    // name of the thing, for tooltip
-    label?: string
-}
-
-interface PaletteEntryIcon {
-    // src for an icon used to represent the thing
-    icon: string
-    img?: undefined
-    // name of the thing, for tooltip
-    label?: string
-}
-
-interface PaletteEntryText {
-    icon?: undefined
-    img?: undefined
-    label: string
-}
-
 /** Display a selection of possible  */
-export function PaletteBox(props: {
-    choices: PaletteEntryImage[] | PaletteEntryIcon[] | PaletteEntryText[]
-}) {
-    const isTileMap = selectors.activeResource.is('tile_map')
-    if (!isTileMap) return null
+export function PaletteBox(props: unknown) {
+    const palette: Palette<any> | undefined = selectors.activeResource.palette()
+    if (!palette) return null
 
-    function getIcon(
-        choice: PaletteEntryImage | PaletteEntryIcon | PaletteEntryText,
-    ) {
-        if (choice.icon) {
-            return (
-                <img
-                    src={choice.icon}
-                    width={24}
-                    height={24}
-                    title={choice.label}
-                />
-            )
+    let klass = ''
+    if (palette.length) {
+        if (palette[0].icon || palette[0].img) {
+            klass = 'palette-grid'
+        } else if (palette[0].label) {
+            klass = 'palette-tags'
         }
-        return <div>Hi</div>
     }
-
     // TODO: real keys
     return (
         <Section title="Palette" compact elevation={1}>
-            <SectionCard padded className="palette-grid">
-                {props.choices.map((choice, idx) => (
-                    <Button key={idx} icon={getIcon(choice)} />
+            <SectionCard padded className={klass}>
+                {Object.entries(palette).map(([id, entry], idx) => (
+                    <PaletteButton id={id} item={entry} key={id} />
+                    // <Button key={idx} icon={getIcon(choice)} />
                 ))}
             </SectionCard>
         </Section>
     )
+}
+
+function PaletteButton(props: { id: PaletteID; item: Palette[number] }) {
+    const update = useUpdate()
+    const selected = useSelector((st) => st.activePaletteItem === props.id)
+
+    const { id, item } = props
+
+    const onClick: MouseEventHandler<HTMLElement> = useCallback(
+        (ev) => {
+            update((draft) => {
+                draft.activePaletteItem = id
+            })
+        },
+        [id],
+    )
+
+    if (item.icon) {
+        return (
+            <Button active={selected} minimal onClick={onClick}>
+                <img
+                    src={item.icon}
+                    width={24}
+                    height={24}
+                    title={item.label}
+                />
+            </Button>
+        )
+    }
+
+    if (item.img) {
+        throw new Error('TODO')
+    }
+
+    invariant(item.label, 'Invalid palette entry')
+    if (item.label) {
+        return (
+            <Tag
+                round
+                intent={selected ? 'primary' : 'none'}
+                interactive
+                onClick={onClick}
+            >
+                {item.label}
+            </Tag>
+        )
+    }
 }
 
 const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
@@ -325,9 +249,6 @@ const Canvy = forwardRef<HTMLCanvasElement>((_props, ref) => {
         </LeaveMeAlone>
     )
 })
-
-// activeResourceType: () => {},
-// (st: DesignerStateType) =>
 
 export function Toolbar(
     props: PropsWithChildren<{ className: CardProps['className'] }>,
@@ -367,7 +288,6 @@ function ToolButton(
                 icon={props.icon}
                 large
                 intent={tool === props.id ? 'primary' : 'none'}
-                // disabled={props.disabled}
                 onClick={() => {
                     update((draft) => {
                         //@ts-expect-error
@@ -402,44 +322,17 @@ export function SelectTool(props: unknown) {
     )
 }
 
-/*
-export function MarqueeTool() {
-    // const currentLayerType = useSelector((d) => d.currentLayer?.type)
-    // const currentLayer = useSelector((d) => d.currentLayer)
-    return (
-        <ToolButton id="marquee" icon="select">
-            Marquee
-        </ToolButton>
-    )
-}
-*/
-
 export function DrawTool(props: unknown) {
-    // const currentLayer } = useSelector()
-
-    // const currentLayerType = useSelector((d) => d.currentLayer?.type)
     const enabled = selectors.activeResource.is('tile_map')
+
     return (
         <ToolButton id="draw" icon="draw" disabled={!enabled}>
             Draw
         </ToolButton>
     )
 }
-/*
-export function LineTool(props: unknown) {
-    return (
-        <ToolButton id="line" icon="edit">
-            Line
-        </ToolButton>
-    )
-}
-*/
 
-export function FileMenu(props: unknown) {
-    return <button>File...</button>
-}
-
-export function PropertiesBox(props: unknown) {
+export function SpawnPointBox(props: unknown) {
     const res = useSelector(
         (st) => st.activeResource?.type === 'object_list' && st.activeResource,
     )
@@ -448,11 +341,10 @@ export function PropertiesBox(props: unknown) {
         return null
     }
 
-    const formData = { id: 'abc', respawn: true }
-    const log = (type: any) => console.log.bind(console, type)
+    const formData = { position: [1, 1], type: 'player' }
 
     // TODO: would be very nice to have the real type on this
-    const schema = res.properties as TSchema
+    const schema = res.element as TSchema
 
     return (
         <Section compact elevation={1} title="Entity">
@@ -464,14 +356,6 @@ export function PropertiesBox(props: unknown) {
                         data={formData}
                     />
                 </form>
-                {/* <Form
-                    schema={jsonSchema}
-                    validator={validator}
-                    onSubmit={log('submitted')}
-                    onError={log('errors')}
-                    formData={formData}
-                    onChange={(e) => console.warn('CHG', e.formData)}
-                /> */}
             </SectionCard>
         </Section>
     )
@@ -483,7 +367,8 @@ function FormControl<T extends TSchema>(props: {
     data: Static<T>
     readonly?: boolean
 }) {
-    const { schema } = props
+    const { schema, name, data } = props
+    invariant(typeof schema.type === 'string', schema.type)
     console.warn('schema', schema.type, schema)
 
     switch (schema.type) {
@@ -503,22 +388,50 @@ function FormControl<T extends TSchema>(props: {
                 )
             })
         }
+        case 'boolean':
+            invariant(typeof data === 'boolean' || typeof data === 'undefined')
+            return (
+                <Switch
+                    label={schema.title}
+                    checked={false}
+                    alignIndicator={Alignment.RIGHT}
+                    onChange={(e) => console.warn('TODO', e)}
+                />
+                // </FormGroup>
+            )
+            break
+        case 'number':
+        case 'integer':
+            if ('minimum' in schema && 'maximum' in schema) {
+                return (
+                    <FormGroup label={schema.title}>
+                        <Slider
+                            min={schema.minimum}
+                            max={schema.maximum}
+                            stepSize={schema.multipleOf}
+                            value={0}
+                            onChange={(e) => console.warn('TODO', e)}
+                            // TODO: these aren't the same thing, esp. if min isn't a multiple of multipleOf
+                            labelStepSize={schema.multipleOf * 4}
+                        />
+                    </FormGroup>
+                )
+            }
+            break
         case 'array': {
             const ary = schema as unknown as TArray
             const isTuple = ary.minItems === ary.maxItems
 
             if (isTuple) {
+                // TODO: the actual types
+                // TODO: max, min
                 return (
-                    <FormGroup label={schema.title}>
-                        <ControlGroup>
-                            <InputGroup type="number"></InputGroup>
-                            <InputGroup type="number"></InputGroup>
-                        </ControlGroup>
+                    <FormGroup inline label={schema.title}>
+                        <NumericInput selectAllOnFocus placeholder="0" small />
+                        <NumericInput selectAllOnFocus placeholder="0" small />
                     </FormGroup>
                 )
             }
-            // console.warn('ARRAY', schema)
-            // invariant(schema
             break
         }
         case 'string': {
@@ -539,5 +452,4 @@ function FormControl<T extends TSchema>(props: {
     }
 
     return null
-    // switch (schema.$schema)
 }

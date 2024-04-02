@@ -1,13 +1,12 @@
-import type { Matrix3 } from 'three'
 import {
-    type TSchema,
-    type Static,
-    type SchemaOptions,
     Type,
+    type SchemaOptions,
+    type TSchema
 } from '@sinclair/typebox'
 
 import type { rect } from 'gamebucket'
 
+import invariant from 'tiny-invariant'
 import type { PlotHandler, SelectHandler } from './gestures'
 
 export const TOOLS = [
@@ -19,13 +18,14 @@ export type ToolID = (typeof TOOLS)[number]
 
 type TODO = any
 
-export type Resource<P extends TSchema> = MapResource<P>
+// export type Resource<S extends TSchema> = MapResource<S>
 
 /** Metadata for resources that can be edited as map layers */
-type MapResource<P extends TSchema> =
-    | TileMapResource<P>
-    | ContinuousMapResource<P>
-    | ObjectListResource<P, string>
+export type Resource<S extends TSchema> =
+    | TileMapResource<S>
+    | ContinuousMapResource<S>
+    | EntityListResource<S>
+// type MapResource = Resource
 
 export type ResourceType = Resource<any>['type']
 
@@ -37,6 +37,7 @@ export function TVec2(opts?: SchemaOptions) {
     return Type.Tuple([Type.Number(), Type.Number()], opts)
 }
 
+/** Constructor functions for typescript */
 // -----
 //
 // -----
@@ -51,51 +52,55 @@ interface ResourceCommon {
 
     /** Size of the map in local coordinates */
     size: rect.Size
-}
 
-interface TileSet {}
+    /** Each element of the resource's data matches this schema. Can be a scalar, object, etc. */
+    element: TSchema
+}
 
 export interface TileMapResource<P extends TSchema> extends ResourceCommon {
     type: 'tile_map'
-    elementType: P
+    element: P
+    palette: Palette
 
-    palette?: TileSet[]
-
-    plot: PlotHandler<P>
+    plot: PlotHandler<PaletteID>
 }
 
+export function tileMap<P extends TSchema>(r: TileMapResource<P>) {
+    return r
+}
+
+// export function entityList<P extends TSchema>(e: EntityListResource<P>) {
+// return e
+// }
 /** TODO: this is kind of theoretical, mostly meant as a look-ahead  */
 export interface ContinuousMapResource<P extends TSchema>
     extends ResourceCommon {
     type: 'continuous_map'
-    elementType: P
+    element: P
+    // palette: Palette
 
     /** @todo Mostly same as tilemap. But does it apply? */
-    plot: PlotHandler<P>
+    plot: PlotHandler<PaletteID>
 }
 
-// https://json-schema.org/implementations
-
-// TODO: ugh. this wants to be a unique value that identifies an object
 /** A list of object properties  */
-export interface ObjectListResource<P extends TSchema, K extends string>
-    extends ResourceCommon {
+export interface EntityListResource<P extends TSchema> extends ResourceCommon {
     type: 'object_list'
+    element: P
 
-    /** property name that identifies an object */
-    // key: TODO
-    // properties: TSchema
-    properties: P
-    key: K
-    /*
+    /** Schema for properties that can be set in the designer. Doesn't have to
+     * be the entire entity.
+     */
+
+    palette: Palette<PaletteID>
+
+    select: SelectHandler<P>
     create: (
         viewport_x: number,
         viewport_y: number,
-        object_type: string,
+        object_type: PaletteID,
     ) => void
-*/
 
-    select: SelectHandler<P>
     /** Called when the user wants to remove an object from the dataset */
     // delete: (id: K) => void
 
@@ -109,4 +114,58 @@ export interface ObjectListResource<P extends TSchema, K extends string>
      * @param value The new value for the property
      */
     // set: (id: K, property: string, value: any) => void
+}
+
+export function entityList<P extends TSchema>(e: EntityListResource<P>) {
+    return e
+}
+
+export function validID<T extends object>(
+    o: T,
+    v: string | number | symbol,
+): asserts v is keyof T {
+    invariant(v in o, 'Not a valid key')
+}
+
+// -----
+//  Palettes
+// -----
+export type PaletteID = string | number
+
+export type Palette<
+    ID extends PaletteID = PaletteID,
+    E extends PaletteEntry = PaletteEntry,
+> = Record<ID, E>
+
+type PaletteEntry = PaletteEntryText | /*PaletteEntryImage |*/ PaletteEntryIcon
+
+interface PaletteEntryText {
+    icon?: undefined
+    img?: undefined
+    label: string
+
+    /** if true, this item occupies a rectangular area rather than a point */
+    area?: boolean
+}
+
+interface PaletteEntryImage {
+    icon?: undefined
+    // src for an image of the thing, intended to be displayed as large as reasonable
+    img: string
+    // name of the thing, for tooltip
+    label?: string
+
+    /** if true, this item occupies a rectangular area rather than a point */
+    area?: boolean
+}
+
+interface PaletteEntryIcon {
+    // src for an icon used to represent the thing
+    icon: string
+    img?: undefined
+    // name of the thing, for tooltip
+    label?: string
+
+    /** if true, this item occupies a rectangular area rather than a point */
+    area?: boolean
 }
