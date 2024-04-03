@@ -49,6 +49,10 @@ async function switchMode(nextMode: Mode, teardown?: Teardown | void) {
     }
 }
 
+/**
+ * 
+ * @returns 
+ */
 export function create(): GoTo {
     return async (laterMode: Mode) => {
         return switchMode(laterMode, undefined)
@@ -56,13 +60,14 @@ export function create(): GoTo {
 }
 
 /**
- *
- * @param mode A function that performs some setup
- * @returns
+ * 
+ * @param mode 
+ * @returns 
  */
 export async function start(mode: Mode): Promise<GoTo> {
     return await switchMode(mode, undefined)
 }
 
-/** A no-op mode */
+/** A no-op mode, useful for tearing down a state without immediately switching
+ * to another one */
 export const halt: Mode = (teardown) => teardown()
