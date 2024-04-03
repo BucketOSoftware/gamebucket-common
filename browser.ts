@@ -1,10 +1,10 @@
 import invariant from 'tiny-invariant'
 import { Teardown } from './machine'
 
-const IDLE = Symbol()
-type FixedUpdateReturnCode = typeof IDLE | void
+const PAUSE = Symbol()
+type LoopStatus = typeof PAUSE | void
 
-const TOO_LONG_DELTA_MS = 1000 / 10
+const MAXIMUM_DELTA_MS = 1000 / 10
 const timestep_ms = 1000 / 60
 
 /**
@@ -15,65 +15,76 @@ const timestep_ms = 1000 / 60
  * @returns
  */
 export function fixedLoop(
-    fixedUpdate: (dt: number) => FixedUpdateReturnCode,
-    render: (dt: number, t: number) => void,
+    fixedUpdate: (dt: number) => void,
+    render: (
+        renderDelta_ms: number,
+        updatePause: boolean,
+        frameProgress: number,
+        gameTime_t: number,
+    ) => LoopStatus,
     // options: { timestep?: number; speed?: number}
 ): Teardown {
     let lastLoop = performance.now()
-    let lastRender = lastLoop
+    let lastRender_t = lastLoop
     let updateAccumulator = 0
+    let gameTime_t = 0
 
-    let updateStatus: FixedUpdateReturnCode
+    let loopStatus: LoopStatus
 
     let rafId: number | undefined = requestAnimationFrame(l)
     function l(t: number) {
+        t = performance.now()
+
+        // t is wall-clock time
+
         invariant(rafId !== undefined, 'Loop kept going?')
         rafId = undefined
 
-        let dt = t - lastLoop
-        lastLoop = t
+        const speedFactor = 1
+        const isPaused = loopStatus === PAUSE
 
-        if (dt > TOO_LONG_DELTA_MS) {
+        // dt is game time
+        // if the last render paused the loop, we don't contribute the time
+        let dt = isPaused ? 0 : (t - lastLoop) * speedFactor
+        if (dt > MAXIMUM_DELTA_MS) {
+            // Slow down the game
             // TODO: does this work? Test with slow updates
-            dt = 0
+            dt = timestep_ms
         }
-
         updateAccumulator += dt
+        gameTime_t += dt
+
+        lastLoop = t
 
         while (updateAccumulator >= timestep_ms) {
             updateAccumulator -= timestep_ms
 
-            const lastUpdateStatus = updateStatus
-            updateStatus = fixedUpdate(timestep_ms)
-            const statusChanged = updateStatus !== lastUpdateStatus
-
-            if (updateStatus === IDLE) {
-                // Drain any extra update time
-                updateAccumulator %= timestep_ms
-                lastRender = t
-                if (statusChanged) {
-                    console.debug('Became idle')
-                    render(0, lastRender)
-                }
-            }
+            fixedUpdate(timestep_ms)
         }
 
-        if (updateStatus !== IDLE) {
-            const timeAfterUpdates = performance.now()
-            const renderDelta = timeAfterUpdates - lastRender
-            lastRender = timeAfterUpdates
+        const afterUpdates_t = performance.now()
 
-            // FIXME: the second param should be time in game terms...  or can
-            // we derive that some other way
-            render(renderDelta, timeAfterUpdates)
-        }
+        const frameProgress = updateAccumulator / timestep_ms
+        // A delta of 0 indicates that the update loop is paused; the render function can render or not based on its preference
+        const renderDelta_ms = afterUpdates_t - lastRender_t
+
+        lastRender_t = afterUpdates_t
+
+        lastRender_t = performance.now()
+        loopStatus = render(
+            renderDelta_ms,
+            loopStatus === PAUSE,
+            frameProgress,
+            gameTime_t,
+        )
+
         rafId = requestAnimationFrame(l)
     }
 
     return () => {
-        cancelAnimationFrame(rafId!)
+        cancelAnimationFrame(rafId!) // doesn't matter if it's undefined
         rafId = undefined
     }
 }
 
-fixedLoop.IDLE = IDLE
+fixedLoop.PAUSE = PAUSE

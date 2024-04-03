@@ -181,9 +181,14 @@ export default class Input<Intent extends string> {
         }
     }
 
-    /** @param [t] Current time in miliseconds */
-    readDevices(t = performance.now()) {
-        // console.log(t, this.lastRead, this.lastInteraction)
+    readDevices() {
+        // t is wall clock time, so you can't pass it in
+        const t = performance.now()
+        const dt = this.lastRead
+        if (dt <= 0) {
+            console.warn('Time since last input read is', dt)
+        }
+
         this.lastRead = Math.max(t, this.lastRead)
         this.allDeviceButtonJustPressed = {}
 
