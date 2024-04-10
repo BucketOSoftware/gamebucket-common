@@ -2,34 +2,48 @@ import { produce } from 'immer'
 import debounce from 'lodash-es/debounce'
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
+import { TSchema } from '@sinclair/typebox'
 
 import * as rect from '../rect'
-import { GESTURE_PHASE, GesturePhase } from './gestures'
-import { Palette, PaletteID, Resource, ResourceType, ToolID } from './types'
+import { BucketResource } from '../formats/resources'
 
-import { TSchema } from '@sinclair/typebox'
+import { GESTURE_PHASE, GesturePhase } from './gestures'
+import {
+    LayerType,
+    Palette,
+    PaletteID,
+    Resource as DesignerResource,
+    ResourceLayer,
+    ToolID,
+} from './types'
 
 function defaultState() {
     return {
-        openResources: [] as Resource<TSchema>[],
-        activeResource: undefined as Resource<TSchema> | undefined,
+        openResources: [] as DesignerResource[],
+        activeResource: undefined as DesignerResource | undefined,
+        // TODO: need to get ready for the active resource to not be spatial!
+        activeLayer: undefined as ResourceLayer<TSchema> | undefined,
 
         activePaletteItem: null as PaletteID | null,
 
+        // TODO: load from localStorage?
         currentTool: {
-            object_list: 'select',
-            tile_map: 'draw',
+            ['resource/spatial2d/entity_list']: 'select',
+            ['resource/spatial2d/tile_map']: 'draw',
             continuous_map: 'draw',
-        } as Record<ResourceType, ToolID>,
+        } as Record<LayerType, ToolID>,
 
-        //
-        // selection: null as Resource<TSchema> | null,
+        /** Independent of active layer or what have you */
+        selection: [] as any[],
 
         canvas: null as HTMLCanvasElement | null,
+        overlay: null as HTMLCanvasElement | null,
     }
 }
 
 type DesignerState = ReturnType<typeof defaultState>
+
+export type RenderCallback = (store: StateStore) => void
 
 export class StateStore {
     private state = produce(defaultState(), () => {})
@@ -38,12 +52,29 @@ export class StateStore {
         return this.state.canvas
     }
 
-    subscribers = new Set<() => void>()
+    get overlay() {
+        return this.state.overlay
+    }
+
+    private subscribers = new Set<() => void>()
 
     subscribe = (onStoreChange: () => void) => {
         this.subscribers.add(onStoreChange)
         return () => {
             this.subscribers.delete(onStoreChange)
+        }
+    }
+
+    private renderFns: RenderCallback[] = []
+    private toolCallback = (
+        enqueueRender: (store: StateStore) => void = () => {},
+    ) => {
+        this.renderFns = [enqueueRender]
+    }
+
+    renderViewport() {
+        for (let cb of this.renderFns) {
+            cb(this)
         }
     }
 
@@ -69,15 +100,15 @@ export class StateStore {
         begin_y: number,
         originalEvent: MouseEvent,
     ) => {
-        const { activeResource, currentTool, activePaletteItem } = this.state
-        if (!activeResource) {
+        const { activeLayer, currentTool, activePaletteItem } = this.state
+        if (!activeLayer) {
             return console.warn(
                 'No layer selected and/or no tool selected',
                 originalEvent,
             )
         }
 
-        const tool = currentTool[activeResource.type]
+        const tool = currentTool[activeLayer.type]
         if (!tool) {
             return console.warn('No tool selected', originalEvent)
         }
@@ -92,37 +123,56 @@ export class StateStore {
 
         switch (tool) {
             case 'draw':
-                invariant('plot' in activeResource)
-                invariant(
-                    activePaletteItem,
-                    'TODO: disable tool cursor / show feedback if no item is selected',
-                )
-                // TODO: draw a line from the last point to this one
-                activeResource.plot(
-                    phase,
-                    viewport_x,
-                    viewport_y,
-                    activePaletteItem,
-                )
-                break
-            case 'select':
-                invariant('select' in activeResource)
-                // TODO: select or show entity tooltip
-                // console.log(activeResource.select(phase, dragArea))
-                break
-            case 'create':
-                invariant('create' in activeResource)
-                invariant(
-                    activePaletteItem,
-                    'TODO: disable tool cursor/whatever when no item is selected',
-                )
+                invariant('plot' in activeLayer)
+                try {
+                    invariant(
+                        activePaletteItem,
+                        'TODO: disable tool cursor / show feedback if no item is selected',
+                    )
 
-                if (phase === GESTURE_PHASE.START) {
-                    activeResource.create(
+                    // TODO: draw a line from the last point to this one
+                    activeLayer.plot(
+                        phase,
                         viewport_x,
                         viewport_y,
                         activePaletteItem,
                     )
+                } catch (e) {
+                    console.error(e)
+                }
+                break
+            case 'select':
+                invariant('select' in activeLayer)
+                const selection = activeLayer.select(
+                    phase,
+                    dragArea,
+                    this.toolCallback,
+                )
+                if (selection !== undefined) {
+                    invariant(Array.isArray(selection))
+                    this.update((state) => {
+                        state.selection = selection
+                    })
+                }
+
+                break
+            case 'create':
+                invariant('create' in activeLayer)
+                try {
+                    invariant(
+                        activePaletteItem,
+                        'TODO: disable tool cursor/whatever when no item is selected',
+                    )
+
+                    if (phase === GESTURE_PHASE.START) {
+                        activeLayer.create(
+                            viewport_x,
+                            viewport_y,
+                            activePaletteItem,
+                        )
+                    }
+                } catch (e) {
+                    console.error(e)
                 }
                 break
             default:
@@ -138,7 +188,7 @@ export class StateStore {
 }
 
 function validate(state: DesignerState) {
-    const labels = state.openResources.map((n) => n.label)
+    const labels = state.openResources.map((n) => n.displayName)
     const uniqLabels = new Set(labels)
     invariant(
         labels.length === uniqLabels.size,
@@ -167,14 +217,13 @@ export function useMouse() {
 }
 
 export const selectors = {
-    activeResource: {
-        is: (type: ResourceType) => {
-            return useSelector((state) => state.activeResource?.type) === type
+    activeLayer: {
+        is: (type: LayerType) => {
+            return useSelector((state) => state.activeLayer?.type) === type
         },
         palette: () => {
             return useSelector((state) => {
-                // @ts-expect-error
-                return state.activeResource?.palette as Palette | undefined
+                return state.activeLayer?.palette as Palette | undefined
             })
         },
     },

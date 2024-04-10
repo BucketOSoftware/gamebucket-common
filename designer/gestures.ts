@@ -2,6 +2,9 @@ import { Static, TSchema } from '@sinclair/typebox'
 import { rect } from 'gamebucket'
 import invariant from 'tiny-invariant'
 
+import { entityList } from './types'
+import { RenderCallback } from './state'
+
 export const GESTURE_PHASE = {
     START: 'gesture.start',
     CONTINUE: 'gesture.continue',
@@ -26,10 +29,11 @@ export type PlotHandler<PK> = (
 ) => void
 
 /** @returns An iterable of items within the rect */
-export type SelectHandler<V extends TSchema> = (
+export type SelectHandler<E extends TSchema> = (
     phase: GesturePhase | undefined,
-    selectionArea: rect.Rect | 'all',
-) => Iterable<Static<V>> | void
+    selectionArea: rect.Rect | typeof entityList.EVERYTHING,
+    renderDeferred: (cb?: RenderCallback) => void,
+) => Iterable<Static<E>> | void
 
 const mouseEvents = ['mousedown', 'mousemove', 'mouseup'] as const
 
@@ -96,6 +100,11 @@ export function recognizeGestures(
                 }
                 break
             case 'mouseup':
+                if (!leftButtonDown) {
+                    console.warn(
+                        "Got a mouseUp but we hadn't been tracking the input",
+                    )
+                }
                 invariant((ev.buttons & 1) === 0)
                 mouseInput(
                     GESTURE_PHASE.COMMIT,

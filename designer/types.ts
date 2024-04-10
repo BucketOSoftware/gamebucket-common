@@ -4,6 +4,8 @@ import type { rect } from 'gamebucket'
 
 import invariant from 'tiny-invariant'
 import type { PlotHandler, SelectHandler } from './gestures'
+import { Matrix3 } from 'three'
+import { Metadata, Spatial2D, TileMapLayer } from '../formats/resources'
 
 export const TOOLS = [
     'select',
@@ -16,12 +18,19 @@ export const TOOLS = [
 export type ToolID = (typeof TOOLS)[number]
 
 /** Metadata for resources that can be edited as map layers */
-export type Resource<S extends TSchema> =
-    | TileMapResource<S>
-    | ContinuousMapResource<S>
-    | EntityListResource<S>
+export type Resource = MapHandler & Metadata
+export type ResourceLayer<S extends TSchema> = MapLayerHandler<S>
 
-export type ResourceType = Resource<any>['type']
+interface MapHandler {
+    layers: MapLayerHandler<any>[]
+}
+
+type MapLayerHandler<S extends TSchema> =
+    | TileMapHandler<S>
+    | ContinuousMapHandler<S>
+    | EntityListHandler<S>
+
+export type LayerType = MapLayerHandler<any>['type']
 
 // -----
 // Extra stuff
@@ -31,53 +40,37 @@ export function TVec2(opts?: SchemaOptions) {
     return Type.Tuple([Type.Number(), Type.Number()], opts)
 }
 
-/** Constructor functions for typescript */
-
 // -----
 //
 // -----
-interface ResourceCommon {
-    /** Label shown in the editor. Must be unique.
-     * @todo Make one up if it's not given?
-     */
-    label: string
 
-    /** Matrix to transform the map's local coordinates into world coordinates, suitable for arranging maps in a larger space. TODO: is it necessary? */
-    // worldTransform?: Matrix3
-
-    /** Size of the map in local coordinates */
-    size: rect.Size
-
-    /** Each element of the resource's data matches this schema. Can be a scalar, object, etc. */
-    element: TSchema
+interface DesignerMetadata<T extends TSchema> extends Metadata {
+    /** The resource sans metadata is an array of this. */
+    element: T
 }
 
-export interface TileMapResource<P extends TSchema> extends ResourceCommon {
-    type: 'tile_map'
-    element: P
+export interface TileMapHandler<P extends TSchema> extends DesignerMetadata<P> {
+    type: 'resource/spatial2d/tile_map'
     palette: Palette
 
     plot: PlotHandler<PaletteID>
 }
 
-export function tileMap<P extends TSchema>(r: TileMapResource<P>) {
-    return r
-}
-
-/** TODO: this is kind of theoretical, mostly meant as a look-ahead  */
-interface ContinuousMapResource<P extends TSchema> extends ResourceCommon {
+/**
+ * @todo this is kind of theoretical, mostly meant as a look-ahead  */
+interface ContinuousMapHandler<P extends TSchema> extends DesignerMetadata<P> {
     type: 'continuous_map'
-    element: P
-    // palette: Palette
+    palette: Palette
 
     /** @todo Mostly same as tilemap. But does it apply? */
     plot: PlotHandler<PaletteID>
 }
 
 /** A list of object properties  */
-interface EntityListResource<P extends TSchema> extends ResourceCommon {
-    type: 'object_list'
-    element: P
+export interface EntityListHandler<P extends TSchema>
+    extends DesignerMetadata<P> {
+    type: 'resource/spatial2d/entity_list'
+    // element: P
 
     /** Schema for properties that can be set in the designer. Doesn't have to
      * be the entire entity.
@@ -107,9 +100,20 @@ interface EntityListResource<P extends TSchema> extends ResourceCommon {
     // set: (id: K, property: string, value: any) => void
 }
 
-export function entityList<P extends TSchema>(e: EntityListResource<P>) {
+// --------------
+//  Type helpers
+// --------------
+export function tileMap<P extends TSchema>(r: TileMapHandler<P>) {
+    return r
+}
+
+export function entityList<P extends TSchema>(e: EntityListHandler<P>) {
     return e
 }
+
+/** Special value indicating the select callback should select everything it contains */
+const EVERYTHING = Symbol()
+entityList.EVERYTHING = EVERYTHING
 
 export function validID<T extends object>(
     o: T,
