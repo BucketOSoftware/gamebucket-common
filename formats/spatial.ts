@@ -1,5 +1,6 @@
-import { rect } from 'gamebucket'
 import type { Matrix3Tuple } from 'three'
+
+import * as rect from '../rect'
 import { Metadata, TYPES } from './common'
 
 /** A dataset where elements are located by 2D coordinates, e.g. an area/level.
@@ -15,7 +16,7 @@ export type Map2D = Spatial2D
 
 type Layer2D<S> = TileMapLayer<S> | EntityLayer<S>
 
-/** Generic 2D map layerwith implicit coordinates */
+/** Generic 2D map layer with implicit coordinates, in row-major (?) order */
 export interface TileMapLayer<
     Element = { tile: number },
     K extends string | number = number,

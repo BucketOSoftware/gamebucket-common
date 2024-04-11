@@ -63,7 +63,8 @@ export function mapRange(
     )
 }
 
-/** @todo Don't know if this is the right name for this
+/**
+ * @todo Don't know if this is the right name for this
  * @param value A number in the range of [0, 1] inclusive
  * @param easing An easing function to apply to the input
  * @returns `value` mapped to the range [-1, 1] inclusive
