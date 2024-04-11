@@ -9,7 +9,8 @@ import type { rect } from 'gamebucket'
 
 import invariant from 'tiny-invariant'
 import { Matrix3 } from 'three'
-import { Metadata, Spatial2D, TileMapLayer } from '../formats/resources'
+import { Metadata } from '../formats/resources'
+import { Spatial2D, TileMapLayer } from '../formats/spatial'
 import { GESTURE_PHASE, GesturePhase } from './gestures'
 import { RenderCallback } from './state'
 

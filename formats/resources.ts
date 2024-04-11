@@ -1,9 +1,11 @@
-import { GVec2, rect } from 'gamebucket'
-import { Brand } from 'gamebucket/types'
-import type { Matrix3Tuple, Matrix3, TypedArray } from 'three'
+// import { Static, TSchema, Type } from '@sinclair/typebox'
+import { GVec2 } from 'gamebucket'
+import type { TypedArray } from 'three'
 
-/** "File" formats, or I guess metadata/wrappers so the designer knows how to
- * edit them */
+import { Metadata } from './common'
+import { Spatial2D } from './spatial'
+
+/** "File" formats as they'd exist in memory. Maybe some of them are the s
 
 /** All types supported by designer */
 export type BucketResource =
@@ -13,12 +15,7 @@ export type BucketResource =
     | Equation
     | Song
 
-export interface Metadata {
-    /** where the resource was loaded from, or new/unsaved if undefined */
-    src?: File | URL | string
-    /** If present, a user-facing name for the resource */
-    displayName?: string
-}
+type ResourceTypes = BucketResource['type']
 
 export interface Scene extends Metadata {
     /** MIME-ish? */
@@ -28,11 +25,11 @@ export interface Scene extends Metadata {
 
 /** Change one or more values over time, to be applied to whatever at runtime.
  * Base on the GLTF animation format */
-export interface TimelineAnimation extends Metadata {
+interface TimelineAnimation extends Metadata {
     type: 'resource/timeline'
 }
 
-export interface Equation extends Metadata {
+interface Equation extends Metadata {
     type: 'resource/equation'
     ast: EquationNode
 }
@@ -42,66 +39,8 @@ interface EquationNode {
     cdr: EquationNode[]
 }
 
-// -----
-//  Maps/levels
-// -----
-
-/** A dataset where elements are located by 2D coordinates, e.g. an area/level.
- * Contains layers in a defined order. Extend to add metadata.
- * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size? */
-export interface Spatial2D extends Metadata {
-    type: 'resource/spatial2d'
-    layers: Layer2D[]
-}
-
-export type Map2D = Spatial2D
-
-type Layer2D = TileMapLayer | EntityLayer
-
-/** Generic 2D map layerwith implicit coordinates */
-export interface TileMapLayer<
-    K extends string | number = number,
-    Element extends { tile: K } = { tile: K },
-> {
-    type: 'resource/spatial2d/tile_map'
-    size: rect.Size
-
-    /** Allows a map to have layers with different origins/orientations
-     * @todo Probably just accept integer translations to start, the rest can come later
-     * @default Identity matrix.
-     */
-    worldTransform?: Matrix3Tuple
-
-    /**
-     * Data
-     * @todo Store as struct of arrays, or save that for the actual game?
-     */
-    data: Element[]
-
-    /** The `tile` field of `data` is an array of indexes into this. Can contain
-     * whatever properties are needed to render the map. Could be stored in a
-     * separate shared file. */
-    tileset: Record<K, Tile>
-}
-
-export interface EntityLayer<Element extends {} = {}> {
-    type: 'resource/spatial2d/entity_list'
-
-    /**
-     * Simple array of things. Not even confined to the bounds of the map,
-     * because that may have some function in the game, or they may be temporary,
-     * or whatever
-     */
-    data: Element[]
-}
-
-export interface Tile {
-    /** image source, possibly with rect, e.g. 'backgrounds.png#0,0,16,16' */
-    src: string
-}
-
 /** TODO: make sure this covers different use cases */
-export interface TexturePackerSpriteSheet extends Metadata {
+interface TexturePackerSpriteSheet extends Metadata {
     frames: {
         /** poorly named -- just the identifier for the frame */
         filename: string
@@ -164,7 +103,7 @@ type TexturePackerImageFormat = 'RGBA8888'
 //  Audio
 // -------
 
-export interface Song extends Metadata {
+interface Song extends Metadata {
     type: 'audio/raw+soundbucket'
     /** Uncompressed audio data */
     samples: TypedArray
@@ -186,6 +125,4 @@ export interface Song extends Metadata {
          *  runtime. */
         next?: number
     }[]
-    // if true,
-    loop: boolean
 }

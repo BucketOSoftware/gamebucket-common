@@ -160,7 +160,7 @@ export default class CharacterDisplay {
 
     set canvas(canvas: HTMLCanvasElement) {
         invariant(canvas)
-        console.warn('setting', canvas)
+
         this.drawTarget = canvas
         // this.cellSize = cellSize
         const w = this.cellSize.width * this.viewportSize.width
@@ -424,14 +424,14 @@ export default class CharacterDisplay {
     }
 
     /**
-     * @todo Don't round
      * @param x Normalized coordinate, 0..1
      * @param y Normalized coordinate, 0..1
+     * @returns Fractional coordinate
      */
     cellAtCoordinate(x: number, y: number): GVec2 {
         const { viewportSize, scroll } = this
-        invariant(x >= 0 && x < 1)
-        invariant(y >= 0 && y < 1)
+        invariant(x >= 0 && x <= 1)
+        invariant(y >= 0 && y <= 1)
 
         return {
             x: x * viewportSize.width + scroll.x,

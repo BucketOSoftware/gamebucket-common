@@ -17,8 +17,13 @@ export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
 
 //
 
-
-const mouseEvents = ['mousedown', 'mousemove', 'mouseup'] as const
+const mouseEvents = [
+    'mousedown',
+    'mousemove',
+    'mouseup',
+    'mouseover',
+    'mouseout',
+] as const
 
 export function recognizeGestures(
     dom: HTMLCanvasElement,
@@ -42,6 +47,13 @@ export function recognizeGestures(
         const viewport_y = ev.offsetY / dom.offsetHeight
 
         switch (ev.type) {
+            case 'mouseover':
+                console.warn('EEB', leftButtonDown, ev)
+                break
+            case 'mouseout':
+                leftButtonDown = false
+                console.warn('BUTTONUP', leftButtonDown, ev)
+                break
             case 'mousedown':
                 if (ev.buttons === 1) {
                     invariant(!leftButtonDown)
@@ -60,7 +72,14 @@ export function recognizeGestures(
                 break
             case 'mousemove':
                 if (ev.buttons === 1) {
-                    invariant(leftButtonDown, 'button handling??')
+                    // invariant(leftButtonDown, 'button handling??')
+                    if (!leftButtonDown) {
+                        console.warn(
+                            "We have a held button that we didn't know about",
+                        )
+                    }
+                    leftButtonDown = true
+
                     // drag
                     mouseInput(
                         GESTURE_PHASE.CONTINUE,

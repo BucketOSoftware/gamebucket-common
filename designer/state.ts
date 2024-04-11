@@ -1,18 +1,17 @@
+import { TSchema } from '@sinclair/typebox'
 import { produce } from 'immer'
 import debounce from 'lodash-es/debounce'
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
-import { TSchema } from '@sinclair/typebox'
 
 import * as rect from '../rect'
-import { BucketResource } from '../formats/resources'
 
 import { GESTURE_PHASE, GesturePhase } from './gestures'
 import {
+    Resource as DesignerResource,
     LayerType,
     Palette,
     PaletteID,
-    Resource as DesignerResource,
     ResourceLayer,
     ToolID,
 } from './types'
@@ -60,9 +59,8 @@ export class StateStore {
 
     subscribe = (onStoreChange: () => void) => {
         this.subscribers.add(onStoreChange)
-        return () => {
-            this.subscribers.delete(onStoreChange)
-        }
+
+        return () => this.subscribers.delete(onStoreChange)
     }
 
     private renderFns: RenderCallback[] = []
@@ -83,6 +81,20 @@ export class StateStore {
     createSelector<T = unknown>(selector: (st: DesignerState) => T) {
         return () => selector(this.state)
     }
+
+    // ------
+    //  Actions/Dispatch
+    // ------
+
+    open(resource: DesignerResource) {
+        // TODO: enqueue this instead of doing it right away?
+        this.update((draft) => {
+            draft.openResources = [resource]
+            draft.activeResource = draft.openResources[0]
+        })
+    }
+
+    // ------
 
     update = (callback: (draft: DesignerState) => void | DesignerState) => {
         // TODO?: rollback to old state if the validation fails
@@ -113,7 +125,6 @@ export class StateStore {
             return console.warn('No tool selected', originalEvent)
         }
 
-        // TODO: this seems to work wrong with inverted rects
         const dragArea = rect.fromCorners(
             viewport_x,
             viewport_y,
@@ -152,12 +163,14 @@ export class StateStore {
                     invariant(Array.isArray(selection))
                     this.update((state) => {
                         state.selection = selection
+                        console.log(selection)
                     })
                 }
 
                 break
             case 'create':
                 invariant('create' in activeLayer)
+                console.log(phase)
                 try {
                     invariant(
                         activePaletteItem,

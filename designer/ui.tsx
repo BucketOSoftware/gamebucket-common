@@ -52,8 +52,9 @@ import {
     type ToolID,
 } from './types'
 // include blueprint-icons.css for icon font support
-import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import { recognizeGestures } from './gestures'
+
+import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 
 export function create(domElement: HTMLElement, App: ReactNode) {
     const store = new StateStore()
@@ -292,11 +293,10 @@ function ToolButton(
         children: string | JSX.Element
     }>,
 ) {
-    const tool = useSelector(
-        // @ts-expect-error: maybe we make NONE a key?
-        (st) => st.currentTool[st.activeResource?.type],
-    )
     const update = useUpdate()
+    const layerType = useSelector((st) => st.activeLayer?.type)
+    const tool = useSelector((st) => layerType && st.currentTool[layerType])
+
 
     if (props.disabled) return null
 
@@ -311,11 +311,11 @@ function ToolButton(
             <Button
                 icon={props.icon}
                 large
+                disabled={!layerType}
                 intent={tool === props.id ? 'primary' : 'none'}
                 onClick={() => {
                     update((draft) => {
-                        //@ts-expect-error
-                        draft.currentTool[draft.activeResource?.type] = props.id
+                        draft.currentTool[layerType!] = props.id
                     })
                 }}
             />
@@ -360,36 +360,47 @@ export function DrawTool(props: unknown) {
         </ToolButton>
     )
 }
+import { Check, Default } from '@sinclair/typebox/value'
 
 export function SpawnPointProperties(props: unknown) {
-    const res = useSelector(
+    const layer = useSelector(
         (st) =>
             st.activeLayer?.type === 'resource/spatial2d/entity_list' &&
             st.activeLayer,
     )
 
-    if (!res) {
+    const selection = useSelector((st) => st.selection)
+    if (!(layer && selection.length)) {
         return null
     }
 
-    const formData = { position: [1, 1], type: 'player' }
-
     // TODO: would be very nice to have the real type on this
-    const schema = res.element as TSchema
+    const schema = layer.element
 
-    return (
-        <Section compact elevation={1} title="Entity">
-            <SectionCard>
-                <form>
-                    <FormControl
-                        name="Entity?"
-                        schema={schema}
-                        value={formData}
-                    />
-                </form>
-            </SectionCard>
+    if (selection.length > 1) {
+        if (!Check(schema, selection[0])) {
+            console.warn('Not what we wanted:', selection)
+            return null
+        }
+
+        return (
+            <Section compact elevation={1} title="Entity">
+                <SectionCard>
+                    <form>
+                        <FormControl
+                            name="Entity?"
+                            schema={schema}
+                            value={selection[0]}
+                        />
+                    </form>
+                </SectionCard>
+            </Section>
+        )
+    } else {
+        ;<Section compact elevation={1} title="Entity">
+            <SectionCard>[!] {selection.length} entities selected</SectionCard>
         </Section>
-    )
+    }
 }
 
 function FormControl<T extends TSchema>(props: {
@@ -400,7 +411,7 @@ function FormControl<T extends TSchema>(props: {
 }) {
     const { schema, name, value } = props
     invariant(typeof schema.type === 'string', schema.type)
-    console.warn('schema', schema.type, schema)
+    // console.warn('schema', schema.type, schema)
 
     switch (schema.type) {
         case 'object': {
