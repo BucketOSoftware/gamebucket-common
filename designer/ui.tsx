@@ -6,6 +6,7 @@ import {
     Card,
     CardList,
     CardProps,
+    ControlGroup,
     FormGroup,
     InputGroup,
     NumericInput,
@@ -17,7 +18,15 @@ import {
     Tooltip,
 } from '@blueprintjs/core'
 import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
-import { TArray, TObject, TSchema, Type, type Static } from '@sinclair/typebox'
+import {
+    TNumber,
+    TObject,
+    TSchema,
+    TTuple,
+    ValueGuard,
+    type Static,
+} from '@sinclair/typebox'
+import { TypeGuard } from '@sinclair/typebox/type'
 import {
     MouseEventHandler,
     PropsWithChildren,
@@ -26,14 +35,14 @@ import {
     forwardRef,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from 'react'
-import { Root, createRoot } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import invariant from 'tiny-invariant'
 
-import '@blueprintjs/core/lib/css/blueprint.css'
-import 'normalize.css'
+import { recognizeGestures } from './gestures'
 import {
     DesignerContext,
     StateStore,
@@ -43,18 +52,14 @@ import {
     useStore,
     useUpdate,
 } from './state'
-import {
-    Palette,
-    PaletteID,
-    ResourceLayer,
-    TVec2,
-    type Resource as DesignerResource,
-    type ToolID,
-} from './types'
-// include blueprint-icons.css for icon font support
-import { recognizeGestures } from './gestures'
+import { Palette, PaletteID, ResourceLayer, type ToolID } from './types'
 
+// include blueprint-icons.css for icon font support
+import '@blueprintjs/core/lib/css/blueprint.css'
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
+import { Cast, Check, Convert } from '@sinclair/typebox/value'
+import 'normalize.css'
+import './frontend.css'
 
 export function create(domElement: HTMLElement, App: ReactNode) {
     const store = new StateStore()
@@ -297,7 +302,6 @@ function ToolButton(
     const layerType = useSelector((st) => st.activeLayer?.type)
     const tool = useSelector((st) => layerType && st.currentTool[layerType])
 
-
     if (props.disabled) return null
 
     return (
@@ -360,9 +364,8 @@ export function DrawTool(props: unknown) {
         </ToolButton>
     )
 }
-import { Check, Default } from '@sinclair/typebox/value'
 
-export function SpawnPointProperties(props: unknown) {
+export function PropertiesBox(props: unknown) {
     const layer = useSelector(
         (st) =>
             st.activeLayer?.type === 'resource/spatial2d/entity_list' &&
@@ -378,40 +381,65 @@ export function SpawnPointProperties(props: unknown) {
     const schema = layer.element
 
     if (selection.length > 1) {
-        if (!Check(schema, selection[0])) {
-            console.warn('Not what we wanted:', selection)
-            return null
-        }
-
         return (
             <Section compact elevation={1} title="Entity">
                 <SectionCard>
-                    <form>
-                        <FormControl
-                            name="Entity?"
-                            schema={schema}
-                            value={selection[0]}
-                        />
-                    </form>
+                    [!] {selection.length} entities selected
                 </SectionCard>
             </Section>
         )
     } else {
-        ;<Section compact elevation={1} title="Entity">
-            <SectionCard>[!] {selection.length} entities selected</SectionCard>
-        </Section>
+        const obj = selection[0]
+        if (!Check(schema, obj)) {
+            console.warn('Not what we wanted:', selection)
+            return null
+        }
+
+        // TODO: let the user specify this somehow. We shouldn't know anything about the semantics of the object we're editing
+        const title =
+            ValueGuard.IsObject(obj) && ValueGuard.IsString(obj.type)
+                ? obj.type
+                : 'Entity'
+        return (
+            <Section compact elevation={1} title={title}>
+                <SectionCard>
+                    <form>
+                        <FormControl path={[]} schema={schema} value={obj} />
+                    </form>
+                </SectionCard>
+            </Section>
+        )
     }
 }
 
-function FormControl<T extends TSchema>(props: {
+interface FormControlProps<T extends TSchema> {
+    path: (string | number)[]
     schema: T
-    name: string
     value: Static<T>
-    readonly?: boolean
-}) {
-    const { schema, name, value } = props
-    invariant(typeof schema.type === 'string', schema.type)
-    // console.warn('schema', schema.type, schema)
+}
+
+function FormControl<T extends TSchema>(
+    props: FormControlProps<T> & {
+        readonly?: boolean
+    },
+) {
+    const { schema, value, path = [] } = props
+    invariant(ValueGuard.IsString(schema.type))
+    invariant(Check(schema, value), "Value doesn't match schema")
+
+    if (TypeGuard.IsTuple(schema)) {
+        invariant(ValueGuard.IsArray(value))
+        invariant(schema.items, 'No items in schema?')
+
+        return (
+            <FormControlTuple
+                schema={schema}
+                // name={name}
+                path={path}
+                value={value as []}
+            />
+        )
+    }
 
     switch (schema.type) {
         case 'object': {
@@ -422,7 +450,7 @@ function FormControl<T extends TSchema>(props: {
                 return (
                     <FormControl
                         key={name}
-                        name={name}
+                        path={path.concat(name)}
                         schema={subschema}
                         readonly={schema.required.includes(name)}
                         value={data[name]}
@@ -461,18 +489,17 @@ function FormControl<T extends TSchema>(props: {
             }
             throw new Error("Can't do it")
         case 'array': {
-            const ary = schema as unknown as TArray
-            const isTuple = ary.minItems === ary.maxItems
+            // TODO: exclude versions?
 
-            if (isTuple) {
+            if (TypeGuard.IsTuple(schema)) {
                 // TODO: the actual types
                 // TODO: max, min
-                return (
-                    <FormGroup inline label={schema.title}>
-                        <NumericInput selectAllOnFocus placeholder="0" small />
-                        <NumericInput selectAllOnFocus placeholder="0" small />
-                    </FormGroup>
-                )
+                // const ary = schema as unknown as TArray
+                // invariant()
+                // invariant(Check(schema, value))
+                // invariant(value.length === 2)
+
+                return <></>
             }
             break
         }
@@ -481,15 +508,79 @@ function FormControl<T extends TSchema>(props: {
             invariant(typeof data === 'string')
             return (
                 <FormGroup inline label={schema.title}>
-                    <InputGroup
-                        key={props.name}
-                        value={data}
-                        disabled={props.readonly}
-                    ></InputGroup>
+                    <InputGroup value={data} disabled={props.readonly} />
                 </FormGroup>
             )
         }
     }
 
     throw new Error("Can't do it")
+}
+function FormControlTuple<T extends TTuple>(props: FormControlProps<T>) {
+    const { schema, value, path } = props
+
+    return (
+        <FormGroup label={schema.title ?? path.at(-1)}>
+            <ControlGroup fill>
+                {schema.items?.map((subschema, idx) => (
+                    <FormControlTupleElement
+                        schema={subschema as TNumber}
+                        key={idx}
+                        path={path!.concat(idx)}
+                        value={value[idx]}
+                    />
+                ))}
+            </ControlGroup>
+        </FormGroup>
+    )
+}
+
+function FormControlTupleElement(props: FormControlProps<TNumber>) {
+    const placeholder = '0'
+
+    const { schema, value, path } = props
+
+    const [isValid, setValid] = useState(true)
+    const intent = isValid ? 'none' : 'danger'
+
+    const label = useMemo(
+        () =>
+            schema.title ? (
+                <Tag minimal intent={intent}>
+                    {schema.title}
+                </Tag>
+            ) : undefined,
+        [schema.title, intent],
+    )
+
+    const handler = useCallback(
+        (text: string, target: HTMLInputElement | null) => {
+            invariant(target)
+            const castValue = Convert(schema, text || placeholder)
+            const validity = Check(schema, castValue)
+            setValid(validity)
+            if (validity) {
+                console.log(path, castValue)
+            }
+        },
+        [schema, path],
+    )
+
+    return (
+        // TODO: non-numeric
+        <InputGroup
+            small
+            data-path={JSON.stringify(path)}
+            intent={intent}
+            type="numeric"
+            leftElement={label}
+            fill={false}
+            placeholder={placeholder}
+            defaultValue={String(value)}
+            onValueChange={handler}
+            onBlur={(ev) => {
+                console.log('I blur:', ev)
+            }}
+        />
+    )
 }

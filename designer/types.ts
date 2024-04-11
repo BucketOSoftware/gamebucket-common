@@ -1,5 +1,8 @@
 import {
+    NumberOptions,
     Static,
+    TNumber,
+    TTuple,
     Type,
     type SchemaOptions,
     type TSchema,
@@ -9,10 +12,10 @@ import type { rect } from 'gamebucket'
 
 import invariant from 'tiny-invariant'
 import { Matrix3 } from 'three'
-import { Metadata } from '../formats/resources'
 import { Spatial2D, TileMapLayer } from '../formats/spatial'
 import { GESTURE_PHASE, GesturePhase } from './gestures'
 import { RenderCallback } from './state'
+import { Metadata } from '../formats/common'
 
 export const TOOLS = [
     'select',
@@ -43,8 +46,20 @@ export type LayerType = MapLayerHandler<any>['type']
 // Extra stuff
 // -----
 
-export function TVec2(opts?: SchemaOptions) {
-    return Type.Tuple([Type.Number(), Type.Number()], opts)
+const VecTitles = ['x', 'y'] as const
+
+/** @todo Allow user to specify integer, etc.  */
+export function TVec2(
+    tupleOpts?: SchemaOptions,
+    numberOpts: NumberOptions = {},
+) {
+    return Type.Tuple(
+        [
+            Type.Number({ ...numberOpts, title: VecTitles[0] }),
+            Type.Number({ ...numberOpts, title: VecTitles[1] }),
+        ],
+        tupleOpts,
+    )
 }
 
 // -----

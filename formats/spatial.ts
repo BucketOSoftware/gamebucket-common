@@ -44,7 +44,7 @@ export interface TileMapLayer<
 }
 
 export interface EntityLayer<Element> {
-    type: (typeof TYPES)['tileMap']
+    type: (typeof TYPES)['entityList']
 
     /**
      * Simple array of things. Not even confined to the bounds of the map,
