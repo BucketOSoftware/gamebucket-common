@@ -1,11 +1,17 @@
-import { Type, type SchemaOptions, type TSchema } from '@sinclair/typebox'
+import {
+    Static,
+    Type,
+    type SchemaOptions,
+    type TSchema,
+} from '@sinclair/typebox'
 
 import type { rect } from 'gamebucket'
 
 import invariant from 'tiny-invariant'
-import type { PlotHandler, SelectHandler } from './gestures'
 import { Matrix3 } from 'three'
 import { Metadata, Spatial2D, TileMapLayer } from '../formats/resources'
+import { GESTURE_PHASE, GesturePhase } from './gestures'
+import { RenderCallback } from './state'
 
 export const TOOLS = [
     'select',
@@ -79,11 +85,7 @@ export interface EntityListHandler<P extends TSchema>
     palette: Palette<PaletteID>
 
     select: SelectHandler<P>
-    create: (
-        viewport_x: number,
-        viewport_y: number,
-        object_type: PaletteID,
-    ) => void
+    create: CreateHandler
 
     /** Called when the user wants to remove an object from the dataset */
     // delete: (id: K) => void
@@ -164,3 +166,27 @@ interface PaletteEntryIcon {
     /** if true, this item occupies a rectangular area rather than a point */
     area?: boolean
 }
+
+/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1)?, and the value that's been plotted.
+ * @todo what could the return value mean?
+ * @todo make this a two-point thing
+ */
+type PlotHandler<PK> = (
+    phase: Omit<GesturePhase, typeof GESTURE_PHASE.CANCEL>,
+    viewport_x: number,
+    viewport_y: number,
+    value: PK,
+) => void
+
+/** @returns An iterable of items within the rect */
+type SelectHandler<E extends TSchema> = (
+    phase: GesturePhase | undefined,
+    selectionArea: rect.Rect | typeof entityList.EVERYTHING,
+    renderDeferred: (cb?: RenderCallback) => void,
+) => Iterable<Static<E>> | void
+
+type CreateHandler = (
+    viewport_x: number,
+    viewport_y: number,
+    object_type: PaletteID,
+) => void

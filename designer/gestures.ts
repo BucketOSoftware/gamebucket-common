@@ -17,23 +17,6 @@ export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
 
 //
 
-/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1)?, and the value that's been plotted.
- * @todo what could the return value mean?
- * @todo make this a two-point thing
- */
-export type PlotHandler<PK> = (
-    phase: Omit<GesturePhase, typeof GESTURE_PHASE.CANCEL>,
-    x: number,
-    y: number,
-    value: PK,
-) => void
-
-/** @returns An iterable of items within the rect */
-export type SelectHandler<E extends TSchema> = (
-    phase: GesturePhase | undefined,
-    selectionArea: rect.Rect | typeof entityList.EVERYTHING,
-    renderDeferred: (cb?: RenderCallback) => void,
-) => Iterable<Static<E>> | void
 
 const mouseEvents = ['mousedown', 'mousemove', 'mouseup'] as const
 
