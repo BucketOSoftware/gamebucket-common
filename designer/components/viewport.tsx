@@ -6,8 +6,8 @@ import { recognizeGestures } from '../gestures'
 import { useMouse, useSelector, useUpdate } from '../state'
 import { LeaveMeAlone } from './util'
 
-const Canvy = forwardRef<HTMLCanvasElement>(
-    (props: { className?: string }, ref) => {
+const Canvy = forwardRef<HTMLCanvasElement, { className?: string }>(
+    (props, ref) => {
         return (
             <LeaveMeAlone>
                 <canvas
@@ -46,7 +46,7 @@ export function Viewport() {
         // canvas.style.cursor = regCursor
         update((draft) => {
             draft.canvas = canvas
-            draft.overlay = document.createElement('canvas')
+            // draft.overlay = document.createElement('canvas')
         })
 
         const detachGestures = recognizeGestures(canvas, mouse)
@@ -54,7 +54,7 @@ export function Viewport() {
             detachGestures()
             update((draft) => {
                 draft.canvas = null
-                draft.overlay = null
+                // draft.overlay = null
             })
         }
     }, [display.current, resource])
@@ -62,9 +62,7 @@ export function Viewport() {
     return (
         <Section compact title="Viewport">
             <SectionCard>
-                {/* <div className="viewport"> */}
-                <Canvy ref={display} />
-                {/* </div> */}
+                <Canvy ref={display} className="gbk-viewport" />
             </SectionCard>
         </Section>
     )

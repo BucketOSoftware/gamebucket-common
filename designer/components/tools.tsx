@@ -10,6 +10,7 @@ import { PropsWithChildren } from 'react'
 
 import { selectors, useSelector, useUpdate } from '../state'
 import { type ToolID } from '../types'
+import { TYPES } from '../../formats'
 
 export function Toolbar(
     props: PropsWithChildren<{ className: CardProps['className'] }>,
@@ -58,35 +59,26 @@ function ToolButton(
 }
 
 export function CreateTool(props: unknown) {
+    const enabled = useSelector(selectors.activeLayer.is(TYPES.entityList))
+
     return (
-        <ToolButton
-            id="create"
-            icon="new-object"
-            disabled={
-                !selectors.activeLayer.is('resource/spatial2d/entity_list')
-            }
-        >
+        <ToolButton id="create" icon="new-object" disabled={!enabled}>
             New Entity
         </ToolButton>
     )
 }
 
 export function SelectTool(props: unknown) {
+    const enabled = useSelector(selectors.activeLayer.is(TYPES.entityList))
     return (
-        <ToolButton
-            id="select"
-            icon="hand-up"
-            disabled={
-                !selectors.activeLayer.is('resource/spatial2d/entity_list')
-            }
-        >
+        <ToolButton id="select" icon="hand-up" disabled={!enabled}>
             Select
         </ToolButton>
     )
 }
 
 export function DrawTool(props: unknown) {
-    const enabled = selectors.activeLayer.is('resource/spatial2d/tile_map')
+    const enabled = useSelector(selectors.activeLayer.is(TYPES.tileMap))
 
     return (
         <ToolButton id="draw" icon="draw" disabled={!enabled}>

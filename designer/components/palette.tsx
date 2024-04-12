@@ -8,7 +8,9 @@ import { Palette, PaletteID } from '../types'
 /** Display a selection of possible  */
 
 export function PaletteBox(props: unknown) {
-    const palette: Palette<any> | undefined = selectors.activeLayer.palette()
+    const palette: Palette<any> | undefined = useSelector(
+        selectors.activeLayer.palette,
+    )
     if (!palette) return null
 
     let klass = ''

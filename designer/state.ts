@@ -15,6 +15,7 @@ import {
     ResourceLayer,
     ToolID,
 } from './types'
+import { TYPES } from '../formats'
 
 function defaultState() {
     return {
@@ -27,13 +28,22 @@ function defaultState() {
 
         // TODO: load from localStorage?
         currentTool: {
-            ['resource/spatial2d/entity_list']: 'select',
-            ['resource/spatial2d/tile_map']: 'draw',
+            [TYPES.entityList]: 'select',
+            [TYPES.tileMap]: 'draw',
             continuous_map: 'draw',
         } as Record<LayerType, ToolID>,
 
+        /** True if a UI drag is ongoing */
+        dragging: false,
+
+        /** True if the current tool can't be used (no item selected, wrong layer type, etc.) */
+        toolBroken: false,
+
+        /** Objects returned by a hover gesture */
+        hover: [] as Readonly<any[]>,
+
         /** Independent of active layer or what have you */
-        selection: [] as any[],
+        selection: [] as Readonly<any[]>,
 
         canvas: null as HTMLCanvasElement | null,
         overlay: null as HTMLCanvasElement | null,
@@ -78,7 +88,7 @@ export class StateStore {
 
     getSnapshot = () => this.state
 
-    createSelector<T = unknown>(selector: (st: DesignerState) => T) {
+    createSelector<T = unknown>(selector: (st: Readonly<DesignerState>) => T) {
         return () => selector(this.state)
     }
 
@@ -125,6 +135,7 @@ export class StateStore {
             return console.warn('No tool selected', originalEvent)
         }
 
+        // TODO: act as if no area when drag area is too small
         const dragArea = rect.fromCorners(
             viewport_x,
             viewport_y,
@@ -132,14 +143,17 @@ export class StateStore {
             Number.isNaN(begin_y) ? viewport_y : begin_y,
         )
 
-        switch (tool) {
-            case 'draw':
-                invariant('plot' in activeLayer)
-                try {
-                    invariant(
-                        activePaletteItem,
-                        'TODO: disable tool cursor / show feedback if no item is selected',
-                    )
+        this.update((draft) => {
+            draft.dragging = phase === 'gesture.continue'
+            draft.toolBroken = false
+
+            switch (tool) {
+                case 'draw':
+                    invariant('plot' in activeLayer)
+                    if (!activePaletteItem) {
+                        draft.toolBroken = true
+                        break
+                    }
 
                     // TODO: draw a line from the last point to this one
                     activeLayer.plot(
@@ -148,34 +162,33 @@ export class StateStore {
                         viewport_y,
                         activePaletteItem,
                     )
-                } catch (e) {
-                    console.error(e)
-                }
-                break
-            case 'select':
-                invariant('select' in activeLayer)
-                const selection = activeLayer.select(
-                    phase,
-                    dragArea,
-                    this.toolCallback,
-                )
-                if (selection !== undefined) {
-                    invariant(Array.isArray(selection))
-                    this.update((state) => {
-                        state.selection = selection
-                        console.log(selection)
-                    })
-                }
-
-                break
-            case 'create':
-                invariant('create' in activeLayer)
-                console.log(phase)
-                try {
-                    invariant(
-                        activePaletteItem,
-                        'TODO: disable tool cursor/whatever when no item is selected',
+                    break
+                case 'select':
+                    invariant('select' in activeLayer)
+                    const selection = activeLayer.select(
+                        phase,
+                        dragArea,
+                        this.toolCallback,
                     )
+
+                    if (selection !== undefined) {
+                        invariant(Array.isArray(selection))
+                        if (phase === GESTURE_PHASE.HOVER) {
+                            draft.hover = selection
+                        } else {
+                            draft.selection = selection
+                        }
+                        console.log(selection)
+                    }
+
+                    break
+                case 'create':
+                    invariant('create' in activeLayer)
+                    // TODO: provide more feedback that a create has happened. Onscreen log?
+                    if (!activePaletteItem) {
+                        draft.toolBroken = true
+                        break
+                    }
 
                     if (phase === GESTURE_PHASE.START) {
                         activeLayer.create(
@@ -184,13 +197,11 @@ export class StateStore {
                             activePaletteItem,
                         )
                     }
-                } catch (e) {
-                    console.error(e)
-                }
-                break
-            default:
-                console.warn('TODO:', tool)
-        }
+                    break
+                default:
+                    console.warn('TODO:', tool)
+            }
+        })
     }
 
     private notifySubscribers = debounce(() => {
@@ -216,7 +227,7 @@ export function useStore() {
     return useSelector((x) => x)
 }
 
-export function useSelector<T>(selector: (st: DesignerState) => T) {
+export function useSelector<T>(selector: (st: Readonly<DesignerState>) => T) {
     const store = useContext(DesignerContext)
     return useSyncExternalStore(store.subscribe, store.createSelector(selector))
 }
@@ -229,15 +240,40 @@ export function useMouse() {
     return useContext(DesignerContext).handleMouseInput
 }
 
-export const selectors = {
+type SelectorFn<R> = (state: Readonly<DesignerState>) => R
+type SelectorHigherOrderFn<R> = (...args: any[]) => SelectorFn<R>
+interface SelectorBag<R = unknown> {
+    [k: string]: SelectorBag<R> | SelectorFn<R> | SelectorHigherOrderFn<R>
+}
+
+export const selectors = verifySelectors({
     activeLayer: {
-        is: (type: LayerType) => {
-            return useSelector((state) => state.activeLayer?.type) === type
-        },
-        palette: () => {
-            return useSelector((state) => {
-                return state.activeLayer?.palette as Palette | undefined
-            })
+        is: (type: LayerType) => (state: Readonly<DesignerState>) =>
+            state.activeLayer?.type === type,
+
+        palette: (state: Readonly<DesignerState>) => state.activeLayer?.palette,
+    },
+
+    tool: {
+        classes: (state: Readonly<DesignerState>) => {
+            const lay = state.activeLayer
+            let toolClass = lay
+                ? 'gbk-tool-' + state.currentTool[lay.type]
+                : 'gbk-tool-none'
+
+            let broken = state.toolBroken ? 'gbk-tool-no-use' : undefined
+            let dragging = state.dragging ? 'gbk-tool-dragging' : undefined
+            let hovering = state.hover.length ? 'gbk-tool-hovering' : undefined
+
+            // not sure if this will come up, but dragging takes precedence
+            // over hovering
+            const c = [toolClass, broken, dragging || hovering].join(' ')
+            console.warn('c', c)
+            return c
         },
     },
+} as const)
+
+function verifySelectors<T extends SelectorBag>(bag: T): T {
+    return bag
 }

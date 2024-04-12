@@ -150,7 +150,8 @@ export type Palette<
     E extends PaletteEntry = PaletteEntry,
 > = Record<ID, E>
 
-type PaletteEntry = PaletteEntryText | /*PaletteEntryImage |*/ PaletteEntryIcon
+export type PaletteEntry = PaletteEntryText | PaletteEntryIcon
+// | PaletteEntryImage
 
 interface PaletteEntryText {
     icon?: undefined

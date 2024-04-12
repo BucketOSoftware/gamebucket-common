@@ -5,3 +5,31 @@
 #gbk-designer input[type="numeric"] {
     text-align: right;
 }
+
+#gbk-designer .gbk-viewport {
+    cursor: help;
+}
+
+#gbk-designer .gbk-tool-no-use .gbk-viewport {
+    cursor: not-allowed !important;
+}
+
+#gbk-designer .gbk-tool-none .gbk-viewport {
+    cursor: not-allowed;
+}
+
+#gbk-designer .gbk-tool-draw .gbk-viewport {
+    cursor: crosshair;
+}
+
+#gbk-designer .gbk-tool-select .gbk-viewport {
+    cursor: crosshair;
+}
+
+#gbk-designer .gbk-tool-select.gbk-tool-dragging .gbk-viewport {
+    cursor: nwse-resize;
+}
+
+#gbk-designer .gbk-tool-create .gbk-viewport {
+    cursor: copy;
+}
