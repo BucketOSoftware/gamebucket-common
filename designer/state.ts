@@ -5,6 +5,7 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
 import * as rect from '../rect'
+import { LAYER_TYPES } from '../formats'
 
 import { GESTURE_PHASE, GesturePhase } from './gestures'
 import {
@@ -15,7 +16,6 @@ import {
     ResourceLayer,
     ToolID,
 } from './types'
-import { TYPES } from '../formats'
 
 function defaultState() {
     return {
@@ -28,8 +28,8 @@ function defaultState() {
 
         // TODO: load from localStorage?
         currentTool: {
-            [TYPES.entityList]: 'select',
-            [TYPES.tileMap]: 'draw',
+            [LAYER_TYPES.entityList]: 'select',
+            [LAYER_TYPES.tileMap]: 'draw',
             continuous_map: 'draw',
         } as Record<LayerType, ToolID>,
 
@@ -178,7 +178,6 @@ export class StateStore {
                         } else {
                             draft.selection = selection
                         }
-                        console.log(selection)
                     }
 
                     break
@@ -187,6 +186,7 @@ export class StateStore {
                     // TODO: provide more feedback that a create has happened. Onscreen log?
                     if (!activePaletteItem) {
                         draft.toolBroken = true
+                        // return
                         break
                     }
 
@@ -267,9 +267,7 @@ export const selectors = verifySelectors({
 
             // not sure if this will come up, but dragging takes precedence
             // over hovering
-            const c = [toolClass, broken, dragging || hovering].join(' ')
-            console.warn('c', c)
-            return c
+            return [toolClass, broken, dragging || hovering].join(' ')
         },
     },
 } as const)

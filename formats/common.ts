@@ -5,7 +5,7 @@ export interface Metadata {
     displayName?: string
 }
 
-export const TYPES = {
+export const LAYER_TYPES = {
     entityList: 'resource/spatial2d/entity_list',
     tileMap: 'resource/spatial2d/tile_map',
 } as const

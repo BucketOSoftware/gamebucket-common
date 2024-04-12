@@ -10,7 +10,7 @@ import { PropsWithChildren } from 'react'
 
 import { selectors, useSelector, useUpdate } from '../state'
 import { type ToolID } from '../types'
-import { TYPES } from '../../formats'
+import { LAYER_TYPES as TYPES } from '../../formats'
 
 export function Toolbar(
     props: PropsWithChildren<{ className: CardProps['className'] }>,

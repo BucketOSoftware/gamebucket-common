@@ -4,7 +4,7 @@ import { ReactNode, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { Check } from '@sinclair/typebox/value'
-import { TYPES } from '../formats'
+import { LAYER_TYPES as TYPES } from '../formats'
 import { FormControl } from './components/forms'
 import { DesignerContext, StateStore, useSelector } from './state'
 

@@ -15,7 +15,7 @@ import { Matrix3 } from 'three'
 import { Spatial2D, TileMapLayer } from '../formats/spatial'
 import { GESTURE_PHASE, GesturePhase } from './gestures'
 import { RenderCallback } from './state'
-import { Metadata } from '../formats/common'
+import { LAYER_TYPES, Metadata } from '../formats/common'
 
 export const TOOLS = [
     'select',
@@ -72,7 +72,7 @@ interface DesignerMetadata<T extends TSchema> extends Metadata {
 }
 
 export interface TileMapHandler<P extends TSchema> extends DesignerMetadata<P> {
-    type: 'resource/spatial2d/tile_map'
+    type: typeof LAYER_TYPES.tileMap
     palette: Palette
 
     plot: PlotHandler<PaletteID>
@@ -91,7 +91,7 @@ interface ContinuousMapHandler<P extends TSchema> extends DesignerMetadata<P> {
 /** A list of object properties  */
 export interface EntityListHandler<P extends TSchema>
     extends DesignerMetadata<P> {
-    type: 'resource/spatial2d/entity_list'
+    type: typeof LAYER_TYPES.entityList
     // element: P
 
     /** Schema for properties that can be set in the designer. Doesn't have to
@@ -121,12 +121,12 @@ export interface EntityListHandler<P extends TSchema>
 // --------------
 //  Type helpers
 // --------------
-export function tileMap<P extends TSchema>(r: TileMapHandler<P>) {
-    return r
+export function tileMap<P extends TSchema>(handler: TileMapHandler<P>) {
+    return handler
 }
 
-export function entityList<P extends TSchema>(e: EntityListHandler<P>) {
-    return e
+export function entityList<P extends TSchema>(handler: EntityListHandler<P>) {
+    return handler
 }
 
 /** Special value indicating the select callback should select everything it contains */
@@ -197,7 +197,7 @@ type PlotHandler<PK> = (
 
 /** @returns An iterable of items within the rect */
 type SelectHandler<E extends TSchema> = (
-    phase: GesturePhase | undefined,
+    phase: GesturePhase,
     selectionArea: rect.Rect | typeof entityList.EVERYTHING,
     renderDeferred: (cb?: RenderCallback) => void,
 ) => Iterable<Static<E>> | void

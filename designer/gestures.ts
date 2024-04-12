@@ -51,11 +51,9 @@ export function recognizeGestures(
 
         switch (ev.type) {
             case 'mouseover':
-                console.warn('EEB', leftButtonDown, ev)
                 break
             case 'mouseout':
                 leftButtonDown = false
-                console.warn('BUTTONUP', leftButtonDown, ev)
                 break
             case 'mousedown':
                 if (ev.buttons === 1) {
