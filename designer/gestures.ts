@@ -1,9 +1,6 @@
-import { Static, TSchema } from '@sinclair/typebox'
-import { rect } from 'gamebucket'
 import invariant from 'tiny-invariant'
 
-import { entityList } from './types'
-import { RenderCallback } from './state'
+export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
 
 export const GESTURE_PHASE = {
     START: 'gesture.start',
@@ -13,10 +10,6 @@ export const GESTURE_PHASE = {
     HOVER: 'gesture.hover',
 } as const
 
-export type GesturePhase = (typeof GESTURE_PHASE)[keyof typeof GESTURE_PHASE]
-
-//
-
 const mouseEvents = [
     'mousedown',
     'mousemove',
@@ -25,22 +18,32 @@ const mouseEvents = [
     'mouseout',
 ] as const
 
+type MouseInputCallback = (
+    phase: GesturePhase,
+    viewport_x: number,
+    viewport_y: number,
+    begin_x: number,
+    begin_y: number,
+    originalEvent: MouseEvent,
+) => void
+
+/**
+ * Track mouse inputs on a DOM element and report gesture progress to a callback
+ * @todo Touch inputs
+ * @param [dom]
+ * @param [mouseInput] Called
+ * @returns
+ */
 export function recognizeGestures(
-    dom: HTMLCanvasElement,
-    mouseInput: (
-        phase: GesturePhase,
-        viewport_x: number,
-        viewport_y: number,
-        begin_x: number,
-        begin_y: number,
-        originalEvent: MouseEvent,
-    ) => void,
+    dom: HTMLElement,
+    mouseInput: MouseInputCallback,
 ) {
     let leftButtonDown = false
     let begin_x = NaN
     let begin_y = NaN
-    let last_x = 0
-    let last_y = 0
+    // TODO
+    // // let last_x = 0
+    // let last_y = 0
 
     function mouseHandler(ev: MouseEvent) {
         const viewport_x = ev.offsetX / dom.offsetWidth
@@ -72,12 +75,6 @@ export function recognizeGestures(
                 break
             case 'mousemove':
                 if (ev.buttons === 1) {
-                    // invariant(leftButtonDown, 'button handling??')
-                    if (!leftButtonDown) {
-                        console.warn(
-                            "We have a held button that we didn't know about",
-                        )
-                    }
                     leftButtonDown = true
 
                     // drag
@@ -125,13 +122,14 @@ export function recognizeGestures(
 
     for (let eventType of mouseEvents) {
         // console.log('Attaching', eventType)
-        dom.addEventListener(eventType, mouseHandler)
+        let element = eventType === 'mouseup' ? dom.ownerDocument.body : dom
+        element.addEventListener(eventType, mouseHandler)
     }
 
     return () => {
         for (let eventType of mouseEvents) {
-            // console.log('Removing', eventType)
-            dom.removeEventListener(eventType, mouseHandler)
+            let element = eventType === 'mouseup' ? dom.ownerDocument.body : dom
+            element.removeEventListener(eventType, mouseHandler)
         }
     }
 }

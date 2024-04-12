@@ -1,3 +1,7 @@
+#gbk-designer .flex-shrink {
+    flex: 0 1 auto;
+}
+
 #gbk-designer input[type="numeric"] {
     text-align: right;
 }
