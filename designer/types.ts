@@ -7,13 +7,13 @@ import {
     type SchemaOptions,
     type TSchema,
 } from '@sinclair/typebox'
-
-import type { rect } from 'gamebucket'
-
 import invariant from 'tiny-invariant'
 import { Matrix3 } from 'three'
+
+import type { GVec2, rect } from 'gamebucket'
+
 import { Spatial2D, TileMapLayer } from '../formats/spatial'
-import { GESTURE_PHASE, GesturePhase } from './gestures'
+import { GESTURE_PHASE, GestureInfo, GesturePhase } from './gestures'
 import { RenderCallback } from './state'
 import { LAYER_TYPES, Metadata } from '../formats/common'
 
@@ -184,26 +184,16 @@ interface PaletteEntryIcon {
     area?: boolean
 }
 
-/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1)?, and the value that's been plotted.
+/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1]?, and the value that's been plotted.
  * @todo what could the return value mean?
  * @todo make this a two-point thing
  */
-type PlotHandler<PK> = (
-    phase: Omit<GesturePhase, typeof GESTURE_PHASE.CANCEL>,
-    viewport_x: number,
-    viewport_y: number,
-    value: PK,
-) => void
+type PlotHandler<PK> = (gesture: GestureInfo, value: PK) => void
 
 /** @returns An iterable of items within the rect */
 type SelectHandler<E extends TSchema> = (
-    phase: GesturePhase,
-    selectionArea: rect.Rect | typeof entityList.EVERYTHING,
+    gesture: GestureInfo,
     renderDeferred: (cb?: RenderCallback) => void,
 ) => Iterable<Static<E>> | void
 
-type CreateHandler = (
-    viewport_x: number,
-    viewport_y: number,
-    object_type: PaletteID,
-) => void
+type CreateHandler = (gesture: GestureInfo, object_type: PaletteID) => void

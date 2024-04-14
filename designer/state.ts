@@ -7,7 +7,7 @@ import invariant from 'tiny-invariant'
 import * as rect from '../rect'
 import { LAYER_TYPES } from '../formats'
 
-import { GESTURE_PHASE, GesturePhase } from './gestures'
+import { GESTURE_PHASE, GestureInfo, GesturePhase } from './gestures'
 import {
     Resource as DesignerResource,
     LayerType,
@@ -114,37 +114,25 @@ export class StateStore {
         this.notifySubscribers()
     }
 
-    handleMouseInput = (
-        phase: GesturePhase,
-        viewport_x: number,
-        viewport_y: number,
-        begin_x: number,
-        begin_y: number,
-        originalEvent: MouseEvent,
-    ) => {
+    handleMouseInput = (gesture: GestureInfo) => {
+        invariant(gesture.phase)
+        invariant(gesture.to)
+
         const { activeLayer, currentTool, activePaletteItem } = this.state
+
         if (!activeLayer) {
-            return console.warn(
-                'No layer selected and/or no tool selected',
-                originalEvent,
-            )
+            return console.warn('No layer selected and/or no tool selected')
         }
 
         const tool = currentTool[activeLayer.type]
         if (!tool) {
-            return console.warn('No tool selected', originalEvent)
+            return console.warn('No tool selected')
         }
 
         // TODO: act as if no area when drag area is too small
-        const dragArea = rect.fromCorners(
-            viewport_x,
-            viewport_y,
-            Number.isNaN(begin_x) ? viewport_x : begin_x,
-            Number.isNaN(begin_y) ? viewport_y : begin_y,
-        )
 
         this.update((draft) => {
-            draft.dragging = phase === 'gesture.continue'
+            // draft.dragging = phase === 'gesture.continue'
             draft.toolBroken = false
 
             switch (tool) {
@@ -154,26 +142,19 @@ export class StateStore {
                         draft.toolBroken = true
                         break
                     }
-
                     // TODO: draw a line from the last point to this one
-                    activeLayer.plot(
-                        phase,
-                        viewport_x,
-                        viewport_y,
-                        activePaletteItem,
-                    )
+                    activeLayer.plot(gesture, activePaletteItem)
                     break
                 case 'select':
                     invariant('select' in activeLayer)
                     const selection = activeLayer.select(
-                        phase,
-                        dragArea,
+                        gesture,
                         this.toolCallback,
                     )
 
                     if (selection !== undefined) {
                         invariant(Array.isArray(selection))
-                        if (phase === GESTURE_PHASE.HOVER) {
+                        if (gesture.phase === GESTURE_PHASE.HOVER) {
                             draft.hover = selection
                         } else {
                             draft.selection = selection
@@ -190,13 +171,7 @@ export class StateStore {
                         break
                     }
 
-                    if (phase === GESTURE_PHASE.START) {
-                        activeLayer.create(
-                            viewport_x,
-                            viewport_y,
-                            activePaletteItem,
-                        )
-                    }
+                    activeLayer.create(gesture, activePaletteItem)
                     break
                 default:
                     console.warn('TODO:', tool)

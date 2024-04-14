@@ -23,6 +23,10 @@ export type GVec3 = { x: number; y: number; z: number }
 /** A generic quaternion */
 export type GQuat = { w: number; x: number; y: number; z: number }
 
+export function toTVec2(v: GVec2): TVec2 {
+    return new TVec2(v.x, v.y)
+}
+
 export function toTVec3(v: GVec3): TVec3 {
     return new TVec3(v.x, v.y, v.z)
 }
