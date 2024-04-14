@@ -106,18 +106,18 @@ class MouseEventStack {
             this.reset()
         }
 
-        let dx = (info.to?.x || NaN) - (info.from?.x || NaN)
-        let dy = (info.to?.y || NaN) - (info.from?.y || NaN)
-
         if (!(phase && info.to)) {
             return
         }
+        let dx = (info.to?.x || NaN) - (info.from?.x || NaN)
+        let dy = (info.to?.y || NaN) - (info.from?.y || NaN)
+        let distSq = dx * dx + dy * dy || 0
 
         return {
             phase,
             from: info.from,
             to: info.to,
-            distSq: dx * dx + dy * dy,
+            distSq,
             held:
                 info.downAt &&
                 (info.upAt

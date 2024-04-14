@@ -1,4 +1,4 @@
-import { GVec2, clamp, grid, rect, roundBy } from 'gamebucket'
+import { GVec2, ZVec2, clamp, grid, rect, roundBy, ZMatrix3 } from 'gamebucket'
 import invariant from 'tiny-invariant'
 import fontImage from './font-12x12'
 
@@ -118,6 +118,16 @@ export default class CharacterDisplay {
 
     public readonly viewportSize: rect.Size
     public readonly magnify: number
+
+    private pixmat = new ZMatrix3()
+    get cellViewMatrix(): ZMatrix3 {
+        let { pixmat, scroll, cellSize } = this
+
+        pixmat = pixmat.makeTranslation(scroll.x, scroll.y)
+        pixmat.scale(cellSize.width, cellSize.height)
+
+        return pixmat
+    }
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -437,6 +447,39 @@ export default class CharacterDisplay {
             x: x * viewportSize.width + scroll.x,
             y: y * viewportSize.height + scroll.y,
         }
+    }
+
+    /**
+     * @param
+     * @param [minimumDiagonal] If the diagonal length of the rect is less than this, the rect returned will have a size of 0
+     * @return The smallest rect in cell coordinates that encloses both cells
+     */
+    rectFromCorners(a: GVec2, b: GVec2, minimumDiagonal = 0): rect.Rect {
+        const p1 = this.cellAtCoordinate(a.x, a.y)
+        const p2 = this.cellAtCoordinate(b.x, b.y)
+
+        const min_x = Math.min(p1.x, p2.x)
+        const min_y = Math.min(p1.y, p2.y)
+        const max_x = Math.max(p1.x, p2.x)
+        const max_y = Math.max(p1.y, p2.y)
+
+        const result = rect.fromCorners(
+            Math.floor(min_x),
+            Math.floor(min_y),
+            Math.ceil(max_x),
+            Math.ceil(max_y),
+        )
+
+        const dx = max_x - min_x
+        const dy = max_y - min_y
+        // TODO?: is this still intuitive with non-square cells
+        const diagonal = Math.sqrt(dx * dx + dy * dy)
+        if (diagonal < minimumDiagonal) {
+            result.width = 0
+            result.height = 0
+        }
+
+        return result
     }
 }
 

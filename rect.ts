@@ -1,5 +1,5 @@
 import { clamp as scalarClamp } from './math'
-import { GVec2 } from './geometry'
+import { GVec2, ZMatrix3, ZVec2 } from './geometry'
 import invariant from 'tiny-invariant'
 
 export interface Size {
@@ -7,7 +7,7 @@ export interface Size {
     height: number
 }
 
-/** A rectangle. `x` and `y` represent the minium coordinate in the rectangle, and `width` and `height` are the size/shape */
+/** An axis-aligned rectangle. `x` and `y` represent the minium coordinate in the rectangle, and `width` and `height` are the size/shape */
 export type Rect = GVec2 & Size
 
 export function build(
@@ -28,6 +28,27 @@ export function fromCorners(x1: number, y1: number, x2: number, y2: number) {
         width: Math.abs(x1 - x2),
         height: Math.abs(y1 - y2),
     }
+}
+
+export function applyMatrix3(
+    matrix: ZMatrix3,
+    rect: Rect,
+    out: Rect = build(0, 0, 0, 0),
+): Rect {
+    // TODO: warn if the matrix has a rotation element?
+    const min = ZVec2(rect.x, rect.y)
+    const max = ZVec2(rect.width, rect.height)
+    max.add(min)
+
+    min.applyMatrix3(matrix)
+    max.applyMatrix3(matrix)
+
+    out.x = min.x
+    out.y = min.y
+    out.width = max.x - min.x
+    out.height = max.y - min.y
+
+    return out
 }
 
 export const area = (size: Size) => size.width * size.height

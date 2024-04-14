@@ -5,6 +5,8 @@ import {
     Vector2 as TVec2,
     Vector3 as TVec3,
 } from 'three'
+export { Matrix3 as ZMatrix3 } from 'three'
+
 import { roundBy, roundToPlaces } from './math'
 
 // This is solely so other code doesn't have to depend on three.js directly
