@@ -6,6 +6,8 @@ export interface Metadata {
 }
 
 export const LAYER_TYPES = {
-    entityList: 'resource/spatial2d/entity_list',
-    tileMap: 'resource/spatial2d/tile_map',
+    ENTITY_LIST: 'resource/spatial2d/entity_list',
+    TILE_MAP: 'resource/spatial2d/tile_map',
 } as const
+
+export type LayerType = (typeof LAYER_TYPES)[keyof typeof LAYER_TYPES]

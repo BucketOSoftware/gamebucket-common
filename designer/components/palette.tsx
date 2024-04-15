@@ -8,7 +8,7 @@ import { Palette, PaletteID } from '../types'
 /** Display a selection of possible  */
 
 export function PaletteBox(props: unknown) {
-    const palette: Palette<any> | undefined = useSelector(
+    const palette: Palette<PaletteID> | undefined = useSelector(
         selectors.activeLayer.palette,
     )
     if (!palette) return null
@@ -33,21 +33,27 @@ export function PaletteBox(props: unknown) {
         </Section>
     )
 }
+
 function PaletteButton(props: { id: PaletteID; item: Palette[number] }) {
     const update = useUpdate()
-    const selected = useSelector((st) => st.activePaletteItem === props.id)
+    const layer = useSelector(selectors.activeLayer.get)
+    const palette = layer.palette
+
+    const selected = useSelector(
+        (st) => st.activePaletteItem.get(palette) === props.id,
+    )
 
     const { id, item } = props
 
     const onClick: MouseEventHandler<HTMLElement> = useCallback(
         (ev) => {
             update((draft) => {
-                draft.activePaletteItem = id
+                draft.activePaletteItem.set(palette, id)
             })
         },
-        [id],
+        [id, palette],
     )
-
+6
     if (item.icon) {
         return (
             <Button active={selected} minimal onClick={onClick}>

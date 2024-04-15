@@ -3,7 +3,8 @@ import { GVec2 } from 'gamebucket'
 import type { TypedArray } from 'three'
 
 import { Metadata } from './common'
-import { Spatial2D } from './spatial'
+import { Layer2D, Spatial2D } from './spatial'
+import { TSchema } from '@sinclair/typebox'
 
 /** "File" formats as they'd exist in memory. Maybe some of them are the s
 
@@ -11,7 +12,7 @@ import { Spatial2D } from './spatial'
 export type BucketResource =
     | Scene
     | TimelineAnimation
-    | Spatial2D
+    | Spatial2D<Layer2D<TSchema>[]>
     | Equation
     | Song
 

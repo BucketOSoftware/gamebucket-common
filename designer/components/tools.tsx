@@ -58,8 +58,9 @@ function ToolButton(
     )
 }
 
+const { supportsCreate, supportsDraw, supportsSelect } = selectors.activeLayer
 export function CreateTool(props: unknown) {
-    const enabled = useSelector(selectors.activeLayer.is(TYPES.entityList))
+    const enabled = useSelector(supportsCreate)
 
     return (
         <ToolButton id="create" icon="new-object" disabled={!enabled}>
@@ -69,7 +70,8 @@ export function CreateTool(props: unknown) {
 }
 
 export function SelectTool(props: unknown) {
-    const enabled = useSelector(selectors.activeLayer.is(TYPES.entityList))
+    const enabled = useSelector(supportsSelect)
+
     return (
         <ToolButton id="select" icon="hand-up" disabled={!enabled}>
             Select
@@ -78,7 +80,7 @@ export function SelectTool(props: unknown) {
 }
 
 export function DrawTool(props: unknown) {
-    const enabled = useSelector(selectors.activeLayer.is(TYPES.tileMap))
+    const enabled = useSelector(supportsDraw)
 
     return (
         <ToolButton id="draw" icon="draw" disabled={!enabled}>

@@ -1,21 +1,15 @@
 import {
     NumberOptions,
     Static,
-    TNumber,
-    TTuple,
     Type,
     type SchemaOptions,
     type TSchema,
 } from '@sinclair/typebox'
 import invariant from 'tiny-invariant'
-import { Matrix3 } from 'three'
 
-import type { GVec2, rect } from 'gamebucket'
-
-import { Spatial2D, TileMapLayer } from '../formats/spatial'
-import { GESTURE_PHASE, GestureInfo, GesturePhase } from './gestures'
+import { LayerType, Metadata } from '../formats/common'
+import { GestureInfo } from './gestures'
 import { RenderCallback } from './state'
-import { LAYER_TYPES, Metadata } from '../formats/common'
 
 export const TOOLS = [
     'select',
@@ -29,21 +23,13 @@ export type ToolID = (typeof TOOLS)[number]
 
 /** Metadata for resources that can be edited as map layers */
 export type Resource = MapHandler & Metadata
-export type ResourceLayer<S extends TSchema> = MapLayerHandler<S>
 
 interface MapHandler {
-    layers: MapLayerHandler<any>[]
+    layers: ResourceAdapter<any, any>[]
 }
 
-type MapLayerHandler<S extends TSchema> =
-    | TileMapHandler<S>
-    | ContinuousMapHandler<S>
-    | EntityListHandler<S>
-
-export type LayerType = MapLayerHandler<any>['type']
-
 // -----
-// Extra stuff
+//  JSON schema "presets"
 // -----
 
 const VecTitles = ['x', 'y'] as const
@@ -62,76 +48,81 @@ export function TVec2(
     )
 }
 
+// -------------------
+// #region Resource adapters
+// -------------------
+
+interface Adapter<E extends TSchema, ID extends PaletteID>
+    extends Record<ToolID, Function> {
+    callbacks: ToolCallbacks<E, ID>
+    displayName?: string
+}
+
+export class ResourceAdapter<
+    E extends TSchema,
+    ID extends PaletteID = PaletteID,
+> implements Adapter<E, ID>
+{
+    callbacks: ToolCallbacks<E, ID> = {}
+    displayName?: string
+
+    constructor(
+        public readonly type: LayerType,
+        public elementSchema: E,
+        public palette: Palette<ID>,
+    ) {
+        console.dir(palette)
+    }
+
+    title(t: string) {
+        this.displayName = t
+        return this
+    }
+
+    select(hand: SelectHandler<E>) {
+        this.callbacks.select = hand
+        return this
+    }
+
+    create(hand: CreateHandler) {
+        this.callbacks.create = hand
+        return this
+    }
+
+    draw(hand: PlotHandler<ID>) {
+        this.callbacks.draw = hand
+        return this
+    }
+}
+
+// ----------------
+//  Tool callbacks
+// ----------------
+
+interface ToolCallbacks<E extends TSchema, ID extends PaletteID> {
+    select?: SelectHandler<E>
+    create?: CreateHandler
+    draw?: PlotHandler<ID>
+}
+
+/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1]?, and the value that's been plotted.
+ * @todo what could the return value mean?
+ * @todo make this a two-point thing
+ */
+type PlotHandler<PK> = (gesture: GestureInfo, value: PK) => void
+
+/** @returns An iterable of items within the rect */
+type SelectHandler<E extends TSchema> = (
+    gesture: GestureInfo,
+    renderDeferred: (cb?: RenderCallback) => void,
+) => Iterable<Static<E>> | void
+
+/** creates a new entity where indicated */
+type CreateHandler = (gesture: GestureInfo, object_type: PaletteID) => void
+
 // -----
-//
+//  Palettes
 // -----
-
-interface DesignerMetadata<T extends TSchema> extends Metadata {
-    /** The resource sans metadata is an array of this. */
-    element: T
-}
-
-export interface TileMapHandler<P extends TSchema> extends DesignerMetadata<P> {
-    type: typeof LAYER_TYPES.tileMap
-    palette: Palette
-
-    plot: PlotHandler<PaletteID>
-}
-
-/**
- * @todo this is kind of theoretical, mostly meant as a look-ahead  */
-interface ContinuousMapHandler<P extends TSchema> extends DesignerMetadata<P> {
-    type: 'continuous_map'
-    palette: Palette
-
-    /** @todo Mostly same as tilemap. But does it apply? */
-    plot: PlotHandler<PaletteID>
-}
-
-/** A list of object properties  */
-export interface EntityListHandler<P extends TSchema>
-    extends DesignerMetadata<P> {
-    type: typeof LAYER_TYPES.entityList
-    // element: P
-
-    /** Schema for properties that can be set in the designer. Doesn't have to
-     * be the entire entity.
-     */
-
-    palette: Palette<PaletteID>
-
-    select: SelectHandler<P>
-    create: CreateHandler
-
-    /** Called when the user wants to remove an object from the dataset */
-    // delete: (id: K) => void
-
-    // /    get: (id: K) => Static<P>
-
-    /**
-     * Callback when the user modified an object property.
-     * @todo better types
-     * @param id Which object has been modified by the user
-     * @param property Which property has been changed
-     * @param value The new value for the property
-     */
-    // set: (id: K, property: string, value: any) => void
-}
-
-// --------------
-//  Type helpers
-// --------------
-export function tileMap<P extends TSchema>(handler: TileMapHandler<P>) {
-    return handler
-}
-
-export function entityList<P extends TSchema>(handler: EntityListHandler<P>) {
-    return handler
-}
-
-/** Special value indicating the select callback should select everything it contains */
-const EVERYTHING = Symbol()
-entityList.EVERYTHING = EVERYTHING
 
 export function validID<T extends object>(
     o: T,
@@ -140,9 +131,6 @@ export function validID<T extends object>(
     invariant(v in o, 'Not a valid key')
 }
 
-// -----
-//  Palettes
-// -----
 export type PaletteID = string | number
 
 export type Palette<
@@ -183,17 +171,3 @@ interface PaletteEntryIcon {
     /** if true, this item occupies a rectangular area rather than a point */
     area?: boolean
 }
-
-/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1]?, and the value that's been plotted.
- * @todo what could the return value mean?
- * @todo make this a two-point thing
- */
-type PlotHandler<PK> = (gesture: GestureInfo, value: PK) => void
-
-/** @returns An iterable of items within the rect */
-type SelectHandler<E extends TSchema> = (
-    gesture: GestureInfo,
-    renderDeferred: (cb?: RenderCallback) => void,
-) => Iterable<Static<E>> | void
-
-type CreateHandler = (gesture: GestureInfo, object_type: PaletteID) => void

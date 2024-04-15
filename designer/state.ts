@@ -1,36 +1,35 @@
 import { TSchema } from '@sinclair/typebox'
-import { produce } from 'immer'
+import { enableMapSet, produce } from 'immer'
 import debounce from 'lodash-es/debounce'
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
-import * as rect from '../rect'
-import { LAYER_TYPES } from '../formats'
+import { LAYER_TYPES, LayerType } from '../formats'
 
-import { GESTURE_PHASE, GestureInfo, GesturePhase } from './gestures'
+import { GESTURE_PHASE, GestureInfo } from './gestures'
 import {
     Resource as DesignerResource,
-    LayerType,
     Palette,
     PaletteID,
-    ResourceLayer,
+    ResourceAdapter,
     ToolID,
 } from './types'
+
+enableMapSet()
 
 function defaultState() {
     return {
         openResources: [] as DesignerResource[],
         activeResource: undefined as DesignerResource | undefined,
         // TODO: need to get ready for the active resource to not be spatial!
-        activeLayer: undefined as ResourceLayer<TSchema> | undefined,
+        activeLayer: undefined as ResourceAdapter<TSchema> | undefined,
 
-        activePaletteItem: null as PaletteID | null,
+        activePaletteItem: new Map<Palette, PaletteID>(),
 
         // TODO: load from localStorage?
         currentTool: {
-            [LAYER_TYPES.entityList]: 'select',
-            [LAYER_TYPES.tileMap]: 'draw',
-            continuous_map: 'draw',
+            [LAYER_TYPES.ENTITY_LIST]: 'select',
+            [LAYER_TYPES.TILE_MAP]: 'draw',
         } as Record<LayerType, ToolID>,
 
         /** True if a UI drag is ongoing */
@@ -101,6 +100,15 @@ export class StateStore {
         this.update((draft) => {
             draft.openResources = [resource]
             draft.activeResource = draft.openResources[0]
+            draft.activeLayer = resource.layers[0]
+
+            // set some defaults so we don't have to deal with nulls
+            for (let layer of resource.layers) {
+                draft.activePaletteItem.set(
+                    layer.palette,
+                    Object.keys(layer.palette)[0],
+                )
+            }
         })
     }
 
@@ -129,25 +137,25 @@ export class StateStore {
             return console.warn('No tool selected')
         }
 
-        // TODO: act as if no area when drag area is too small
-
         this.update((draft) => {
-            // draft.dragging = phase === 'gesture.continue'
             draft.toolBroken = false
+
+            const item = activePaletteItem.get(activeLayer.palette)
 
             switch (tool) {
                 case 'draw':
-                    invariant('plot' in activeLayer)
+                    invariant(activeLayer.callbacks.draw)
+                    invariant(item)
                     if (!activePaletteItem) {
                         draft.toolBroken = true
                         break
                     }
                     // TODO: draw a line from the last point to this one
-                    activeLayer.plot(gesture, activePaletteItem)
+                    activeLayer.callbacks.draw(gesture, item)
                     break
                 case 'select':
-                    invariant('select' in activeLayer)
-                    const selection = activeLayer.select(
+                    invariant(activeLayer.callbacks.select)
+                    const selection = activeLayer.callbacks.select(
                         gesture,
                         this.toolCallback,
                     )
@@ -163,7 +171,8 @@ export class StateStore {
 
                     break
                 case 'create':
-                    invariant('create' in activeLayer)
+                    invariant(activeLayer.callbacks.create)
+                    invariant(item)
                     // TODO: provide more feedback that a create has happened. Onscreen log?
                     if (!activePaletteItem) {
                         draft.toolBroken = true
@@ -171,7 +180,7 @@ export class StateStore {
                         break
                     }
 
-                    activeLayer.create(gesture, activePaletteItem)
+                    activeLayer.callbacks.create(gesture, item)
                     break
                 default:
                     console.warn('TODO:', tool)
@@ -196,7 +205,6 @@ function validate(state: DesignerState) {
 }
 
 export const DesignerContext = createContext(new StateStore())
-// const getAll = (st: DesignerStateType) => st
 
 export function useStore() {
     return useSelector((x) => x)
@@ -225,8 +233,19 @@ export const selectors = verifySelectors({
     activeLayer: {
         is: (type: LayerType) => (state: Readonly<DesignerState>) =>
             state.activeLayer?.type === type,
+        get: (state: Readonly<DesignerState>) =>
+            (state.activeLayer ?? {
+                type: '',
+            }) as unknown as ResourceAdapter<TSchema>,
 
         palette: (state: Readonly<DesignerState>) => state.activeLayer?.palette,
+
+        supportsCreate: (state: Readonly<DesignerState>) =>
+            !!state.activeLayer?.callbacks.create,
+        supportsDraw: (state: Readonly<DesignerState>) =>
+            !!state.activeLayer?.callbacks.draw,
+        supportsSelect: (state: Readonly<DesignerState>) =>
+            !!state.activeLayer?.callbacks.select,
     },
 
     tool: {

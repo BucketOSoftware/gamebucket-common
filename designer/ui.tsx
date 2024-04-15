@@ -3,7 +3,7 @@ import { ValueGuard } from '@sinclair/typebox'
 import { ReactNode, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { Check } from '@sinclair/typebox/value'
+import { Check, Value } from '@sinclair/typebox/value'
 import { LAYER_TYPES as TYPES } from '../formats'
 import { FormControl } from './components/forms'
 import { DesignerContext, StateStore, useSelector } from './state'
@@ -13,6 +13,7 @@ import '@blueprintjs/core/lib/css/blueprint.css'
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import 'normalize.css'
 import './ui.css'
+import invariant from 'tiny-invariant'
 
 export * from './components'
 
@@ -40,7 +41,7 @@ export function create(domElement: HTMLElement, App: ReactNode) {
 
 export function PropertiesBox(props: unknown) {
     const layer = useSelector(
-        (st) => st.activeLayer?.type === TYPES.entityList && st.activeLayer,
+        (st) => st.activeLayer?.type === TYPES.ENTITY_LIST && st.activeLayer,
     )
 
     const selection = useSelector((st) => st.selection)
@@ -49,7 +50,7 @@ export function PropertiesBox(props: unknown) {
     }
 
     // TODO: would be very nice to have the real type on this
-    const schema = layer.element
+    const schema = layer.elementSchema
 
     if (selection.length > 1) {
         return (
@@ -62,7 +63,10 @@ export function PropertiesBox(props: unknown) {
     } else {
         const obj = selection[0]
         if (!Check(schema, obj)) {
-            console.warn('Not what we wanted:', selection)
+            console.warn(
+                'Not what we wanted:',
+                Array.from(Value.Errors(schema, obj)),
+            )
             return null
         }
 
