@@ -89,9 +89,10 @@ const palette = new Uint8Array(256 * 6)
 }
 
 interface Options {
-    viewportSize?: rect.Size
-    magnify?: number
-    tryGL?: boolean
+    viewportSize: rect.Size
+    backgroundSize: rect.Size
+    magnify: number
+    tryGL: boolean
     // font: string | HTMLImageElement
     // glyphSize:
 }
@@ -117,23 +118,25 @@ export default class CharacterDisplay {
     private bytesPerGlyph: number
 
     public readonly viewportSize: rect.Size
+    private bgSize!: rect.Size
     public readonly magnify: number
 
-    private pixmat = new ZMatrix3()
-    get cellViewMatrix(): ZMatrix3 {
-        let { pixmat, scroll, cellSize } = this
-
-        pixmat = pixmat.makeTranslation(scroll.x, scroll.y)
-        pixmat.scale(cellSize.width, cellSize.height)
-
-        return pixmat
-    }
+    tiles!: Uint8Array
+    colors!: Uint8Array
+    sprites: Sprite[] = []
 
     constructor(
         canvas: HTMLCanvasElement,
-        public readonly options: Options,
+        public readonly options: Partial<Options>,
     ) {
         this.viewportSize = options.viewportSize ?? { width: 80, height: 25 }
+        this.resizeBackground(
+            options.backgroundSize ?? {
+                width: 80,
+                height: 25,
+            },
+        )
+
         this.magnify = options.magnify ?? 1
 
         const tryGL = options.tryGL ?? true
@@ -195,11 +198,37 @@ export default class CharacterDisplay {
         invariant(this.ctx, "Couldn't get a drawing context")
     }
 
+    get backgroundSize() {
+        return { ...this.worldBounds }
+    }
+
+    resizeBackground(size: rect.Size) {
+        this.worldBounds.width = size.width
+        this.worldBounds.height = size.height
+
+        const bytesPerArray = rect.area(size)
+        const buffer = new ArrayBuffer(bytesPerArray * 2)
+        this.tiles = new Uint8Array(buffer, 0, bytesPerArray)
+        this.colors = new Uint8Array(buffer, bytesPerArray, bytesPerArray)
+        this.colors.fill(COLOR_WHITE)
+    }
+
+    private pixmat = new ZMatrix3()
+    get cellViewMatrix(): ZMatrix3 {
+        let { pixmat, scroll, cellSize } = this
+
+        pixmat = pixmat.makeTranslation(scroll.x, scroll.y)
+        pixmat.scale(cellSize.width, cellSize.height)
+
+        return pixmat
+    }
+
     setMagnify(magnify: number) {
         const canvas = this.drawTarget
         canvas.style.width = canvas.width * this.magnify + 'px'
         canvas.style.height = canvas.height * this.magnify + 'px'
     }
+
     /** Scroll the given point into the center of the screen, clipped against renderable area */
     centerView(target: GVec2) {
         const { scroll, viewportSize, worldBounds } = this
@@ -239,39 +268,30 @@ export default class CharacterDisplay {
     }
 
     render(
-        {
-            width: backgroundWidth,
-            height: backgroundHeight,
-        }: Readonly<rect.Size>,
-        background: Readonly<Uint8Array | Uint8ClampedArray>,
-        sprites: Readonly<Sprite[]> = [],
-        colors?: Readonly<Uint8Array | Uint8ClampedArray>,
         time?: number, // in ms
         border = COLOR_BG_BLACK,
     ) {
         // console.time('render')
 
-        // TODO: modify this.offset if it would cause us to render subpixel tiles
+        // TODO: modify this.scroll if it would cause us to render subpixel tiles
         const {
             ctx,
+            worldBounds,
             viewportSize: { width: viewportWidth, height: viewportHeight },
             cellSize: { height: cellHeight },
-            worldBounds,
             booleanFont: font,
             pixelBuffer,
             blinkPeriod,
+            tiles,
+            colors,
+            sprites,
         } = this
-        // worldBounds.size = { ...backgroundSize }
-        worldBounds.width = backgroundWidth
-        worldBounds.height = backgroundHeight
         invariant(ctx, 'No context')
         invariant(font, 'No font')
 
         const blinkCycle = BRIGHT_BACKGROUNDS
             ? false
             : !((((time || 0) / blinkPeriod) | 0) % 2)
-
-        // const defaultPaletteEntry =
 
         // TODO: reimplement fractional scrolling, maybe
         this.scroll.x = roundBy(this.scroll.x, 1 / 12)
@@ -287,15 +307,16 @@ export default class CharacterDisplay {
         const colorBuffer = new Uint8Array(viewportWidth)
 
         let outIdx = 0
-        for (let cellY = 0; cellY < viewportHeight; cellY++) {
-            const backgroundRowIdx = (cellY + scrollY) * backgroundWidth
+        let cellY = 0
+        for (cellY = 0; cellY < viewportHeight; cellY++) {
+            const backgroundRowIdx = (cellY + scrollY) * worldBounds.width
             const validRow =
-                cellY + scrollY >= 0 && cellY + scrollY < backgroundHeight
+                cellY + scrollY >= 0 && cellY + scrollY < worldBounds.height
 
             const firstValid = -scrollX
             const lastValidExcl = Math.min(
-                -scrollX + backgroundWidth,
-                backgroundWidth,
+                -scrollX + worldBounds.width,
+                worldBounds.width,
             )
 
             // first, grab the whole array
@@ -304,7 +325,7 @@ export default class CharacterDisplay {
                 const validIndex =
                     validRow && x >= firstValid && x < lastValidExcl
 
-                charBuffer[x] = validIndex ? background[idx] : 0
+                charBuffer[x] = validIndex ? tiles[idx] : 0
                 if (colors) {
                     colorBuffer[x] = validIndex ? colors[idx] : border
                 }
@@ -438,15 +459,21 @@ export default class CharacterDisplay {
      * @param y Normalized coordinate, 0..1
      * @returns Fractional coordinate
      */
-    cellAtCoordinate(x: number, y: number): GVec2 {
+    cellAtCoordinate(x: number, y: number) {
         const { viewportSize, scroll } = this
         invariant(x >= 0 && x <= 1)
         invariant(y >= 0 && y <= 1)
 
-        return {
+        const cell = {
             x: x * viewportSize.width + scroll.x,
             y: y * viewportSize.height + scroll.y,
         }
+
+        if (rect.containsPoint(this.worldBounds, cell)) {
+            return cell
+        }
+
+        return null
     }
 
     /**
@@ -457,6 +484,7 @@ export default class CharacterDisplay {
     rectFromCorners(a: GVec2, b: GVec2, minimumDiagonal = 0): rect.Rect {
         const p1 = this.cellAtCoordinate(a.x, a.y)
         const p2 = this.cellAtCoordinate(b.x, b.y)
+        invariant(p1 && p2, 'Rectangle is out of bounds')
 
         const min_x = Math.min(p1.x, p2.x)
         const min_y = Math.min(p1.y, p2.y)

@@ -151,22 +151,31 @@ export class StateStore {
                         break
                     }
                     // TODO: draw a line from the last point to this one
-                    activeLayer.callbacks.draw(gesture, item)
+                    try {
+                        activeLayer.callbacks.draw(gesture, item)
+                    } catch (e) {
+                        return console.error('Tool callback failed:', e)
+                    }
                     break
                 case 'select':
                     invariant(activeLayer.callbacks.select)
-                    const selection = activeLayer.callbacks.select(
-                        gesture,
-                        this.toolCallback,
-                    )
 
-                    if (selection !== undefined) {
-                        invariant(Array.isArray(selection))
-                        if (gesture.phase === GESTURE_PHASE.HOVER) {
-                            draft.hover = selection
-                        } else {
-                            draft.selection = selection
+                    try {
+                        const selection = activeLayer.callbacks.select(
+                            gesture,
+                            this.toolCallback,
+                        )
+
+                        if (selection !== undefined) {
+                            invariant(Array.isArray(selection))
+                            if (gesture.phase === GESTURE_PHASE.HOVER) {
+                                draft.hover = selection
+                            } else {
+                                draft.selection = selection
+                            }
                         }
+                    } catch (e) {
+                        return console.error('Tool callback failed:', e)
                     }
 
                     break
@@ -180,7 +189,11 @@ export class StateStore {
                         break
                     }
 
-                    activeLayer.callbacks.create(gesture, item)
+                    try {
+                        activeLayer.callbacks.create(gesture, item)
+                    } catch (e) {
+                        console.error('Tool callback failed:', e)
+                    }
                     break
                 default:
                     console.warn('TODO:', tool)
