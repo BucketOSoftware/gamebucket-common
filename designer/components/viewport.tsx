@@ -1,4 +1,4 @@
-import { Section, SectionCard } from '@blueprintjs/core'
+import { Popover, Section, SectionCard } from '@blueprintjs/core'
 import { forwardRef, useEffect, useRef } from 'react'
 import invariant from 'tiny-invariant'
 
@@ -31,22 +31,14 @@ export function Viewport() {
     const resource = useSelector((state) => state.activeResource)
     const mouse = useMouse()
 
-    const display = useRef<HTMLCanvasElement>(null)
+    const canvasRef = useRef<HTMLCanvasElement>(null)
 
     useEffect(() => {
-        const canvas = display.current
+        const canvas = canvasRef.current
         invariant(canvas)
 
-        // const type = resource && resource.type
-        // TODO: set cursors via CSS
-        // let regCursor = ''
-        // if (type === 'tile_map') {
-        //     regCursor = 'crosshair'
-        // }
-        // canvas.style.cursor = regCursor
         update((draft) => {
             draft.canvas = canvas
-            // draft.overlay = document.createElement('canvas')
         })
 
         const detachGestures = recognizeGestures(canvas, mouse)
@@ -54,15 +46,14 @@ export function Viewport() {
             detachGestures()
             update((draft) => {
                 draft.canvas = null
-                // draft.overlay = null
             })
         }
-    }, [display.current, resource])
+    }, [canvasRef.current, resource])
 
     return (
         <Section compact title="Viewport">
             <SectionCard>
-                <Canvy ref={display} className="gbk-viewport" />
+                <Canvy ref={canvasRef} className="gbk-viewport" />
             </SectionCard>
         </Section>
     )

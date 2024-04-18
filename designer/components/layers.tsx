@@ -2,15 +2,13 @@ import { Card, CardList, Section, SectionCard } from '@blueprintjs/core'
 import { forwardRef, useEffect } from 'react'
 
 import { useStore, useUpdate } from '../state'
-import { ResourceLayer } from '../types'
+import invariant from 'tiny-invariant'
+import { ResourceAdapter } from '../types'
+import { TSchema } from '@sinclair/typebox'
 
 export function Layers(props: unknown) {
     const update = useUpdate()
-    const { openResources, activeResource, activeLayer } = useStore()
-
-    if (!activeResource) {
-        return null
-    }
+    const { activeResource, activeLayer } = useStore()
 
     useEffect(() => {
         update((draft) => {
@@ -19,11 +17,11 @@ export function Layers(props: unknown) {
             // } else {
             //     draft.activeResource = openResources[0]
             // }
-            draft.activeLayer = activeResource.layers[0]
+            draft.activeLayer = activeResource?.layers[0]
         })
     }, [activeResource])
 
-    function selectLayer(seek: ResourceLayer<any>) {
+    function selectLayer<S extends TSchema>(seek: ResourceAdapter<S>) {
         return () => {
             update((draft) => {
                 draft.activeLayer = activeResource?.layers.find(
@@ -37,7 +35,7 @@ export function Layers(props: unknown) {
         <Section compact elevation={1} title="Layers" className="sidebar-panel">
             <SectionCard padded={false}>
                 <CardList compact bordered={false}>
-                    {activeResource.layers.map((layer) => {
+                    {activeResource?.layers.map((layer) => {
                         return (
                             <Card
                                 key={layer.displayName}

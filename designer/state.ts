@@ -1,7 +1,13 @@
 import { TSchema } from '@sinclair/typebox'
+import { Cast, Convert } from '@sinclair/typebox/value'
 import { enableMapSet, produce } from 'immer'
 import debounce from 'lodash-es/debounce'
-import { createContext, useContext, useSyncExternalStore } from 'react'
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useSyncExternalStore,
+} from 'react'
 import invariant from 'tiny-invariant'
 
 import { LAYER_TYPES, LayerType } from '../formats'
@@ -9,6 +15,7 @@ import { LAYER_TYPES, LayerType } from '../formats'
 import { GESTURE_PHASE, GestureInfo } from './gestures'
 import {
     Resource as DesignerResource,
+    JSONPatch,
     Palette,
     PaletteID,
     ResourceAdapter,
@@ -39,10 +46,10 @@ function defaultState() {
         toolBroken: false,
 
         /** Objects returned by a hover gesture */
-        hover: [] as Readonly<any[]>,
+        hover: [] as Readonly<unknown[]>,
 
         /** Independent of active layer or what have you */
-        selection: [] as Readonly<any[]>,
+        selection: [] as Readonly<unknown[]>,
 
         canvas: null as HTMLCanvasElement | null,
         overlay: null as HTMLCanvasElement | null,
@@ -140,60 +147,15 @@ export class StateStore {
         this.update((draft) => {
             draft.toolBroken = false
 
-            const item = activePaletteItem.get(activeLayer.palette)
-
             switch (tool) {
                 case 'draw':
-                    invariant(activeLayer.callbacks.draw)
-                    invariant(item)
-                    if (!activePaletteItem) {
-                        draft.toolBroken = true
-                        break
-                    }
-                    // TODO: draw a line from the last point to this one
-                    try {
-                        activeLayer.callbacks.draw(gesture, item)
-                    } catch (e) {
-                        return console.error('Tool callback failed:', e)
-                    }
+                    ToolHandlers.draw(draft, gesture)
                     break
                 case 'select':
-                    invariant(activeLayer.callbacks.select)
-
-                    try {
-                        const selection = activeLayer.callbacks.select(
-                            gesture,
-                            this.toolCallback,
-                        )
-
-                        if (selection !== undefined) {
-                            invariant(Array.isArray(selection))
-                            if (gesture.phase === GESTURE_PHASE.HOVER) {
-                                draft.hover = selection
-                            } else {
-                                draft.selection = selection
-                            }
-                        }
-                    } catch (e) {
-                        return console.error('Tool callback failed:', e)
-                    }
-
+                    ToolHandlers.select(draft, gesture, this.toolCallback)
                     break
                 case 'create':
-                    invariant(activeLayer.callbacks.create)
-                    invariant(item)
-                    // TODO: provide more feedback that a create has happened. Onscreen log?
-                    if (!activePaletteItem) {
-                        draft.toolBroken = true
-                        // return
-                        break
-                    }
-
-                    try {
-                        activeLayer.callbacks.create(gesture, item)
-                    } catch (e) {
-                        console.error('Tool callback failed:', e)
-                    }
+                    ToolHandlers.create(draft, gesture)
                     break
                 default:
                     console.warn('TODO:', tool)
@@ -208,8 +170,98 @@ export class StateStore {
     }, 1000 / 60)
 }
 
+export const ToolHandlers = {
+    draw: (draft: DesignerState, gesture: GestureInfo) => {
+        // TODO: can we safely read from the draft
+        const layer = draft.activeLayer
+        invariant(layer?.callbacks.draw)
+
+        const item = draft.activePaletteItem.get(layer.palette)
+        if (!item) {
+            draft.toolBroken = true
+            return
+        }
+        // TODO: draw a line from the last point to this one
+        try {
+            layer.callbacks.draw(gesture, item)
+        } catch (e) {
+            return console.error('Tool callback failed:', e)
+        }
+        return
+    },
+
+    select: (
+        draft: DesignerState,
+        gesture: GestureInfo,
+        toolCallback: (cb?: RenderCallback | undefined) => void,
+    ) => {
+        const layer = draft.activeLayer
+        invariant(layer?.callbacks.select)
+
+        try {
+            const selection = layer.callbacks.select(gesture, toolCallback)
+
+            if (selection !== undefined) {
+                invariant(Array.isArray(selection))
+                if (gesture.phase === GESTURE_PHASE.HOVER) {
+                    draft.hover = selection
+                } else {
+                    draft.selection = selection
+                }
+            }
+        } catch (e) {
+            return console.error('Tool callback failed:', e)
+        }
+    },
+
+    create: (draft: DesignerState, gesture: GestureInfo) => {
+        const layer = draft.activeLayer
+        invariant(layer?.callbacks.create)
+
+        const item = draft.activePaletteItem.get(layer.palette)
+        if (!item) {
+            draft.toolBroken = true
+            return
+        }
+
+        try {
+            // TODO: provide more feedback that a create has happened. Onscreen log?
+            const created = layer.callbacks.create(gesture, item)
+            if (created) {
+                draft.selection = [created]
+            }
+        } catch (e) {
+            console.error('Tool callback failed:', e)
+        }
+    },
+    update: (draft: DesignerState, diff: JSONPatch) => {
+        const layer = draft.activeLayer
+        invariant(layer?.callbacks.update)
+
+        const item = draft.activePaletteItem.get(layer.palette)
+        if (!item) {
+            draft.toolBroken = true
+            return
+        }
+
+        const obj = draft.selection.length === 1 && draft.selection[0]
+        invariant(obj, 'No object under edit')
+
+        try {
+            const updated = layer.callbacks.update(obj, diff)
+            if (updated) {
+                draft.selection = [updated]
+            }
+        } catch (e) {
+            console.error('Tool callback failed:', e)
+        }
+    },
+} as const
+
+export const handleEntityUpdate = ToolHandlers.update
+
 function validate(state: DesignerState) {
-    const labels = state.openResources.map((n) => n.displayName)
+    const labels = state.activeResource?.layers.map((n) => n.displayName) ?? []
     const uniqLabels = new Set(labels)
     invariant(
         labels.length === uniqLabels.size,
@@ -259,6 +311,8 @@ export const selectors = verifySelectors({
             !!state.activeLayer?.callbacks.draw,
         supportsSelect: (state: Readonly<DesignerState>) =>
             !!state.activeLayer?.callbacks.select,
+        supportsUpdate: (state: Readonly<DesignerState>) =>
+            !!state.activeLayer?.callbacks.update,
     },
 
     tool: {

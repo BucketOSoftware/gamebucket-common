@@ -53,7 +53,10 @@ export interface TileMapLayer<
 }
 
 // export interface EntityLayer<Element> {
-export interface EntityLayer<S extends TSchema> {
+export interface EntityLayer<
+    S extends TSchema,
+    ID extends string | number | symbol = string | number | symbol,
+> {
     type: typeof LAYER_TYPES.ENTITY_LIST
 
     schema: S
@@ -62,5 +65,5 @@ export interface EntityLayer<S extends TSchema> {
      * because that may have some function in the game, or they may be temporary,
      * or whatever
      */
-    data: Static<S>[]
+    data: Record<ID, Static<S>>
 }

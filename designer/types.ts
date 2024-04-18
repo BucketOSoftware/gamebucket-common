@@ -10,14 +10,18 @@ import invariant from 'tiny-invariant'
 import { LayerType, Metadata } from '../formats/common'
 import { GestureInfo } from './gestures'
 import { RenderCallback } from './state'
+import { Value } from '@sinclair/typebox/value'
 
 export const TOOLS = [
+    'draw',
     'select',
     'create',
-    'draw',
+    'update',
     /*'line'*/
     /*'marquee',*/
 ] as const
+
+export type JSONPatch = ReturnType<typeof Value.Diff>
 
 export type ToolID = (typeof TOOLS)[number]
 
@@ -71,7 +75,7 @@ export class ResourceAdapter<
         public elementSchema: E,
         public palette: Palette<ID>,
     ) {
-        console.dir(palette)
+        // console.dir(palette)
     }
 
     title(t: string) {
@@ -84,13 +88,18 @@ export class ResourceAdapter<
         return this
     }
 
-    create(hand: CreateHandler) {
+    create(hand: CreateHandler<E>) {
         this.callbacks.create = hand
         return this
     }
 
     draw(hand: PlotHandler<ID>) {
         this.callbacks.draw = hand
+        return this
+    }
+
+    update(hand: UpdateHandler<E>) {
+        this.callbacks.update = hand
         return this
     }
 }
@@ -101,7 +110,8 @@ export class ResourceAdapter<
 
 interface ToolCallbacks<E extends TSchema, ID extends PaletteID> {
     select?: SelectHandler<E>
-    create?: CreateHandler
+    update?: UpdateHandler<E>
+    create?: CreateHandler<E>
     draw?: PlotHandler<ID>
 }
 
@@ -117,8 +127,16 @@ type SelectHandler<E extends TSchema> = (
     renderDeferred: (cb?: RenderCallback) => void,
 ) => Iterable<Static<E>> | void
 
+type UpdateHandler<E extends TSchema> = (
+    obj: Static<E>,
+    diff: JSONPatch,
+) => Static<E>
+
 /** creates a new entity where indicated */
-type CreateHandler = (gesture: GestureInfo, object_type: PaletteID) => void
+type CreateHandler<E extends TSchema> = (
+    gesture: GestureInfo,
+    object_type: PaletteID,
+) => Static<E> | void
 
 // -----
 //  Palettes

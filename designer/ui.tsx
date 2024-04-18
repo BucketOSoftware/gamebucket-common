@@ -1,19 +1,15 @@
-import { BlueprintProvider, Section, SectionCard } from '@blueprintjs/core'
-import { ValueGuard } from '@sinclair/typebox'
+import { BlueprintProvider } from '@blueprintjs/core'
 import { ReactNode, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import invariant from 'tiny-invariant'
 
-import { Check, Value } from '@sinclair/typebox/value'
-import { LAYER_TYPES as TYPES } from '../formats'
-import { FormControl } from './components/forms'
-import { DesignerContext, StateStore, useSelector } from './state'
+import { DesignerContext, StateStore } from './state'
 
 // include blueprint-icons.css for icon font support
 import '@blueprintjs/core/lib/css/blueprint.css'
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import 'normalize.css'
 import './ui.css'
-import invariant from 'tiny-invariant'
 
 export * from './components'
 
@@ -39,50 +35,4 @@ export function create(domElement: HTMLElement, App: ReactNode) {
     ] as const
 }
 
-export function PropertiesBox(props: unknown) {
-    const layer = useSelector(
-        (st) => st.activeLayer?.type === TYPES.ENTITY_LIST && st.activeLayer,
-    )
 
-    const selection = useSelector((st) => st.selection)
-    if (!(layer && selection.length)) {
-        return null
-    }
-
-    // TODO: would be very nice to have the real type on this
-    const schema = layer.elementSchema
-
-    if (selection.length > 1) {
-        return (
-            <Section compact elevation={1} title="Entity">
-                <SectionCard>
-                    [!] {selection.length} entities selected
-                </SectionCard>
-            </Section>
-        )
-    } else {
-        const obj = selection[0]
-        if (!Check(schema, obj)) {
-            console.warn(
-                'Not what we wanted:',
-                Array.from(Value.Errors(schema, obj)),
-            )
-            return null
-        }
-
-        // TODO: let the user specify this somehow. We shouldn't know anything about the semantics of the object we're editing
-        const title =
-            ValueGuard.IsObject(obj) && ValueGuard.IsString(obj.type)
-                ? obj.type
-                : 'Entity'
-        return (
-            <Section compact elevation={1} title={title}>
-                <SectionCard>
-                    <form>
-                        <FormControl path={[]} schema={schema} value={obj} />
-                    </form>
-                </SectionCard>
-            </Section>
-        )
-    }
-}
