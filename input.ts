@@ -548,7 +548,8 @@ export default class Input<Intent extends string> {
             ev.gamepad.id,
             ev.gamepad.buttons.length,
             ev.gamepad.axes.length,
-            ev.gamepad.hapticActuators,
+            // why did this work before?
+            // ev.gamepad.hapticActuators,
         )
 
         if (this.gamepadIndex !== -1) {
@@ -627,8 +628,6 @@ export default class Input<Intent extends string> {
     // -------
 
     private handleDocFocusChange = (ev: FocusEvent | Event) => {
-        console.warn('FOK', ev.type, ev.target)
-
         if (ev.type === 'focusin') {
             this.lastInteraction = ev.timeStamp
         }
