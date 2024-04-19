@@ -461,8 +461,8 @@ export default class CharacterDisplay {
      */
     cellAtCoordinate(x: number, y: number) {
         const { viewportSize, scroll } = this
-        invariant(x >= 0 && x <= 1)
-        invariant(y >= 0 && y <= 1)
+        invariant(x >= 0 && x <= 1, `X coordinate out of bounds: ${x}`)
+        invariant(y >= 0 && y <= 1, `Y coordinate out of bounds: ${y}`)
 
         const cell = {
             x: x * viewportSize.width + scroll.x,

@@ -258,6 +258,8 @@ export const ToolHandlers = {
     },
 } as const
 
+// function enqueueUpdate(
+
 export const handleEntityUpdate = ToolHandlers.update
 
 function validate(state: DesignerState) {
@@ -278,6 +280,17 @@ export function useStore() {
 export function useSelector<T>(selector: (st: Readonly<DesignerState>) => T) {
     const store = useContext(DesignerContext)
     return useSyncExternalStore(store.subscribe, store.createSelector(selector))
+}
+
+export function useUserSelection() {
+    const store = useContext(DesignerContext)
+
+    return useSyncExternalStore(
+        store.subscribe,
+        store.createSelector((st) =>
+            st.selection.length === 1 ? st.selection[0] : undefined,
+        ),
+    )
 }
 
 export function useUpdate() {

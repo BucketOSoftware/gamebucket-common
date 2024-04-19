@@ -27,23 +27,103 @@ import {
     Value,
     ValuePointer,
 } from '@sinclair/typebox/value'
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+    PropsWithChildren,
+    ReactElement,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react'
 import invariant from 'tiny-invariant'
 import {
     DesignerContext,
     ToolHandlers,
     handleEntityUpdate,
     useUpdate,
+    useUserSelection,
 } from '../state'
+import { debounce } from 'lodash-es'
 
-interface ControlProps<T extends TSchema> {
+interface AggregateControlProps<T extends TSchema, I = string> {
     path: string // JSON pointer
     schema: T
     value: /*Static<T> */ unknown
 }
 
+interface ControlProps<T extends TSchema, I = string>
+    extends AggregateControlProps<T, I> {
+    onChange: (newValue: I) => void
+}
+
+/** Wraps a controlled component and updates the selected object with valid
+ * inputs but still allows invalid inputs  */
+function UpdateSelectionData<S extends TSchema, I = string>(
+    props: AggregateControlProps<S, I> & {
+        element: (props: ControlProps<S, I>) => JSX.Element
+    },
+) {
+    const { path, schema, value: realValue } = props
+
+    const update = useUpdate()
+    const selection = useUserSelection()
+    const [formValue, setFormValue] = useState<I | null>(null)
+
+    useEffect(() => {
+        setFormValue(realValue as I)
+    }, [realValue])
+
+    const updateData = useCallback(
+        debounce(
+            (newValue: unknown) => {
+                const converted = Convert(schema, newValue)
+                if (Check(schema, converted)) {
+                    const diff = {
+                        type: 'update',
+                        path: path,
+                        value: converted,
+                    } as const
+
+                    update((draft) => {
+                        ToolHandlers.update(draft, [diff])
+                    })
+                }
+            },
+            250,
+            { leading: false, trailing: true },
+        ),
+        [selection, path, schema],
+    )
+
+    const onEdit = useCallback(
+        (edited: I) => {
+            // set the value right away
+            setFormValue(edited)
+
+            // if validates, update the actual data
+            updateData(edited)
+        },
+        [path, schema],
+    )
+
+    if (formValue === null) {
+        return null
+    }
+
+    // useUpdateSelected(path, schema)
+    return (
+        <props.element
+            value={formValue}
+            path={path}
+            schema={schema}
+            onChange={onEdit}
+        />
+    )
+}
+
 export function FormControl<T extends TSchema>(
-    props: ControlProps<T> & {
+    props: AggregateControlProps<T> & {
         readonly?: boolean
     },
 ) {
@@ -53,12 +133,14 @@ export function FormControl<T extends TSchema>(
         console.error('Not valid:', Array.from(Value.Errors(schema, value)))
     }
 
-    // TODO: show readonly values in another way (optionally?)
+    // TODO: show readonly or literal values in another way (optionally?)
     if (TypeGuard.IsReadonly(schema)) {
         return null
     }
 
     if (TypeGuard.IsLiteral(schema)) {
+        return null
+
         return (
             <div>
                 {path} : {`${value}`}
@@ -85,7 +167,8 @@ export function FormControl<T extends TSchema>(
     if (TypeGuard.IsUnion(schema)) {
         // Assume it's an enum?
         return (
-            <FormControlMultipleChoice
+            <UpdateSelectionData
+                element={FormControlMultipleChoice<typeof schema>}
                 path={path}
                 value={value}
                 schema={schema}
@@ -96,7 +179,12 @@ export function FormControl<T extends TSchema>(
     if (TypeGuard.IsNumber(schema) || TypeGuard.IsInteger(schema)) {
         if ('minimum' in schema && 'maximum' in schema) {
             return (
-                <FormControlSlider path={path} value={value} schema={schema} />
+                <UpdateSelectionData
+                    element={FormControlSlider}
+                    path={path}
+                    value={value}
+                    schema={schema}
+                />
             )
         }
 
@@ -109,9 +197,7 @@ export function FormControl<T extends TSchema>(
         invariant(ValueGuard.IsArray(value))
         invariant(schema.items, 'No items in schema?')
 
-        return (
-            <FormControlTuple schema={schema} path={path} value={value as []} />
-        )
+        return <FormControlTuple schema={schema} path={path} value={value} />
     }
 
     switch (schema.type) {
@@ -161,7 +247,7 @@ export function FormControl<T extends TSchema>(
 
     console.warn("Don't know how to make a form for: ", path, schema)
 }
-function FormControlTuple<T extends TTuple>(props: ControlProps<T>) {
+function FormControlTuple<T extends TTuple>(props: AggregateControlProps<T>) {
     const { schema, value, path } = props
     invariant(ValueGuard.IsArray(value), 'Expected an array, got: ${value}')
 
@@ -169,9 +255,10 @@ function FormControlTuple<T extends TTuple>(props: ControlProps<T>) {
         <FormGroup label={schema.title ?? path.at(-1)}>
             <ControlGroup fill>
                 {schema.items?.map((subschema, idx) => (
-                    <FormControlTupleElement
-                        schema={subschema as TNumber}
+                    <UpdateSelectionData
+                        element={FormControlTupleElement}
                         key={idx}
+                        schema={subschema as TNumber}
                         path={path + '/' + idx}
                         value={value[idx]}
                     />
@@ -181,8 +268,8 @@ function FormControlTuple<T extends TTuple>(props: ControlProps<T>) {
     )
 }
 
-function FormControlSlider(props: ControlProps<TNumber | TInteger>) {
-    const { schema, value, path } = props
+function FormControlSlider(props: ControlProps<TNumber | TInteger, number>) {
+    const { schema, value, onChange } = props
 
     if (schema.minimum && schema.multipleOf) {
         invariant(
@@ -195,8 +282,6 @@ function FormControlSlider(props: ControlProps<TNumber | TInteger>) {
     // TODO: base this on the number of items we want shown on the slider
     // const labelStepSize = multipleOf ? multipleOf * 4 : undefined
     const labelStepSize = undefined
-
-    const onChange = useUpdateSelected(path, schema)
 
     return (
         <FormGroup label={schema.title}>
@@ -214,47 +299,42 @@ function FormControlSlider(props: ControlProps<TNumber | TInteger>) {
 }
 
 function FormControlMultipleChoice<U extends TUnion>({
-    path,
     value,
     schema,
+    onChange,
 }: ControlProps<U>) {
     invariant(TypeGuard.IsUnionLiteral(schema))
 
     return (
-        <SegmentedControl
-            value={String(value)}
-            intent="primary"
-            options={schema.anyOf.map((opt) => ({
-                label: String(opt.title || opt.const.valueOf()),
-                value: String(opt.const.valueOf()),
-            }))}
-            onValueChange={useUpdateSelected(path, schema)}
-        />
+        <FormGroup label={schema.title}>
+            <SegmentedControl
+                fill
+                value={String(value)}
+                intent="primary"
+                options={schema.anyOf.map((opt) => ({
+                    label: String(opt.title || opt.const.valueOf()),
+                    value: String(opt.const.valueOf()),
+                }))}
+                onValueChange={onChange}
+            />
+        </FormGroup>
     )
 }
 
 function FormControlTupleElement({
     schema,
-    path,
     value,
+    onChange,
 }: ControlProps<TNumber>) {
-    const placeholder = '0'
-
-    // const [isValid, setValid] = useState(true)
-    const [formValue, setFormValue] = useState(String(value))
-
-    useEffect(() => {
-        setFormValue(String(value))
-    }, [value])
-
-    const intent = Check(schema, Convert(schema, formValue)) ? 'none' : 'danger'
-    const update = useUpdateSelected(path, schema)
+    const converted = Convert(schema, value)
+    const valid = Check(schema, converted)
+    const intent = valid ? 'none' : 'danger'
 
     return (
         <InputGroup
             small
             fill
-            // data-path={JSON.stringify(path)}
+            className="right-align"
             intent={intent}
             leftElement={
                 schema.title ? (
@@ -263,47 +343,11 @@ function FormControlTupleElement({
                     </Tag>
                 ) : undefined
             }
-            placeholder={placeholder}
-            value={formValue}
-            // selectAllOnFocus
-            onValueChange={(val, targ) => {
-                const castVal = Convert(schema, val)
-                if (Check(schema, castVal)) {
-                    update(castVal)
-                }
-                // if it's not a reasonable value, we still let it happen as input
-                setFormValue(val)
-                // TODO?: should we not do this if it gets set OK
-            }}
+            value={value as string}
+            onValueChange={onChange}
             onBlur={(ev) => {
                 console.log('I blur:', ev)
             }}
         />
-    )
-}
-
-function useUpdateSelected<I extends string | number, S extends TSchema>(
-    path: string,
-    schema: S,
-) {
-    const { update } = useContext(DesignerContext)
-
-    return useCallback(
-        (v: I) => {
-            // convert the value if it fits the schema, otherwise leave it
-            const castValue = Convert(schema, v)
-            if (Check(schema, castValue)) {
-                update((draft) => {
-                    ToolHandlers.update(draft, [
-                        {
-                            type: 'update',
-                            path: path,
-                            value: castValue,
-                        },
-                    ])
-                })
-            }
-        },
-        [path, schema, update],
     )
 }
