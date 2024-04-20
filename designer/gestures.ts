@@ -158,8 +158,8 @@ class MouseEventStack {
     buttons({ timeStamp, buttons }: MouseEvent) {
         const diff = buttons ^ this.lastButtons
         this.lastButtons = buttons
-
-        for (let btn = 0; btn < 5; btn++) {
+        // FIXME: context menu is ruining everything
+        for (let btn = 0; btn < 1; btn++) {
             const changed = (diff >> btn) & 1
             const newlyDown = (buttons >> btn) & 1
 
@@ -198,7 +198,7 @@ export function recognizeGestures(
                 break
             case 'mouseout':
                 // TODO: handle mouseup outside the element
-                stack.reset()
+                // stack.reset()
                 break
             case 'mousedown':
             case 'mouseup':
@@ -211,6 +211,7 @@ export function recognizeGestures(
                 break
             case 'contextmenu':
                 if (blockContextMenu) {
+                    stack.buttons(ev)
                     ev.preventDefault()
                 } else {
                     console.error(
