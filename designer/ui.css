@@ -1,3 +1,12 @@
+#gbk-designer {
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+
+}
+
+#gbk-designer .bp5-monospace-text {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+}
+
 #gbk-designer .flex-shrink {
     flex: 0 1 auto;
 }
