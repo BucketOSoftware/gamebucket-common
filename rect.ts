@@ -21,13 +21,19 @@ export function build(
     return { x, y, width, height }
 }
 
-export function fromCorners(x1: number, y1: number, x2: number, y2: number) {
-    return {
-        x: Math.min(x1, x2),
-        y: Math.min(y1, y2),
-        width: Math.abs(x1 - x2),
-        height: Math.abs(y1 - y2),
-    }
+export function fromCorners(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    out: Rect = { x: 0, y: 0, width: 0, height: 0 },
+): Rect {
+    out.x = Math.min(x1, x2)
+    out.y = Math.min(y1, y2)
+    out.width = Math.abs(x1 - x2)
+    out.height = Math.abs(y1 - y2)
+
+    return out
 }
 
 export function applyMatrix3(

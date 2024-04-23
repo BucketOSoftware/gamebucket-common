@@ -223,6 +223,14 @@ export default class CharacterDisplay {
         return pixmat
     }
 
+    /** Turn a tile coordinate in world space into a pixel coordinate */
+    worldToScreen(world: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = (world.x - this.scroll.x) * this.cellSize.width
+        out.y = (world.y - this.scroll.y) * this.cellSize.height
+
+        return out
+    }
+
     setMagnify(magnify: number) {
         const canvas = this.drawTarget
         canvas.style.width = canvas.width * this.magnify + 'px'
@@ -476,38 +484,37 @@ export default class CharacterDisplay {
         return null
     }
 
+    gridAlignedCellAt(x: number, y: number) {
+        const c = this.cellAtCoordinate(clamp(x, 0, 1), clamp(y, 0, 1))!
+
+        c.x = c.x | 0
+        c.y = c.y | 0
+
+        return c
+    }
+
     /**
      * @param
      * @param [minimumDiagonal] If the diagonal length of the rect is less than this, the rect returned will have a size of 0
      * @return The smallest rect in cell coordinates that encloses both cells
      */
-    rectFromCorners(a: GVec2, b: GVec2, minimumDiagonal = 0): rect.Rect {
-        const p1 = this.cellAtCoordinate(a.x, a.y)
-        const p2 = this.cellAtCoordinate(b.x, b.y)
+    rectFromCorners(
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number,
+        out: rect.Rect = { x: 0, y: 0, width: 0, height: 0 },
+    ): rect.Rect {
+        const p1 = this.cellAtCoordinate(clamp(x1, 0, 1), clamp(y1, 0, 1))
+        const p2 = this.cellAtCoordinate(clamp(x2, 0, 1), clamp(y2, 0, 1))
         invariant(p1 && p2, 'Rectangle is out of bounds')
 
-        const min_x = Math.min(p1.x, p2.x)
-        const min_y = Math.min(p1.y, p2.y)
-        const max_x = Math.max(p1.x, p2.x)
-        const max_y = Math.max(p1.y, p2.y)
-
-        const result = rect.fromCorners(
-            Math.floor(min_x),
-            Math.floor(min_y),
-            Math.ceil(max_x),
-            Math.ceil(max_y),
+        return rect.fromCorners(
+            Math.floor(Math.min(p1.x, p2.x)),
+            Math.floor(Math.min(p1.y, p2.y)),
+            Math.ceil(Math.max(p1.x, p2.x)),
+            Math.ceil(Math.max(p1.y, p2.y)),
         )
-
-        const dx = max_x - min_x
-        const dy = max_y - min_y
-        // TODO?: is this still intuitive with non-square cells
-        const diagonal = Math.sqrt(dx * dx + dy * dy)
-        if (diagonal < minimumDiagonal) {
-            result.width = 0
-            result.height = 0
-        }
-
-        return result
     }
 }
 

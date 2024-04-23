@@ -1,27 +1,18 @@
-import {
-    NumberOptions,
-    Static,
-    Type,
-    type SchemaOptions,
-    type TSchema,
-} from '@sinclair/typebox'
+import { NumberOptions, Type, type SchemaOptions } from '@sinclair/typebox'
+import { Value } from '@sinclair/typebox/value'
 import invariant from 'tiny-invariant'
 
-import { LayerType, Metadata } from '../formats/common'
-import { GestureInfo } from './gestures'
-import { RenderCallback } from './state'
-import { Value } from '@sinclair/typebox/value'
+import { Metadata } from '../formats/common'
+
+import { ResourceAdapter } from './resource'
 
 export const TOOLS = [
     'draw',
     'select',
     'create',
-    'update',
     /*'line'*/
     /*'marquee',*/
 ] as const
-
-export type JSONPatch = ReturnType<typeof Value.Diff>
 
 export type ToolID = (typeof TOOLS)[number]
 
@@ -56,87 +47,9 @@ export function TVec2(
 // #region Resource adapters
 // -------------------
 
-interface Adapter<E extends TSchema, ID extends PaletteID>
-    extends Record<ToolID, Function> {
-    callbacks: ToolCallbacks<E, ID>
-    displayName?: string
-}
-
-export class ResourceAdapter<
-    E extends TSchema,
-    ID extends PaletteID = PaletteID,
-> implements Adapter<E, ID>
-{
-    callbacks: ToolCallbacks<E, ID> = {}
-    displayName?: string
-
-    constructor(
-        public readonly type: LayerType,
-        public elementSchema: E,
-        public palette: Palette<ID>,
-    ) {
-        // console.dir(palette)
-    }
-
-    title(t: string) {
-        this.displayName = t
-        return this
-    }
-
-    select(hand: SelectHandler<E>) {
-        this.callbacks.select = hand
-        return this
-    }
-
-    create(hand: CreateHandler<E>) {
-        this.callbacks.create = hand
-        return this
-    }
-
-    draw(hand: PlotHandler<ID>) {
-        this.callbacks.draw = hand
-        return this
-    }
-
-    update(hand: UpdateHandler<E>) {
-        this.callbacks.update = hand
-        return this
-    }
-}
-
 // ----------------
 //  Tool callbacks
 // ----------------
-
-interface ToolCallbacks<E extends TSchema, ID extends PaletteID> {
-    select?: SelectHandler<E>
-    update?: UpdateHandler<E>
-    create?: CreateHandler<E>
-    draw?: PlotHandler<ID>
-}
-
-/** called by the editor when this resource is selected and there's a click in the viewport with the pencil tool active, or perhaps a line drawn by a line tool. Params will be the normalized viewport coordinate [0..1]?, and the value that's been plotted.
- * @todo what could the return value mean?
- * @todo make this a two-point thing
- */
-type PlotHandler<PK> = (gesture: GestureInfo, value: PK) => void
-
-/** @returns An iterable of items within the rect */
-type SelectHandler<E extends TSchema> = (
-    gesture: GestureInfo,
-    renderDeferred: (cb?: RenderCallback) => void,
-) => Iterable<Static<E>> | void
-
-type UpdateHandler<E extends TSchema> = (
-    obj: Static<E>,
-    diff: JSONPatch,
-) => Static<E>
-
-/** creates a new entity where indicated */
-type CreateHandler<E extends TSchema> = (
-    gesture: GestureInfo,
-    object_type: PaletteID,
-) => Static<E> | void
 
 // -----
 //  Palettes

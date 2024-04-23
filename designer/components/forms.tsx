@@ -3,7 +3,6 @@ import {
     ControlGroup,
     FormGroup,
     InputGroup,
-    NumericInput,
     SegmentedControl,
     Slider,
     Switch,
@@ -14,37 +13,17 @@ import {
     TUnion,
     TypeGuard,
     ValueGuard,
-    type Static,
     type TNumber,
     type TObject,
     type TSchema,
     type TTuple,
 } from '@sinclair/typebox'
-import {
-    Cast,
-    Check,
-    Convert,
-    Value,
-    ValuePointer,
-} from '@sinclair/typebox/value'
-import {
-    PropsWithChildren,
-    ReactElement,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-} from 'react'
-import invariant from 'tiny-invariant'
-import {
-    DesignerContext,
-    ToolHandlers,
-    handleEntityUpdate,
-    useUpdate,
-    useUserSelection,
-} from '../state'
+import { Check, Convert, Value } from '@sinclair/typebox/value'
 import { debounce } from 'lodash-es'
+import { useCallback, useEffect, useState } from 'react'
+import invariant from 'tiny-invariant'
+
+import { selectors, usePatch, useSelector } from '../state'
 
 interface AggregateControlProps<T extends TSchema, I = string> {
     path: string // JSON pointer
@@ -66,9 +45,8 @@ function UpdateSelectionData<S extends TSchema, I = string>(
 ) {
     const { path, schema, value: realValue } = props
 
-    const update = useUpdate()
-    const selection = useUserSelection()
     const [formValue, setFormValue] = useState<I | null>(null)
+    const patchSelection = usePatch()
 
     useEffect(() => {
         setFormValue(realValue as I)
@@ -79,21 +57,19 @@ function UpdateSelectionData<S extends TSchema, I = string>(
             (newValue: unknown) => {
                 const converted = Convert(schema, newValue)
                 if (Check(schema, converted)) {
-                    const diff = {
-                        type: 'update',
-                        path: path,
-                        value: converted,
-                    } as const
-
-                    update((draft) => {
-                        ToolHandlers.update(draft, [diff])
-                    })
+                    patchSelection([
+                        {
+                            type: 'update',
+                            path: path,
+                            value: converted,
+                        } as const,
+                    ])
                 }
             },
             250,
             { leading: false, trailing: true },
         ),
-        [selection, path, schema],
+        [path, schema],
     )
 
     const onEdit = useCallback(

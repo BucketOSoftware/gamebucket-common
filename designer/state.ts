@@ -1,26 +1,21 @@
-import { TSchema } from '@sinclair/typebox'
-import { Cast, Convert } from '@sinclair/typebox/value'
+import { TSchema, ValueGuard } from '@sinclair/typebox'
+import { GestureKey, Handler } from '@use-gesture/react'
 import { enableMapSet, produce } from 'immer'
 import debounce from 'lodash-es/debounce'
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useSyncExternalStore,
-} from 'react'
+import { createContext, useContext, useSyncExternalStore } from 'react'
 import invariant from 'tiny-invariant'
 
 import { LAYER_TYPES, LayerType } from '../formats'
 
-import { GESTURE_PHASE, GestureInfo } from './gestures'
 import {
     Resource as DesignerResource,
-    JSONPatch,
     Palette,
     PaletteID,
-    ResourceAdapter,
     ToolID,
 } from './types'
+import { GesturePhase, GestureState, phaseFromGesture } from './gestures'
+import { ResourceAdapter } from './resource'
+import { Edit } from '@sinclair/typebox/value'
 
 enableMapSet()
 
@@ -42,6 +37,9 @@ function defaultState() {
         /** True if a UI drag is ongoing */
         dragging: false,
 
+        /** TBD */
+        ongoingGesture: undefined as unknown,
+
         /** True if the current tool can't be used (no item selected, wrong layer type, etc.) */
         toolBroken: false,
 
@@ -52,51 +50,51 @@ function defaultState() {
         selection: [] as Readonly<unknown[]>,
 
         canvas: null as HTMLCanvasElement | null,
-        overlay: null as HTMLCanvasElement | null,
     }
 }
 
 type DesignerState = ReturnType<typeof defaultState>
 
-export type RenderCallback = (store: StateStore) => void
+type DispatchActions = 'select' /*| 'hover' */
+
+export interface ToolContext<T = any> {
+    paletteItem: PaletteID
+    userData: T
+    dispatch: (type: DispatchActions, ...args: any[]) => void
+}
 
 export class StateStore {
-    private state = produce(defaultState(), () => {})
+    constructor(public readonly userData: any) {
+        this.toolContext.userData = userData
+    }
 
     get canvas() {
         return this.state.canvas
     }
-
-    get overlay() {
-        return this.state.overlay
-    }
-
-    private subscribers = new Set<() => void>()
 
     subscribe = (onStoreChange: () => void) => {
         this.subscribers.add(onStoreChange)
 
         return () => this.subscribers.delete(onStoreChange)
     }
-
-    private renderFns: RenderCallback[] = []
-    private toolCallback = (
-        enqueueRender: (store: StateStore) => void = () => {},
-    ) => {
-        this.renderFns = [enqueueRender]
-    }
-
-    renderViewport() {
-        for (let cb of this.renderFns) {
-            cb(this)
-        }
-    }
-
     getSnapshot = () => this.state
 
     createSelector<T = unknown>(selector: (st: Readonly<DesignerState>) => T) {
         return () => selector(this.state)
     }
+
+    /** Anything that needs to be reactive has to go in here */
+    private state = produce(defaultState(), () => {})
+
+    /** Info sent to resources about the state of the designer */
+    private toolContext: ToolContext = {
+        paletteItem: NaN as PaletteID,
+        userData: null,
+        dispatch: (type, ...args: any[]) => {
+            this.queuedActions.push([type, args])
+        },
+    }
+    private subscribers = new Set<() => void>()
 
     // ------
     //  Actions/Dispatch
@@ -129,138 +127,120 @@ export class StateStore {
         this.notifySubscribers()
     }
 
-    handleMouseInput = (gesture: GestureInfo) => {
-        invariant(gesture.phase)
-        invariant(gesture.to)
-
-        const { activeLayer, currentTool, activePaletteItem } = this.state
-
-        if (!activeLayer) {
-            return console.warn('No layer selected and/or no tool selected')
-        }
-
-        const tool = currentTool[activeLayer.type]
-        if (!tool) {
-            return console.warn('No tool selected')
-        }
-
-        this.update((draft) => {
-            draft.toolBroken = false
-
-            switch (tool) {
-                case 'draw':
-                    ToolHandlers.draw(draft, gesture)
-                    break
-                case 'select':
-                    ToolHandlers.select(draft, gesture, this.toolCallback)
-                    break
-                case 'create':
-                    ToolHandlers.create(draft, gesture)
-                    break
-                default:
-                    console.warn('TODO:', tool)
-            }
-        })
-    }
-
     private notifySubscribers = debounce(() => {
         for (let s of this.subscribers) {
             s()
         }
     }, 1000 / 60)
-}
 
-export const ToolHandlers = {
-    draw: (draft: DesignerState, gesture: GestureInfo) => {
-        // TODO: can we safely read from the draft
-        const layer = draft.activeLayer
-        invariant(layer?.callbacks.draw)
+    private queuedActions: any[] = []
+    private drainQueue() {
+        requestAnimationFrame(this.actuallyDrainQueue)
+    }
 
-        const item = draft.activePaletteItem.get(layer.palette)
-        if (!item) {
-            draft.toolBroken = true
+    private actuallyDrainQueue = () => {
+        if (!this.queuedActions.length) {
             return
         }
-        // TODO: draw a line from the last point to this one
-        try {
-            layer.callbacks.draw(gesture, item)
-        } catch (e) {
-            return console.error('Tool callback failed:', e)
-        }
-        return
-    },
 
-    select: (
-        draft: DesignerState,
-        gesture: GestureInfo,
-        toolCallback: (cb?: RenderCallback | undefined) => void,
-    ) => {
-        const layer = draft.activeLayer
-        invariant(layer?.callbacks.select)
+        this.update((draft) => {
+            for (let action of this.queuedActions) {
+                const [type, [arg, ...rest]] = action as [
+                    DispatchActions,
+                    any[],
+                ]
 
-        try {
-            const selection = layer.callbacks.select(gesture, toolCallback)
-
-            if (selection !== undefined) {
-                invariant(Array.isArray(selection))
-                if (gesture.phase === GESTURE_PHASE.HOVER) {
-                    draft.hover = selection
-                } else {
-                    draft.selection = selection
+                switch (type) {
+                    case 'select':
+                        invariant(ValueGuard.IsArray(arg))
+                        draft.selection = arg
                 }
             }
-        } catch (e) {
-            return console.error('Tool callback failed:', e)
-        }
-    },
+        })
 
-    create: (draft: DesignerState, gesture: GestureInfo) => {
-        const layer = draft.activeLayer
-        invariant(layer?.callbacks.create)
+        this.queuedActions.length = 0
+    }
 
-        const item = draft.activePaletteItem.get(layer.palette)
-        if (!item) {
-            draft.toolBroken = true
-            return
-        }
+    /** Apply the given patch to the selected object(s) according to the current layer's update logic.
+     * @todo A little concerned about the layer and selection being implicit */
+    patchElement = (patch: Edit[]) => {
+        const {
+            toolContext,
+            state: { activeLayer, selection },
+        } = this
 
-        try {
-            // TODO: provide more feedback that a create has happened. Onscreen log?
-            const created = layer.callbacks.create(gesture, item)
-            if (created) {
-                draft.selection = [created]
+        const callback = activeLayer?.toolCallbacks.update
+
+        invariant(activeLayer, 'No layer selected')
+        invariant(
+            selection.length === 1,
+            'TODO: multiselect. Too many or too few elements selected',
+        )
+        invariant(callback, 'Selected layer does not support edits')
+
+        // TODO: multiselect
+        callback(selection[0], patch, toolContext)
+    }
+
+    private ongoingPhase: GesturePhase | undefined
+    handleGesture = <G extends 'move' | 'drag'>(
+        gesture: GestureState<G>,
+        type: G,
+    ) => {
+        const {
+            toolContext,
+            state: { activeLayer, currentTool, activePaletteItem },
+        } = this
+
+        invariant(activeLayer, 'No layer selected')
+
+        const tool = currentTool[activeLayer.type]
+        const item = activePaletteItem.get(activeLayer.palette)
+        const callback = activeLayer.toolCallbacks[tool]
+
+        invariant(tool, 'No tool selected')
+        invariant(item, 'No palette item')
+
+        const phase = phaseFromGesture(type, gesture, this.ongoingPhase)
+
+        if (callback && phase) {
+            switch (phase) {
+                case GesturePhase.DragCommit:
+                case GesturePhase.Tap:
+                    this.ongoingPhase = undefined
+                    break
+                case GesturePhase.DragStart:
+                    this.ongoingPhase = phase
+                    break
+                case GesturePhase.DragContinue:
+                    invariant(this.ongoingPhase === GesturePhase.DragStart)
+                    break
+                default:
+                    invariant(
+                        !this.ongoingPhase,
+                        "I didn't understand this code enough I guess",
+                    )
             }
-        } catch (e) {
-            console.error('Tool callback failed:', e)
-        }
-    },
-    update: (draft: DesignerState, diff: JSONPatch) => {
-        const layer = draft.activeLayer
-        invariant(layer?.callbacks.update)
 
-        const item = draft.activePaletteItem.get(layer.palette)
-        if (!item) {
-            draft.toolBroken = true
-            return
-        }
+            toolContext.paletteItem = item
 
-        const obj = draft.selection.length === 1 && draft.selection[0]
-        invariant(obj, 'No object under edit')
+            const memo = callback(phase, gesture, toolContext)
+            this.drainQueue()
+            return memo
+        } else {
+            // We don't have a handler for the gesture, or we should ignore it
+            // This will effectively clobber the memo by not returning anything,
+            // but that's fine?
 
-        try {
-            const updated = layer.callbacks.update(obj, diff)
-            if (updated) {
-                draft.selection = [updated]
+            // TODO: examine this behavior
+            if ('cancel' in gesture) {
+                invariant(typeof gesture.cancel === 'function')
+                gesture.cancel()
+                console.debug('Canceling:', gesture)
             }
-        } catch (e) {
-            console.error('Tool callback failed:', e)
         }
-    },
-} as const
-
-// function enqueueUpdate(
-
-export const handleEntityUpdate = ToolHandlers.update
+    }
+}
 
 function validate(state: DesignerState) {
     const labels = state.activeResource?.layers.map((n) => n.displayName) ?? []
@@ -271,7 +251,7 @@ function validate(state: DesignerState) {
     )
 }
 
-export const DesignerContext = createContext(new StateStore())
+export const DesignerContext = createContext(new StateStore(undefined))
 
 export function useStore() {
     return useSelector((x) => x)
@@ -282,23 +262,16 @@ export function useSelector<T>(selector: (st: Readonly<DesignerState>) => T) {
     return useSyncExternalStore(store.subscribe, store.createSelector(selector))
 }
 
-export function useUserSelection() {
-    const store = useContext(DesignerContext)
-
-    return useSyncExternalStore(
-        store.subscribe,
-        store.createSelector((st) =>
-            st.selection.length === 1 ? st.selection[0] : undefined,
-        ),
-    )
-}
-
 export function useUpdate() {
     return useContext(DesignerContext).update
 }
 
-export function useMouse() {
-    return useContext(DesignerContext).handleMouseInput
+export function usePatch() {
+    return useContext(DesignerContext).patchElement
+}
+
+export function useGestureHandler() {
+    return useContext(DesignerContext).handleGesture
 }
 
 type SelectorFn<R> = (state: Readonly<DesignerState>) => R
@@ -319,13 +292,18 @@ export const selectors = verifySelectors({
         palette: (state: Readonly<DesignerState>) => state.activeLayer?.palette,
 
         supportsCreate: (state: Readonly<DesignerState>) =>
-            !!state.activeLayer?.callbacks.create,
+            !!state.activeLayer?.toolCallbacks.create,
         supportsDraw: (state: Readonly<DesignerState>) =>
-            !!state.activeLayer?.callbacks.draw,
+            !!state.activeLayer?.toolCallbacks.draw,
         supportsSelect: (state: Readonly<DesignerState>) =>
-            !!state.activeLayer?.callbacks.select,
+            !!state.activeLayer?.toolCallbacks.select,
         supportsUpdate: (state: Readonly<DesignerState>) =>
-            !!state.activeLayer?.callbacks.update,
+            !!state.activeLayer?.toolCallbacks.update,
+    },
+
+    selection: {
+        single: (state: Readonly<DesignerState>) =>
+            state.selection.length === 1 ? state.selection[0] : undefined,
     },
 
     tool: {
