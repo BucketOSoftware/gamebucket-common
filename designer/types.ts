@@ -1,5 +1,4 @@
 import { NumberOptions, Type, type SchemaOptions } from '@sinclair/typebox'
-import { Value } from '@sinclair/typebox/value'
 import invariant from 'tiny-invariant'
 
 import { Metadata } from '../formats/common'
@@ -15,13 +14,6 @@ export const TOOLS = [
 ] as const
 
 export type ToolID = (typeof TOOLS)[number]
-
-/** Metadata for resources that can be edited as map layers */
-export type Resource = MapHandler & Metadata
-
-interface MapHandler {
-    layers: ResourceAdapter<any, any>[]
-}
 
 // -----
 //  JSON schema "presets"

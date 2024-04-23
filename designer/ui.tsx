@@ -9,7 +9,13 @@ import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import 'normalize.css'
 
 import { DesignerContext, StateStore } from './state'
+
+export * from './types'
 export * from './components'
+export * from './gestures'
+export { Resource, ResourceAdapter } from './resource'
+export * from './state'
+
 import './ui.css'
 
 export function create(

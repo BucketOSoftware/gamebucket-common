@@ -77,6 +77,7 @@ export function Viewport() {
             transform: normalizeCoordinates,
             eventOptions: { passive: false, capture: true },
             drag: {
+                from: [0, 0],
                 // filterTaps: true,
             },
         },

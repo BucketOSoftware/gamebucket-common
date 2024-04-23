@@ -1,5 +1,5 @@
 import { TSchema, ValueGuard } from '@sinclair/typebox'
-import { GestureKey, Handler } from '@use-gesture/react'
+import { Edit } from '@sinclair/typebox/value'
 import { enableMapSet, produce } from 'immer'
 import debounce from 'lodash-es/debounce'
 import { createContext, useContext, useSyncExternalStore } from 'react'
@@ -7,15 +7,9 @@ import invariant from 'tiny-invariant'
 
 import { LAYER_TYPES, LayerType } from '../formats'
 
-import {
-    Resource as DesignerResource,
-    Palette,
-    PaletteID,
-    ToolID,
-} from './types'
 import { GesturePhase, GestureState, phaseFromGesture } from './gestures'
-import { ResourceAdapter } from './resource'
-import { Edit } from '@sinclair/typebox/value'
+import { Resource as DesignerResource, ResourceAdapter } from './resource'
+import { Palette, PaletteID, ToolID } from './types'
 
 enableMapSet()
 
