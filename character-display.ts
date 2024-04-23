@@ -97,6 +97,22 @@ interface Options {
     // glyphSize:
 }
 
+/**
+ * We end up dealing with different coordinate systems when dealing with this,
+ * so let's get the terminology straight:
+ *  - NORMALIZED coordinates represent a point in the viewport, [0..1) in both
+ *    directions.
+ *  - CELL coordinates represent a point on the screen in fractional cells. [0...viewportSize)
+ *    Not affected by scroll.
+ *  - SCREEN coordinates are pixel coordinates on the canvas, used for drawing.
+ *  - WORLD coordinates represent a point in the world in fractional cells.
+ *    The coordinates of the top-left cell is anything from [0,1). If we want to
+ *    be clear that we're referring to the entire cell, make a
+ *    rect out of the Math.floor() of the coordinates and a width/height of 1.
+ *    These coordinates are the only ones that are relative to the world, not
+ *    the screen!
+ *
+ */
 export default class CharacterDisplay {
     // TODO?: Is this accurate?
     readonly blinkPeriod = 800
@@ -213,14 +229,61 @@ export default class CharacterDisplay {
         this.colors.fill(COLOR_WHITE)
     }
 
-    private pixmat = new ZMatrix3()
-    get cellViewMatrix(): ZMatrix3 {
-        let { pixmat, scroll, cellSize } = this
+    normalizedToCell(norm: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = norm.x * this.viewportSize.width
+        out.y = norm.y * this.viewportSize.height
+        return out
+    }
 
-        pixmat = pixmat.makeTranslation(scroll.x, scroll.y)
-        pixmat.scale(cellSize.width, cellSize.height)
+    normalizedToScreen(norm: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = norm.x * this.viewportSize.width * this.cellSize.width
+        out.y = norm.y * this.viewportSize.height * this.cellSize.height
+        return out
+    }
 
-        return pixmat
+    normalizedToWorld(norm: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = norm.x * this.viewportSize.width + this.scroll.x
+        out.y = norm.y * this.viewportSize.height + this.scroll.y
+        return out
+    }
+
+    /** given two points, return the smallest rect in aligned world coordinates
+     * that contains both points. If both points are the same return a rect of
+     * size 1,1 */
+    normalizedCornersToWorld(
+        a_norm: GVec2,
+        b_norm: GVec2,
+        out: rect.Rect = { x: 0, y: 0, width: 0, height: 0 },
+    ): rect.Rect {
+        const { x: ax, y: ay } = this.normalizedToWorld({
+            x: clamp(a_norm.x, 0, 1),
+            y: clamp(a_norm.y, 0, 1),
+        })
+        const { x: bx, y: by } = this.normalizedToWorld({
+            x: clamp(b_norm.x, 0, 1),
+            y: clamp(b_norm.y, 0, 1),
+        })
+
+        rect.fromCorners(
+            Math.floor(Math.min(ax, bx)),
+            Math.floor(Math.min(ay, by)),
+            Math.ceil(Math.max(ax, bx)),
+            Math.ceil(Math.max(ay, by)),
+            out,
+        )
+        return out
+    }
+
+    cellToScreen(cell: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = cell.x * this.cellSize.width
+        out.y = cell.y * this.cellSize.height
+        return out
+    }
+
+    cellToWorld(cell: GVec2, out: GVec2 = { x: 0, y: 0 }) {
+        out.x = cell.x + this.scroll.x
+        out.y = cell.y + this.scroll.y
+        return out
     }
 
     /** Turn a tile coordinate in world space into a pixel coordinate */
@@ -440,81 +503,6 @@ export default class CharacterDisplay {
             outputIdx += 4
         }
         return outputIdx
-    }
-
-    /**
-     * @todo: this won't work if we've CSS reworked our shit!
-     *
-     * @param x An x coordinate within the canvas
-     * @param y A y coordinate within the canvas
-     * @returns {GVec2} The fractional background coordinate at the given pixel,
-     * which may not be on the actual background */
-    cellAtPixel(x: number, y: number): GVec2 {
-        const {
-            cellSize: { width, height },
-            magnify,
-            scroll,
-        } = this
-
-        return {
-            x: (x - width) / width / magnify + scroll.x,
-            y: (y - height) / height / magnify + scroll.y,
-        }
-    }
-
-    /**
-     * @param x Normalized coordinate, 0..1
-     * @param y Normalized coordinate, 0..1
-     * @returns Fractional coordinate
-     */
-    cellAtCoordinate(x: number, y: number) {
-        const { viewportSize, scroll } = this
-        invariant(x >= 0 && x <= 1, `X coordinate out of bounds: ${x}`)
-        invariant(y >= 0 && y <= 1, `Y coordinate out of bounds: ${y}`)
-
-        const cell = {
-            x: x * viewportSize.width + scroll.x,
-            y: y * viewportSize.height + scroll.y,
-        }
-
-        if (rect.containsPoint(this.worldBounds, cell)) {
-            return cell
-        }
-
-        return null
-    }
-
-    gridAlignedCellAt(x: number, y: number) {
-        const c = this.cellAtCoordinate(clamp(x, 0, 1), clamp(y, 0, 1))!
-
-        c.x = c.x | 0
-        c.y = c.y | 0
-
-        return c
-    }
-
-    /**
-     * @param
-     * @param [minimumDiagonal] If the diagonal length of the rect is less than this, the rect returned will have a size of 0
-     * @return The smallest rect in cell coordinates that encloses both cells
-     */
-    rectFromCorners(
-        x1: number,
-        y1: number,
-        x2: number,
-        y2: number,
-        out: rect.Rect = { x: 0, y: 0, width: 0, height: 0 },
-    ): rect.Rect {
-        const p1 = this.cellAtCoordinate(clamp(x1, 0, 1), clamp(y1, 0, 1))
-        const p2 = this.cellAtCoordinate(clamp(x2, 0, 1), clamp(y2, 0, 1))
-        invariant(p1 && p2, 'Rectangle is out of bounds')
-
-        return rect.fromCorners(
-            Math.floor(Math.min(p1.x, p2.x)),
-            Math.floor(Math.min(p1.y, p2.y)),
-            Math.ceil(Math.max(p1.x, p2.x)),
-            Math.ceil(Math.max(p1.y, p2.y)),
-        )
     }
 }
 

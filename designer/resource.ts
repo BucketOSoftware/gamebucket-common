@@ -1,10 +1,10 @@
 import { Static, TSchema } from '@sinclair/typebox'
 import { Edit } from '@sinclair/typebox/value'
 
-import { LayerType, Metadata } from '../formats'
-import { GestureFn } from './gestures'
-import { ToolContext } from './state'
-import { Palette, PaletteID } from './types'
+import type { LayerType, Metadata } from '../formats'
+import type { GestureFn } from './gestures'
+import type { ToolContext } from './state'
+import type { Palette, PaletteID } from './types'
 
 // export interface Adapter<E extends TSchema, ID extends PaletteID>
 //     extends Record<ToolID, Function> {
@@ -13,7 +13,7 @@ import { Palette, PaletteID } from './types'
 // }
 
 /** Metadata for resources that can be edited as map layers */
-export type Resource = MapHandler & Metadata
+export type DesignerResource = MapHandler & Metadata
 
 interface MapHandler {
     layers: ResourceAdapter<any, any>[]

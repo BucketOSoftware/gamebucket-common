@@ -8,7 +8,7 @@ import invariant from 'tiny-invariant'
 import { LAYER_TYPES, LayerType } from '../formats'
 
 import { GesturePhase, GestureState, phaseFromGesture } from './gestures'
-import { Resource as DesignerResource, ResourceAdapter } from './resource'
+import { DesignerResource, ResourceAdapter } from './resource'
 import { Palette, PaletteID, ToolID } from './types'
 
 enableMapSet()
@@ -54,6 +54,7 @@ type DispatchActions = 'select' /*| 'hover' */
 export interface ToolContext<T = any> {
     paletteItem: PaletteID
     userData: T
+    state: Readonly<DesignerState>
     dispatch: (type: DispatchActions, ...args: any[]) => void
 }
 
@@ -84,6 +85,7 @@ export class StateStore {
     private toolContext: ToolContext = {
         paletteItem: NaN as PaletteID,
         userData: null,
+        state: {} as DesignerState,
         dispatch: (type, ...args: any[]) => {
             this.queuedActions.push([type, args])
         },
@@ -217,6 +219,7 @@ export class StateStore {
             }
 
             toolContext.paletteItem = item
+            toolContext.state = this.state
 
             const memo = callback(phase, gesture, toolContext)
             this.drainQueue()

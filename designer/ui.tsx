@@ -13,7 +13,7 @@ import { DesignerContext, StateStore } from './state'
 export * from './types'
 export * from './components'
 export * from './gestures'
-export { Resource, ResourceAdapter } from './resource'
+export { ResourceAdapter, type DesignerResource } from './resource'
 export * from './state'
 
 import './ui.css'
