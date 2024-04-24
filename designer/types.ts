@@ -1,10 +1,6 @@
 import { NumberOptions, Type, type SchemaOptions } from '@sinclair/typebox'
 import invariant from 'tiny-invariant'
 
-import { Metadata } from '../formats/common'
-
-import { ResourceAdapter } from './resource'
-
 export const TOOLS = [
     'draw',
     'select',

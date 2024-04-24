@@ -3,7 +3,7 @@ import { forwardRef, useEffect } from 'react'
 
 import { useStore, useUpdate } from '../state'
 import invariant from 'tiny-invariant'
-import { ResourceAdapter } from '../types'
+import { ResourceAdapter } from '../resource'
 import { TSchema } from '@sinclair/typebox'
 
 export function Layers(props: unknown) {
