@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 #gbk-designer {
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
 
@@ -17,6 +21,7 @@
 
 #gbk-designer .gbk-viewport {
     cursor: help;
+    background-color: aliceblue;
 }
 
 #gbk-designer .gbk-tool-no-use .gbk-viewport {

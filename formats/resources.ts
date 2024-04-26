@@ -2,36 +2,64 @@
 import { GVec2 } from 'gamebucket'
 import type { TypedArray } from 'three'
 
-import { Metadata } from './common'
-import { Layer2D, Spatial2D } from './spatial'
+import { GenericResource, Metadata, ResourceType } from './common'
+// import {  } from './spatial'
 import { TSchema } from '@sinclair/typebox'
 
-/** "File" formats as they'd exist in memory. Maybe some of them are the s
+export { Spatial2D } from './spatial'
+/** "File" formats as they'd exist in memory. */
+
+/** Resource that contains other resources.
+ * @todo Make specific container types so we can have a Spatial2D container that only contains 2D maps? */
+export namespace Container {
+    type Items = GenericResource.Serialized<ResourceType>[]
+    type Properties = Record<keyof any, any> | void
+
+    export interface Serialized<
+        L extends Items = Items,
+        P extends Properties = Properties,
+    > extends GenericResource.Serialized<ResourceType.Container> {
+        type: ResourceType.Container
+        items: L
+        properties?: P
+    }
+
+    export interface Editable<
+        L extends Items = Items,
+        P extends Properties = Properties,
+        K extends string = string,
+    > extends Omit<Serialized<L, P>, 'items'> {
+        items: Record<K, L[number]>
+        itemOrder: K[]
+    }
+
+    /** @todo */
+    export interface Packed<L extends Items, P extends Properties>
+        extends Serialized<L, P> {}
+}
 
 /** All types supported by designer */
 export type BucketResource =
     | Scene
     | TimelineAnimation
-    | Spatial2D<Layer2D<TSchema>[]>
+    // | Spatial2D<Layer2D<TSchema>[]>
     | Equation
     | Song
 
-type ResourceTypes = BucketResource['type']
+// type ResourceTypes = BucketResource['type']
 
-export interface Scene extends Metadata {
-    /** MIME-ish? */
-    type: 'application/gltf+scenebucket'
+// TODO?: are the types MIME-ish? */
+export interface Scene extends Metadata<ResourceType.Scene> {
     // ...scenebucket...
 }
 
 /** Change one or more values over time, to be applied to whatever at runtime.
  * Base on the GLTF animation format */
-interface TimelineAnimation extends Metadata {
-    type: 'resource/timeline'
+interface TimelineAnimation extends Metadata<ResourceType.Timeline> {
+    // type:
 }
 
-interface Equation extends Metadata {
-    type: 'resource/equation'
+interface Equation extends Metadata<ResourceType.Equation> {
     ast: EquationNode
 }
 
@@ -41,7 +69,7 @@ interface EquationNode {
 }
 
 /** TODO: make sure this covers different use cases */
-interface TexturePackerSpriteSheet extends Metadata {
+interface TexturePackerSpriteSheet extends Metadata<ResourceType.SpriteSheet> {
     frames: {
         /** poorly named -- just the identifier for the frame */
         filename: string
@@ -104,8 +132,7 @@ type TexturePackerImageFormat = 'RGBA8888'
 //  Audio
 // -------
 
-interface Song extends Metadata {
-    type: 'audio/raw+soundbucket'
+interface Song extends Metadata<ResourceType.Song> {
     /** Uncompressed audio data */
     samples: TypedArray
     /** Samples per second */

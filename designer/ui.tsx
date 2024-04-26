@@ -1,42 +1,34 @@
-import { BlueprintProvider } from '@blueprintjs/core'
 import { ReactNode, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import invariant from 'tiny-invariant'
+// import invariant from 'tiny-invariant'
 
-// include blueprint-icons.css for icon font support
-import '@blueprintjs/core/lib/css/blueprint.css'
-import '@blueprintjs/icons/lib/css/blueprint-icons.css'
-import 'normalize.css'
+import { Provider } from 'react-redux'
+import { store } from './state'
 
-import { DesignerContext, StateStore } from './state'
-
-export * from './types'
 export * from './components'
 export * from './gestures'
-export { ResourceAdapter, type DesignerResource } from './resource'
 export * from './state'
+export * from './types'
+export * from './resource'
+
+import { Liaison, LiaisonProvider } from './liaison'
+export { useLiaison } from './liaison'
 
 import './ui.css'
 
-export function create(
-    domElement: HTMLElement,
-    App: ReactNode,
-    userData?: any,
-) {
-    const store = new StateStore(userData)
+export function create(domElement: HTMLElement, App: ReactNode) {
+    const liaison = new Liaison()
     const root = createRoot(domElement)
     root.render(
         <StrictMode>
-            <BlueprintProvider>
-                <DesignerContext.Provider value={store}>
-                    {App}
-                </DesignerContext.Provider>
-            </BlueprintProvider>
+            <Provider store={store}>
+                <LiaisonProvider liaison={liaison}>{App}</LiaisonProvider>
+            </Provider>
         </StrictMode>,
     )
 
     return [
-        store,
+        liaison,
         () => {
             root.unmount()
         },

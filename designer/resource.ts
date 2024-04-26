@@ -1,69 +1,80 @@
-import { Static, TSchema } from '@sinclair/typebox'
-import { Edit } from '@sinclair/typebox/value'
+import { Static, TSchema, TUnknown } from '@sinclair/typebox'
 
-import type { LayerType, Metadata } from '../formats'
-import type { GestureFn } from './gestures'
-import type { ToolContext } from './state'
-import type { Palette, PaletteID } from './types'
+/** TODO: can't remember what the existing type name for this is */
+type ObjectKey = keyof any
 
-// export interface Adapter<E extends TSchema, ID extends PaletteID>
-//     extends Record<ToolID, Function> {
-//     // callbacks: ToolCallbacks<E, ID>
-//     displayName?: string
+// /** @param [K]: ID/key of things that can be placed in the layer */
+// export type Resource<
+//     T extends ResourceType = ResourceType,
+//     E extends TSchema | unknown = unknown,
+//     K extends PaletteID | unknown = unknown,
+// > =
+//     | Layer2D<
+//           E extends TSchema ? E : TUnknown,
+//           K extends PaletteID ? K : string | number
+//       >
+//     | MinimalResource<T>
+
+// export interface MinimalResource<T extends ResourceType = ResourceType>
+//     extends Metadata<T> {}
+
+export type LayerID = ObjectKey
+
+// -----
+//  Palettes
+// -----
+
+// export function validID<T extends object>(
+//     o: T,
+//     v: string | number | symbol,
+// ): asserts v is keyof T {
+//     invariant(v in o, 'Not a valid key')
 // }
 
-/** Metadata for resources that can be edited as map layers */
-export type DesignerResource = MapHandler & Metadata
+export type PaletteID = string
 
-interface MapHandler {
-    layers: ResourceAdapter<any, any>[]
+/** Information on which values are valid for a given property */
+export type Palette<K extends PaletteID = PaletteID> =
+    | PaletteDiscrete<K>
+    | ColorPicker
+
+/** User can select from the given items */
+type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
+
+/** Select an arbitrary color. Use a PaletteDiscrete with swatches to select 
+ * from a specific set of colors */
+interface ColorPicker {
+    // default is false
+    alpha?: boolean
+    value: 'rgbtuple'
 }
 
-export class ResourceAdapter<
-    E extends TSchema,
-    ID extends PaletteID = PaletteID,
-> {
-    displayName?: string
+/** If icon/img/label are all omitted, the entry is considered "nil", i.e. no tile in this location or whatever */
+interface PaletteEntry<K extends PaletteID> {
+    /** when this entry is drawn/placed/whatever, the data-adding logic will get
+     * the position (and maybe area, if `this.area` is true), and this value */
+    value: K
+    /** src for an icon used to represent the thing */
+    icon?: string
+    /** src for an image of the thing, intended to be displayed as large as
+     * reasonable */
+    img?: string
+    /** name of the thing, for tooltip */
+    label?: string
+    /** Swatch. Use a subset of CSS colors maybe?
+     * @see https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
+     */
+    swatch?: string
 
-    constructor(
-        public readonly type: LayerType,
-        public elementSchema: E,
-        public palette: Palette<ID>,
-    ) {}
+    /** if true, this item occupies a rectangular area rather than a point */
+    area?: boolean
+}
 
-    title(t: string) {
-        this.displayName = t
-        return this
-    }
-
-    toolCallbacks: {
-        select?: GestureFn<'move' | 'drag'>
-        create?: GestureFn<'move' | 'drag'>
-        draw?: GestureFn<'move' | 'drag'>
-        update?: (element: Static<E>, patch: Edit[], ctx: ToolContext) => void
-    } = {}
-
-    select(handler: typeof this.toolCallbacks.select) {
-        this.toolCallbacks.select = handler
-
-        return this
-    }
-
-    create(handler: typeof this.toolCallbacks.create) {
-        this.toolCallbacks.create = handler
-
-        return this
-    }
-
-    draw(handler: typeof this.toolCallbacks.draw) {
-        this.toolCallbacks.draw = handler
-
-        return this
-    }
-
-    update(handler: typeof this.toolCallbacks.update) {
-        this.toolCallbacks.update = handler
-
-        return this
-    }
+export function isNil(pal: PaletteEntry<any>) {
+    return (
+        pal.label === undefined &&
+        pal.icon === undefined &&
+        pal.img === undefined &&
+        pal.swatch === undefined
+    )
 }

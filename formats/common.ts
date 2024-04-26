@@ -1,13 +1,52 @@
-export interface Metadata {
-    /** where the resource was loaded from, or new/unsaved if undefined */
-    src?: File | URL | string
-    /** If present, a user-facing name for the resource */
-    displayName?: string
+import { Static, TSchema } from '@sinclair/typebox'
+
+export enum ResourceType {
+    Container = 'gamebucket/container',
+    // Spatial2D = 'resource/spatial2d',
+
+    SpatialSparse2D = 'resource/spatial2d/sparse',
+    SpatialDense2D = 'resource/spatial2d/dense',
+
+    Scene = 'application/gltf+scenebucket',
+    Timeline = 'resource/timeline',
+
+    SpriteSheet = 'texture-packer/spritesheet',
+
+    Song = 'audio/raw+soundbucket',
+
+    Equation = 'resource/equation',
 }
 
-export const LAYER_TYPES = {
-    ENTITY_LIST: 'resource/spatial2d/entity_list',
-    TILE_MAP: 'resource/spatial2d/tile_map',
-} as const
+export type Serializable =
+    | string
+    | number
+    | boolean
+    | null
+    | Serializable[]
+    | { [key: string]: Serializable }
 
-export type LayerType = (typeof LAYER_TYPES)[keyof typeof LAYER_TYPES]
+// export type CompoundResourceType = ResourceType.Spatial2D
+
+export interface Metadata<R extends ResourceType> {
+    /** where the resource was loaded from, or new/unsaved if undefined */
+    src?: string
+    /** If present, a user-facing name for the resource */
+    displayName?: string
+
+    type: R
+}
+
+/** Any resource! */
+export namespace GenericResource {
+    export interface Serialized<R extends ResourceType> {
+        type: R
+
+        /** If present, a user-facing name for the resource */
+        displayName?: string
+    }
+
+    export interface Editable<R extends ResourceType> extends Serialized<R> {
+        /** where the resource was loaded from, or new/unsaved if undefined */
+        src?: string
+    }
+}
