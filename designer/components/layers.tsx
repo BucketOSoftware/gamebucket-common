@@ -1,50 +1,51 @@
 import { Card, CardList, Section, SectionCard } from '@blueprintjs/core'
-import { forwardRef, useEffect } from 'react'
-
-import { useStore, useUpdate } from '../state'
-import invariant from 'tiny-invariant'
-import { ResourceAdapter } from '../resource'
 import { TSchema } from '@sinclair/typebox'
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import invariant from 'tiny-invariant'
+
+import { LayerID } from '../resource'
+import { RootState, selectLayer } from '../state'
 
 export function Layers(props: unknown) {
-    const update = useUpdate()
-    const { activeResource, activeLayer } = useStore()
+    const dispatch = useDispatch()
+
+    const resource = useSelector((state: RootState) => state.edited.loaded[0])
+
+    const selectedLayer = useSelector((state: RootState) => state.ui.layer)
 
     useEffect(() => {
-        update((draft) => {
-            // if (activeResource && openResources.includes(activeResource)) {
-            //     // TODO: test that this works to keep the same selection
-            // } else {
-            //     draft.activeResource = openResources[0]
-            // }
-            draft.activeLayer = activeResource?.layers[0]
-        })
-    }, [activeResource])
-
-    function selectLayer<S extends TSchema>(seek: ResourceAdapter<S>) {
-        return () => {
-            update((draft) => {
-                draft.activeLayer = activeResource?.layers.find(
-                    (res) => res === seek,
-                )
-            })
+        if (resource) {
+            console.log('Conna select', resource && resource.itemOrder[0])
+            dispatch(selectLayer(resource.itemOrder[0]))
         }
+    }, [resource])
+
+    if (!resource) {
+        return null
     }
 
+    function selectTheLayer<S extends TSchema>(seek: LayerID) {
+        // Confirm the layer is loaded
+        const found = resource.itemOrder.find((id) => id === seek)
+        invariant(found, 'Layer not found or no resource')
+        dispatch(selectLayer(found))
+    }
     return (
         <Section compact elevation={1} title="Layers" className="sidebar-panel">
             <SectionCard padded={false}>
                 <CardList compact bordered={false}>
-                    {activeResource?.layers.map((layer) => {
+                    {resource.itemOrder.map((id) => {
                         return (
                             <Card
-                                key={layer.displayName}
+                                key={id.toString()}
                                 compact
                                 interactive
-                                selected={layer === activeLayer}
-                                onClick={selectLayer(layer)}
+                                selected={id === selectedLayer}
+                                onClick={() => selectTheLayer(id)}
                             >
-                                {layer.displayName}
+                                {resource.items[id].displayName ||
+                                    id.toString()}
                             </Card>
                         )
                     })}

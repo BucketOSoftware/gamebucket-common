@@ -1,10 +1,20 @@
-import { ResizeSensor, Section, SectionCard } from '@blueprintjs/core'
+// import { ResizeSensor, Section, SectionCard } from '@blueprintjs/core'
 import { useGesture } from '@use-gesture/react'
-import { forwardRef, useCallback, useEffect, useRef } from 'react'
+import {
+    PropsWithChildren,
+    forwardRef,
+    useCallback,
+    useEffect,
+    useRef,
+} from 'react'
 import invariant from 'tiny-invariant'
 
-import { useGestureHandler, useSelector, useUpdate } from '../state'
 import { LeaveMeAlone } from './util'
+import { noop } from 'lodash-es'
+import { Card } from '@blueprintjs/core'
+import { Carte } from './common'
+import { useSelector } from '../state'
+import { useLiaison } from '../liaison'
 
 const Canvy = forwardRef<
     HTMLCanvasElement,
@@ -17,7 +27,6 @@ const Canvy = forwardRef<
                 {...props}
                 // className={props.className}
                 style={{
-                    position: 'fixed',
                     margin: '5px',
                     width: '100%',
                     // borderRadius: '3px',
@@ -28,12 +37,39 @@ const Canvy = forwardRef<
     )
 })
 
-export function Viewport() {
-    const update = useUpdate()
-    const handleGesture = useGestureHandler()
-    const resource = useSelector((state) => state.activeResource)
+// export const Viewport = forwardRef<HTMLCanvasElement>((props, ref) => {
+export const Viewport = (props: PropsWithChildren) => {
+    // const update = useUpdate()
+    // const handleGesture = useGestureHandler()
+    // const resource = useSelector((state) => state.activeResource)
 
+    const handleGesture = noop
     const canvasRef = useRef<HTMLCanvasElement>(null)
+
+    const editedLayer = useSelector(
+        (state) =>
+            state.edited.loaded[0] &&
+            state.edited.loaded[0].items[state.ui.layer!],
+    )
+
+    const { onRender } = useLiaison()
+
+    useEffect(() => {
+        const ctx = canvasRef.current?.getContext('2d')
+        if (!ctx) {
+            console.warn("Can't get a context for", canvasRef.current)
+            return
+        }
+
+        if (canvasRef.current && onRender) {
+            onRender(
+                canvasRef.current,
+                [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                editedLayer,
+            )
+        }
+        console.log('DRAW', editedLayer?.displayName)
+    }, [canvasRef.current, editedLayer])
 
     // const getCanvasSize = useCallback(() => {
     //     return (
@@ -83,30 +119,19 @@ export function Viewport() {
         },
     )
 
-    useEffect(() => {
-        const canvas = canvasRef.current
-        invariant(canvas)
-
-        update((draft) => {
-            draft.canvas = canvas
-        })
-
-        return () => {
-            update((draft) => {
-                draft.canvas = null
-            })
-        }
-    }, [canvasRef.current, resource])
-
     return (
-        <Section compact title="Viewport">
-            <SectionCard>
-                {/* <ResizeSensor 
-                    targetRef={canvasRef}
-                >*/}
-                <Canvy ref={canvasRef} className="gbk-viewport" />
-                {/* </ResizeSensor> */}
-            </SectionCard>
-        </Section>
+        <Carte title="viewport">
+            <LeaveMeAlone>
+                <canvas
+                    ref={canvasRef}
+                    className="gbk-viewport"
+                    style={{
+                        margin: '5px',
+                        width: '100%',
+                        touchAction: 'none',
+                    }}
+                />
+            </LeaveMeAlone>
+        </Carte>
     )
 }

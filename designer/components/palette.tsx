@@ -1,12 +1,10 @@
-import { Button, Section, SectionCard, Tag } from '@blueprintjs/core'
+// import { Button, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { MouseEventHandler, useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
-import { selectors, useSelector, useUpdate } from '../state'
-import { Palette, PaletteID } from '../types'
-
 /** Display a selection of possible  */
 
+/*
 export function PaletteBox(props: unknown) {
     const palette: Palette<PaletteID> | undefined = useSelector(
         selectors.activeLayer.palette,
@@ -85,3 +83,4 @@ function PaletteButton(props: { id: PaletteID; item: Palette[number] }) {
         )
     }
 }
+*/

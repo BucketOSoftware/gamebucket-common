@@ -6,13 +6,20 @@ import {
     useSyncExternalStore,
 } from 'react'
 import { produce } from 'immer'
-import { CompoundResource, DesignerResource } from './resource'
+// import {  } from './resource'
 import { useDispatch } from 'react-redux'
-import { open } from './state'
-import { ResourceType } from '../formats'
+import { EditableResource, open } from './state'
+import { Matrix3Tuple } from 'three'
+import { Spatial2D } from '../formats'
+import { TSchema } from '@sinclair/typebox'
 
 interface LiaisonData {
-    openResources: DesignerResource[]
+    openResources: EditableResource[]
+    onRender?: (
+        canvas: HTMLCanvasElement,
+        camera: Matrix3Tuple,
+        layer: Spatial2D.Editable<TSchema, any>,
+    ) => void
 }
 
 const defaultClientData: LiaisonData = {
@@ -42,10 +49,18 @@ export class Liaison {
         return this.snapshot
     }
 
-    open(resource: CompoundResource<ResourceType.Spatial2D>) {
-        console.log('Wanna open:', resource)
+    open(resource: EditableResource) {
+        // console.log('Wanna open:', resource)
         this.snapshot = produce(this.snapshot, (draft) => {
             draft.openResources = [resource]
+        })
+        // console.warn('SNAPSHOT', this.snapshot)
+        this.notifySubscribers()
+    }
+
+    onRender(callback: LiaisonData['onRender']) {
+        this.snapshot = produce(this.snapshot, (draft) => {
+            draft.onRender = callback
         })
         this.notifySubscribers()
     }
@@ -60,11 +75,10 @@ export function LiaisonProvider({
         liaison.getSnapshot,
     )
 
-    // console.log('bam!', clientData)
-
     const dispatch = useDispatch()
 
     useEffect(() => {
+        console.log('Got resources...', clientData)
         dispatch(open(clientData.openResources[0]))
     }, [clientData.openResources])
 

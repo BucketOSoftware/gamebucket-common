@@ -1,7 +1,8 @@
 import { Section, SectionCard } from '@blueprintjs/core'
 import { Type, TypeGuard, ValueGuard } from '@sinclair/typebox'
 import { Check } from '@sinclair/typebox/value'
-import { useSelector } from '../state'
+import { useSelector } from 'react-redux'
+
 import { FormControl } from './forms'
 
 export function PropertiesBox(props: unknown) {

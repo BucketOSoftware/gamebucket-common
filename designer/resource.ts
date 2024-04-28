@@ -18,7 +18,7 @@ type ObjectKey = keyof any
 // export interface MinimalResource<T extends ResourceType = ResourceType>
 //     extends Metadata<T> {}
 
-export type LayerID = ObjectKey
+export type LayerID = string | number
 
 // -----
 //  Palettes
@@ -41,7 +41,7 @@ export type Palette<K extends PaletteID = PaletteID> =
 /** User can select from the given items */
 type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
 
-/** Select an arbitrary color. Use a PaletteDiscrete with swatches to select 
+/** Select an arbitrary color. Use a PaletteDiscrete with swatches to select
  * from a specific set of colors */
 interface ColorPicker {
     // default is false

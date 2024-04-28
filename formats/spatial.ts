@@ -13,6 +13,27 @@ import * as rect from '../rect'
 
 import { ResourceType } from './common'
 
+// Differentiation here is rough. On disk, it seems like we really don't need it to ever be a map -- it can just be an array with "intrusive" IDs. We only need it to be a map for efficiency when editing, and we don't even know if we actually need that. Maybe a special VECTOR property is the only differentiation?
+
+const POSITION = '\0position'
+
+const TILE = Type.Integer({ minimum: 0 })
+const C = Type.Number({ minimum: 0, maximum: 1 })
+const RICH_TILE = Type.Object({ tile: TILE, color: Type.Tuple([C, C, C]) })
+
+const SparseSchema = Type.Object({
+    [POSITION]: Type.Union([TVec2()]), //Type.Array(Type.Number(), { minItems: 1, maxItems: 3 }),
+})
+
+const ENTITY = Type.Object({
+    [POSITION]: TVec2(),
+})
+
+type IsSparse<T extends TSchema> =
+    T extends TObject<{ [POSITION]: TSchema }> ? 'vagina sparse' : 'penis'
+
+type Ja = IsSparse<typeof RICH_TILE>
+
 /** A dataset where elements are located by 2D coordinates, e.g. an area/level.
  * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
  */
@@ -74,3 +95,10 @@ export namespace Spatial2D {
         return true
     }
 }
+
+// const v = Spatial2D.check({
+//     type: ResourceType.SpatialDense2D,
+//     schema: Type.Integer({ minimum: 0 }),
+//     data: [1, 2, 3],
+//     size: { width: 50, height: 50 },
+// })

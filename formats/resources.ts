@@ -9,6 +9,8 @@ import { TSchema } from '@sinclair/typebox'
 export { Spatial2D } from './spatial'
 /** "File" formats as they'd exist in memory. */
 
+// type Iff<P> = P extends void ? {} : P
+
 /** Resource that contains other resources.
  * @todo Make specific container types so we can have a Spatial2D container that only contains 2D maps? */
 export namespace Container {

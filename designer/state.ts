@@ -1,5 +1,9 @@
 import { TSchema, ValueGuard } from '@sinclair/typebox'
 import invariant from 'tiny-invariant'
+import {
+    useDispatch as reduxUseDispatch,
+    useSelector as reduxUseSelector,
+} from 'react-redux'
 
 import { ResourceType, Container, Spatial2D, GenericResource } from '../formats'
 
@@ -29,8 +33,8 @@ export const uiSlice = createSlice({
     },
 })
 
-type AcceptableResource = Container.Serialized<
-    Spatial2D.Serialized<TSchema, any>[]
+export type EditableResource = Container.Editable<
+    Spatial2D.Editable<TSchema, any>[]
 >
 
 export const editedSlice = createSlice({
@@ -42,29 +46,32 @@ export const editedSlice = createSlice({
     reducers: {
         open: (
             draft,
-            { payload: resource }: PayloadAction<AcceptableResource>,
+            { payload: resource }: PayloadAction<EditableResource>,
         ) => {
+            console.warn('responding!!', resource)
             if (!resource) {
                 draft.loaded = []
                 return
             }
 
-            // Convert to editable form
+            // TODO: accept serialized form, convert to editable form.
 
-            // if (resource.type === ResourceType.Container) {
-            // TODO?: should we ever not auto-generate these?
-            const ids = resource.items.map((item) =>
-                uniqueId(`gbres/${item.displayName}/`),
-            )
-            const items = zipObject(ids, resource.items)
+            // // TODO?: should we ever not auto-generate these?
+            // invariant(resource.items, 'No items??')
+            // const ids = resource.itemOrder.map((item) =>
+            //     uniqueId(`gbres/${item}/`),
+            // )
+            // const items = zipObject(ids, resource.items)
 
-            draft.loaded = [
-                {
-                    ...resource,
-                    items,
-                    itemOrder: ids,
-                },
-            ]
+            // draft.loaded = [
+            //     {
+            //         ...resource,
+            //         items,
+            //         itemOrder: ids,
+            //     },
+            // ]
+
+            draft.loaded = [resource]
         },
     },
 })
@@ -83,3 +90,8 @@ export const { selectTool, selectLayer } = uiSlice.actions
 export type RootState = ReturnType<typeof store.getState>
 // Inferred type: {posts: PostsState, comments: CommentsState, users: UsersState}
 export type AppDispatch = typeof store.dispatch
+
+// export const useSelector = reduxUseSelector<RootState>
+// export const useDispatch = reduxUseDispatch/
+export const useSelector = reduxUseSelector.withTypes<RootState>()
+export const useDispatch = reduxUseDispatch.withTypes<AppDispatch>() // Export a hook that can be reused to resolve types

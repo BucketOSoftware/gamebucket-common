@@ -23,7 +23,11 @@ import { debounce } from 'lodash-es'
 import { useCallback, useEffect, useState } from 'react'
 import invariant from 'tiny-invariant'
 
-import { selectors, usePatch, useSelector } from '../state'
+// import { selectors, usePatch, useSelector } from '../state'
+function usePatch() {
+    // TODO
+    return (...a: any[]) => {}
+}
 
 interface AggregateControlProps<T extends TSchema, I = string> {
     path: string // JSON pointer

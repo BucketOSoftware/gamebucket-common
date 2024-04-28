@@ -8,12 +8,12 @@ import {
 import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
 import { PropsWithChildren } from 'react'
 
-import { selectors, useSelector, useUpdate } from '../state'
 import { type ToolID } from '../types'
 import { LAYER_TYPES as TYPES } from '../../formats'
 
+/*
 export function Toolbar(
-    props: PropsWithChildren<{ className: CardProps['className'] }>,
+    props: PropsWithChildren<{ className?: CardProps['className'] }>,
 ) {
     return (
         <Card compact elevation={3} className={props.className}>
@@ -88,3 +88,4 @@ export function DrawTool(props: unknown) {
         </ToolButton>
     )
 }
+*/
