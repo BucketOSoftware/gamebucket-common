@@ -4,13 +4,17 @@ import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
+import { Tuple, Opaque } from 'ts-essentials'
 
-import { ResourceType, Container, Spatial2D, GenericResource } from '../formats'
+import { ResourceType, Container, Spatial, GenericResource } from '../formats'
 
-import { LayerID, PaletteID } from './resource'
+import { PaletteID } from './resource'
 import { ToolID } from './types'
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
 import { uniqueId, zipObject } from 'lodash-es'
+
+export type EditableSubresource = Spatial.Editable<2>
+export type EditableResource = Container.Editable<EditableSubresource[]>
 
 export const uiSlice = createSlice({
     name: 'ui',
@@ -18,7 +22,7 @@ export const uiSlice = createSlice({
         tool: ToolID
         attribs: Record<string, PaletteID>
         /** ID of the layer under edit */
-        layer?: LayerID
+        layer?: Container.ItemID
     },
     reducers: {
         selectTool: (state, { payload }: PayloadAction<ToolID>) => {
@@ -26,29 +30,25 @@ export const uiSlice = createSlice({
         },
         selectLayer: (
             state,
-            { payload }: PayloadAction<LayerID | undefined>,
+            { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
             state.layer = payload
         },
     },
 })
 
-export type EditableResource = Container.Editable<
-    Spatial2D.Editable<TSchema, any>[]
->
-
 export const editedSlice = createSlice({
     name: 'edited',
     initialState: { loaded: [] } as {
         // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
-        loaded: Container.Editable[]
+        loaded: Container.Editable<GenericResource.Editable[]>[]
     },
     reducers: {
         open: (
             draft,
             { payload: resource }: PayloadAction<EditableResource>,
         ) => {
-            console.warn('responding!!', resource)
+            // console.warn('responding!!', resource)
             if (!resource) {
                 draft.loaded = []
                 return

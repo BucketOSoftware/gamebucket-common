@@ -6,6 +6,9 @@ export enum ResourceType {
 
     SpatialSparse2D = 'resource/spatial2d/sparse',
     SpatialDense2D = 'resource/spatial2d/dense',
+    SpatialSparse3D = 'resource/spatial3d/sparse',
+    /** Unclear what this is currently. Voxels? */
+    SpatialDense3D = 'resource/spatial3d/dense',
 
     Scene = 'application/gltf+scenebucket',
     Timeline = 'resource/timeline',
@@ -45,7 +48,8 @@ export namespace GenericResource {
         displayName?: string
     }
 
-    export interface Editable<R extends ResourceType> extends Serialized<R> {
+    export interface Editable<R extends ResourceType = ResourceType>
+        extends Serialized<R> {
         /** where the resource was loaded from, or new/unsaved if undefined */
         src?: string
     }

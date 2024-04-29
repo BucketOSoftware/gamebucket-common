@@ -1,8 +1,5 @@
 import { Static, TSchema, TUnknown } from '@sinclair/typebox'
 
-/** TODO: can't remember what the existing type name for this is */
-type ObjectKey = keyof any
-
 // /** @param [K]: ID/key of things that can be placed in the layer */
 // export type Resource<
 //     T extends ResourceType = ResourceType,
@@ -17,8 +14,6 @@ type ObjectKey = keyof any
 
 // export interface MinimalResource<T extends ResourceType = ResourceType>
 //     extends Metadata<T> {}
-
-export type LayerID = string | number
 
 // -----
 //  Palettes

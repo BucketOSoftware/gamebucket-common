@@ -1,20 +1,36 @@
-// import { ResizeSensor, Section, SectionCard } from '@blueprintjs/core'
 import { useGesture } from '@use-gesture/react'
 import {
     PropsWithChildren,
     forwardRef,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
+    useState,
 } from 'react'
 import invariant from 'tiny-invariant'
+import { noop } from 'lodash-es'
+
+import { Container, Spatial } from '../../formats'
+
+import { EditableSubresource, useSelector } from '../state'
+import { useLiaison } from '../liaison'
+import { useTool } from '../tools'
+import {
+    GesturePhase,
+    GestureState,
+    IGNORE_GESTURE,
+    gesturePhasePersists,
+    phaseFromGesture,
+} from '../gestures'
 
 import { LeaveMeAlone } from './util'
-import { noop } from 'lodash-es'
-import { Card } from '@blueprintjs/core'
 import { Carte } from './common'
-import { useSelector } from '../state'
-import { useLiaison } from '../liaison'
+import { Opaque } from 'ts-essentials'
+
+/** Normalized coordinates of the viewport, [0..1) on both axes. May be out of
+ * those bounds if the gesture has gone outside of the viewport */
+type ViewportCoordinates = Opaque<[number, number], 'VIEWPORT_VEC2'>
 
 const Canvy = forwardRef<
     HTMLCanvasElement,
@@ -39,82 +55,93 @@ const Canvy = forwardRef<
 
 // export const Viewport = forwardRef<HTMLCanvasElement>((props, ref) => {
 export const Viewport = (props: PropsWithChildren) => {
-    // const update = useUpdate()
-    // const handleGesture = useGestureHandler()
-    // const resource = useSelector((state) => state.activeResource)
-
-    const handleGesture = noop
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const { redraw } = useLiaison()
 
-    const editedLayer = useSelector(
-        (state) =>
-            state.edited.loaded[0] &&
-            state.edited.loaded[0].items[state.ui.layer!],
-    )
-
-    const { onRender } = useLiaison()
+    const loaded = useSelector((state) => state.edited.loaded[0])
+    const editedLayer = useSelector((state) => loaded?.items[state.ui.layer!])
+    const toolHandler = useTool()
+    const p = useSelector((state) => state.ui.attribs)
 
     useEffect(() => {
-        const ctx = canvasRef.current?.getContext('2d')
-        if (!ctx) {
-            console.warn("Can't get a context for", canvasRef.current)
+        console.warn('Changggg...', canvasRef.current, loaded, redraw)
+        if (canvasRef.current && loaded && redraw) {
+            // console.warn('Draw it all!', loaded)
+            for (let layer of loaded.itemOrder) {
+                redraw(
+                    canvasRef.current,
+                    layer as Container.ItemID,
+                    loaded.items[
+                        layer as Container.ItemID
+                    ] as EditableSubresource,
+                )
+            }
+        }
+    }, [canvasRef.current, loaded, redraw])
+
+    const normalizeCoordinates = (v: [number, number]) => {
+        // hope this works
+        // TODO: use a resize observer
+        // TODO: it seems like we need to useLayoutEffect for this? but how?
+
+        const bounds = canvasRef.current?.getBoundingClientRect()
+        if (!(bounds && bounds.width && bounds.height)) {
+            // FIXME: we have to return a valid result -- what should we do?
+            console.warn(
+                'Returning an invalid coordinate because canvas is',
+                canvasRef.current,
+                bounds,
+            )
+            return [0.97, 0.97] as [number, number]
+        }
+
+        // useGesture wants a tuple
+        return [
+            (v[0] - bounds.left - window.scrollX) / bounds.width,
+            (v[1] - bounds.top - window.scrollY) / bounds.height,
+        ] as ViewportCoordinates
+    }
+
+    const phase = useRef<GesturePhase>()
+
+    const handleGesture = <G extends 'move' | 'drag'>(
+        gesture: GestureState<G>,
+        type: G,
+    ) => {
+        // Track whether a gesture is ongoing, and ignore ones that aren't relevant
+        const newPhase = phaseFromGesture(type, gesture, phase.current)
+
+        if (newPhase === IGNORE_GESTURE) {
             return
         }
 
-        if (canvasRef.current && onRender) {
-            onRender(
-                canvasRef.current,
-                [1, 0, 0, 0, 1, 0, 0, 0, 1],
-                editedLayer,
-            )
-        }
-        console.log('DRAW', editedLayer?.displayName)
-    }, [canvasRef.current, editedLayer])
+        invariant(canvasRef.current)
+        let memo = toolHandler(canvasRef.current, newPhase, gesture)
+        phase.current = gesturePhasePersists(newPhase)
+        // console.log('Ope:', newPhase, phase.current)
 
-    // const getCanvasSize = useCallback(() => {
-    //     return (
-    //         canvasRef.current?.getBoundingClientRect() ?? {
-    //             x: 0,
-    //             y: 0,
-    //             width: 0,
-    //             height: 0,
-    //         }
-    //     )
-    // }, [canvasRef.current])
+        return memo
+    }
 
-    const normalizeCoordinates = useCallback(
-        (v: [number, number]) => {
-            // hope this works
-            // TODO: use a resize observer
-            const bounds = canvasRef.current?.getBoundingClientRect()
-            if (!bounds) {
-                return v
-            }
+    const onMove = useCallback(
+        (state: GestureState<'move'>) => handleGesture(state, 'move'),
+        [handleGesture],
+    )
 
-            return [
-                (v[0] - bounds.left - window.scrollX) / bounds.width,
-                (v[1] - bounds.top - window.scrollY) / bounds.height,
-            ] as [number, number]
-        },
-        [canvasRef.current],
+    const onDrag = useCallback(
+        (state: GestureState<'drag'>) => handleGesture(state, 'drag'),
+        [handleGesture],
     )
 
     useGesture(
-        {
-            onMove: (state) => {
-                return handleGesture(state, 'move')
-            },
-            onDrag: (state) => {
-                return handleGesture(state, 'drag')
-            },
-        },
+        { onMove, onDrag },
         {
             target: canvasRef,
             transform: normalizeCoordinates,
             eventOptions: { passive: false, capture: true },
             drag: {
                 from: [0, 0],
-                // filterTaps: true,
+                filterTaps: false,
             },
         },
     )
@@ -135,3 +162,24 @@ export const Viewport = (props: PropsWithChildren) => {
         </Carte>
     )
 }
+
+// maybe eac
+
+// function LayerCanvas(props: {
+//     layer: Spatial.Editable<2>
+//     layerID: Container.ItemID
+// }) {
+//     // This is to render onto, not to actually render. TODO: offscreencanvas?
+//     // const [canvas] = useState(document.createElement('canvas'))
+//     // useEffect(() => console.warn('NEW CANVAS:', canvas), [canvas])
+//     const canvy = useMemo(
+//         () => document.createElement('canvas'),
+//         [props.layerID],
+//     )
+
+//     // useLiaison
+//     // useEffect(() => {
+
+//     // }, [props.layer, props.layerID])
+//     // return <></>
+// }

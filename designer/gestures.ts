@@ -1,9 +1,11 @@
 import { GestureKey, Handler } from '@use-gesture/react'
 import invariant from 'tiny-invariant'
-import { ToolContext } from './state'
+// import { ToolContext } from './state'
 
 export type GestureType = GestureKey
-export type GestureState<G extends GestureType> = Parameters<Handler<G>>[0]
+export type GestureState<G extends GestureType = GestureType> = Parameters<
+    Handler<G>
+>[0]
 
 export enum GesturePhase {
     Hover = 'HOVER',
@@ -13,31 +15,89 @@ export enum GesturePhase {
     Tap = 'TAP',
 }
 
+/*
 export type GestureFn<K extends GestureKey = GestureKey> = (
     phase: GesturePhase,
     gesture: GestureState<K>,
     context: ToolContext,
 ) => unknown
+*/
+
+export const IGNORE_GESTURE = Symbol()
 
 export function phaseFromGesture<G extends GestureKey>(
     type: G,
     gesture: GestureState<G>,
     ongoingPhase: GesturePhase | undefined,
-): GesturePhase | null {
+): GesturePhase | typeof IGNORE_GESTURE {
     switch (type) {
         case 'move':
-            return ongoingPhase ? null : GesturePhase.Hover
+            // we only want a hover event if nothing else is happening
+            return ongoingPhase ? IGNORE_GESTURE : GesturePhase.Hover
         case 'drag':
             invariant('tap' in gesture)
             if (gesture.tap) {
                 return GesturePhase.Tap
             } else if (gesture.first) {
+                invariant(!ongoingPhase)
                 return GesturePhase.DragStart
             } else if (gesture.last) {
+                invariant(
+                    ongoingPhase === GesturePhase.DragStart ||
+                        ongoingPhase === GesturePhase.DragContinue,
+                )
                 return GesturePhase.DragCommit
             } else {
+                invariant(
+                    ongoingPhase === GesturePhase.DragStart ||
+                        ongoingPhase === GesturePhase.DragContinue,
+                )
                 return GesturePhase.DragContinue
             }
     }
     throw new Error('Unhandleable gesture: ' + type)
 }
+/**
+ *
+ * @return The gesture phase to keep for next time, or undefined
+ */
+export function gesturePhasePersists(
+    phase: GesturePhase,
+): GesturePhase | undefined {
+    switch (phase) {
+        case GesturePhase.DragCommit:
+        case GesturePhase.Hover:
+            return
+    }
+
+    return phase
+}
+/*
+function phaseFromGesture<G extends GestureKey>(
+    type: G,
+    gesture: GestureState<G>,
+    ongoingPhase: GesturePhase | undefined,
+) {
+    const nextPhase = shitPhaseFromGesture(type,gesture,ongoingPhase)
+
+
+switch (nextPhase) {
+    case IGNORE_GESTURE:
+        return
+    case GesturePhase.DragCommit:
+    case GesturePhase.Tap:
+        phase.current = undefined
+        break
+    case GesturePhase.DragStart:
+        phase.current = nextPhase
+        break
+    case GesturePhase.DragContinue:
+        invariant(phase.current === GesturePhase.DragStart)
+        break
+    default:
+        invariant(
+            !phase.current,
+            "I didn't understand this code enough I guess",
+        )
+}
+*/
