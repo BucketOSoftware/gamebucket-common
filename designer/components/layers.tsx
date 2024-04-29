@@ -10,9 +10,9 @@ import { RootState, selectLayer } from '../state'
 export function Layers(props: unknown) {
     const dispatch = useDispatch()
 
-    const resource = useSelector((state: RootState) => state.edited.loaded[0])
+    const resource = useSelector((state: RootState) => state.loaded[0])
 
-    const selectedLayer = useSelector((state: RootState) => state.ui.layer)
+    const selectedLayer = useSelector((state: RootState) => state.layer)
 
     useEffect(() => {
         if (resource) {

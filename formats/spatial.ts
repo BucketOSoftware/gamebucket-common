@@ -43,7 +43,47 @@ export namespace Spatial {
         D extends 2 ? ResourceType.SpatialDense2D : ResourceType.SpatialDense3D
     >
 
-    export interface Serialized<
+    interface Sparse<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        // P extends {} | void = void,
+    > {
+        type: D extends 2
+            ? ResourceType.SpatialSparse2D
+            : ResourceType.SpatialSparse3D
+        displayName?: string
+
+        size?: rect.Size
+        worldTransform?: Matrix3Tuple | Matrix4Tuple
+
+        schema: S
+        data: Record<string, Static<S>>
+    }
+
+    interface Dense<
+        D extends Dimensions,
+        S extends TSchema,
+        // P extends {} | void = void,
+    > {
+        type: D extends 2
+            ? ResourceType.SpatialDense2D
+            : ResourceType.SpatialDense3D
+        displayName?: string
+
+        size: rect.Size
+        worldTransform?: Matrix3Tuple | Matrix4Tuple
+
+        schema: S
+        data: Static<S>[]
+    }
+
+    export type Serialized<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        P extends {} | void = void,
+    > = (Sparse<D, S> | Dense<D, S>) & (P extends void ? {} : { properties: P })
+
+    interface SNEERerialized<
         D extends Dimensions = Dimensions,
         S extends TSchema = TSchema,
         P extends {} | void = void,
@@ -88,10 +128,11 @@ export namespace Spatial {
         ? { [P in keyof S['properties']]?: Palette }
         : Palette | undefined
 
-    export interface Editable<
+    export type Editable<
         D extends Dimensions = Dimensions,
         S extends TSchema = TSchema,
-    > extends Serialized<D, S> {
+        P extends {} | void = void,
+    > = Serialized<D, S, P> & {
         /** For each field in the schema, the palette provides information for the editor to create an interface. If a given property doesn't have a palette, it's assumed that the schema data will be enough to present form elements to edit the value (for an entity list this would be the typical case, but maybe we want to use it for metadata, e.g. this one property is a color and should have a color picker
          */
         palettes: Palettes<S>

@@ -1,4 +1,10 @@
-import { TSchema, ValueGuard } from '@sinclair/typebox'
+import {
+    TSchema,
+    ValueGuard,
+    Kind,
+    Hint,
+    OptionalKind,
+} from '@sinclair/typebox'
 import invariant from 'tiny-invariant'
 import {
     useDispatch as reduxUseDispatch,
@@ -13,37 +19,67 @@ import { ToolID } from './types'
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
 import { uniqueId, zipObject } from 'lodash-es'
 
-export type EditableSubresource = Spatial.Editable<2>
+export type EditableSubresource = Spatial.Editable<2, TSchema, any>
 export type EditableResource = Container.Editable<EditableSubresource[]>
 
-export const uiSlice = createSlice({
-    name: 'ui',
-    initialState: { tool: 'draw', attribs: {} } as {
+// export const uiSlice = createSlice({
+//     name: 'ui',
+//     initialState: { tool: 'draw', attribs: {} } as {},
+//     reducers: {},
+// })
+
+export const designerSlice = createSlice({
+    name: 'designer',
+    initialState: { tool: 'select', attribs: {}, loaded: [] } as {
         tool: ToolID
         attribs: Record<string, PaletteID>
         /** ID of the layer under edit */
         layer?: Container.ItemID
+
+        // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
+        loaded: EditableResource[]
     },
     reducers: {
         selectTool: (state, { payload }: PayloadAction<ToolID>) => {
             state.tool = payload
         },
+
         selectLayer: (
             state,
             { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
             state.layer = payload
         },
-    },
-})
 
-export const editedSlice = createSlice({
-    name: 'edited',
-    initialState: { loaded: [] } as {
-        // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
-        loaded: Container.Editable<GenericResource.Editable[]>[]
-    },
-    reducers: {
+        editElement: (
+            draft,
+            {
+                payload,
+            }: PayloadAction<{
+                layer: Container.ItemID,
+                id: string | number
+                property: string
+                newValue: any
+            }>,
+        ) => {
+            // const { id, layer: layerId, property, newValue } = payload
+            console.log("Hi!", payload)
+            // [id]
+            /*
+            const layerObj = draft.loaded[0].items.find(i => i === layer)
+            const data = layerObj.data
+            invariant(
+                id in data,
+                `Invalid ID for layer ${layerId} '${layerObj.displayName}': ${id}`,
+            )
+            // @ts-expect-error
+            const element = data[id]
+            // FIXME: element might not be an object!
+            console.log("setting", element, property, newValue)
+            element[property] = newValue
+            */
+        },
+
         open: (
             draft,
             { payload: resource }: PayloadAction<EditableResource>,
@@ -72,19 +108,20 @@ export const editedSlice = createSlice({
             // ]
 
             draft.loaded = [resource]
+            console.log(
+                Object.entries(resource.items).map(([k, v]) =>
+                    Object.values(v.data),
+                ),
+            )
         },
     },
 })
 
 export const store = configureStore({
-    reducer: {
-        ui: uiSlice.reducer,
-        edited: editedSlice.reducer,
-    },
+    reducer: designerSlice.reducer,
 })
 
-export const { open } = editedSlice.actions
-export const { selectTool, selectLayer } = uiSlice.actions
+export const { open, selectLayer, selectTool,editElement } = designerSlice.actions
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>

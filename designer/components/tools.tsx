@@ -29,7 +29,7 @@ function ToolButton(
     }>,
 ) {
     const dispatch = useDispatch()
-    const tool = useSelector((st) => st.ui.tool)
+    const tool = useSelector((st) => st.tool)
 
     if (props.disabled) return null
 
@@ -47,7 +47,7 @@ function ToolButton(
                 // disabled={!layerType}
                 intent={tool === props.id ? 'primary' : 'none'}
                 onClick={() => {
-                    console.log("DISPA!", props.id)
+                    console.log('DISPA!', props.id)
                     dispatch(selectTool(props.id))
                     // update((draft) => {
                     // draft.currentTool[layerType!] = props.id

@@ -34,13 +34,15 @@
     height: 100%;
     position: relative;
     inset: 0;
-    box-shadow: 2px 2px 0px black;
+    /* can be bigger than the layers... */
+    /* box-shadow: 2px 2px 0px black; */
 }
 
 #gbk-designer .layerboss>* {
     /* inset: 0; */
     position: absolute;
-    /* box-shadow: 10px 5px 5px blue; */
+    border: 1px dashed blue
+        /* box-shadow: 10px 5px 5px blue; */
 }
 
 #gbk-designer .bp5-monospace-text {
@@ -62,6 +64,11 @@
     touch-action: none;
     background-color: aliceblue;
     cursor: help;
+}
+
+#gbk-designer .gbk-viewport-layer {
+    /* pointer-events: none; */
+    touch-action: none;
 }
 
 #gbk-designer .gbk-tool-no-use .gbk-viewport {
@@ -93,8 +100,6 @@
 }
 
 #gbk-designer .marching-ants {
-
-
     position: absolute;
 
     stroke: rgba(255, 255, 255, 1);

@@ -1,38 +1,46 @@
+import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
+
 import { rect } from '..'
-import { GenericResource, Spatial } from '../formats'
+
+import { Container, ResourceType, Spatial } from '../formats'
+
 import { GesturePhase, GestureState } from './gestures'
+import { editElement, useDispatch, useSelector } from './state'
 import { useLiaison } from './liaison'
-import { useSelector } from './state'
 
 type Callbacks = ReturnType<typeof useLiaison>
 
 export function useTool() {
     const liaisonData = useLiaison()
-    const resource = useSelector((state) => state.edited.loaded[0])
-    /** the layer we're editing */
-    const layer = useSelector((state) => resource?.items[state.ui.layer!])
+    // const resource = useSelector((state) => state.edited.loaded[0])
 
-    const toolName = useSelector((state) => state.ui.tool)
+    const toolName = useSelector((state) => state.tool)
     console.log('hook for', toolName)
 
-    switch (toolName) {
-        case 'select':
-            return useSelectTool(liaisonData, layer)
-        case 'draw':
-            return useDrawTool(liaisonData, layer)
-        case 'create':
-            return useCreateTool(liaisonData, layer)
-    }
+    const getThing = useCallback(() => {
+        switch (toolName) {
+            case 'select':
+                return useSelectTool(liaisonData)
+            case 'draw':
+                return useDrawTool(liaisonData)
+            case 'create':
+                return useCreateTool(liaisonData)
+        }
 
-    throw new Error('Invalid tool: ' + toolName)
+        throw new Error('Invalid tool: ' + toolName)
+    }, [toolName, liaisonData])
+
+    return getThing()
 }
 
-function useSelectTool(callbacks: Callbacks, layer: GenericResource.Editable) {
-    return (
-        canvas: HTMLCanvasElement,
+const useSelectTool =
+    <L extends Spatial.Editable>(callbacks: Callbacks) =>
+    (
         phase: GesturePhase,
         gesture: GestureState,
+        layer: Readonly<L>,
+        dispatch: any,
     ) => {
         // console.warn("select", phase, layer)
         // @ts-expect-error
@@ -44,6 +52,7 @@ function useSelectTool(callbacks: Callbacks, layer: GenericResource.Editable) {
 
         const big_enough_for_marquee = true
 
+        // console.log(gesture.values)
         switch (phase) {
             case GesturePhase.Hover:
                 // 1. get objects under the cursor and mark them as "hovered"
@@ -63,36 +72,66 @@ function useSelectTool(callbacks: Callbacks, layer: GenericResource.Editable) {
                     // 1. show it somewhere else
                 } else if (big_enough_for_marquee) {
                     invariant(callbacks.onMarquee, 'No marquee handler')
-                    const k = callbacks.onMarquee(
+                    /*
+                    const inProgressSelectionItems = callbacks.onMarquee(
                         canvas,
                         layer,
                         rect.fromCorners(...gesture.initial, ...gesture.values),
                     )
+                    */
                 }
                 break
             case GesturePhase.DragCommit:
+            case GesturePhase.Tap:
+                console.warn(
+                    rect.fromCorners(...gesture.initial, ...gesture.values),
+                )
+                if (gesture.memo) {
+                    // finish dragging this object
+                } else {
+                    // select items at this coordinate
+                }
                 break
         }
         return
     }
-}
 
-function useDrawTool(callbacks: Callbacks, layer: GenericResource.Editable) {
-    return (
-        canvas: HTMLCanvasElement,
+const useDrawTool =
+    <L extends Spatial.Editable>(callbacks: Callbacks) =>
+    (
         phase: GesturePhase,
-        g: GestureState,
+        gesture: GestureState,
+        layer: Readonly<L>,
+        dispatch: any,
+        // dispatch: typeof useDispatch,
+        // update: (draft: L) => void,
     ) => {
+        const guff = layer as Spatial.Editable<2>
+        invariant(guff.type === ResourceType.SpatialDense2D)
+        // const elem = guff.data[4] as any
+
+        dispatch(
+            editElement({
+                layer: 'ground' as Container.ItemID,
+                id: 4,
+                property: 'tile',
+                newValue: 99,
+            }),
+        )
+
+        // dispatch(
+        // TODO: need the update fn
+        // elem.tile = 97
         // console.warn('draw', phase, g)
     }
-}
 
-function useCreateTool(callbacks: Callbacks, layer: GenericResource.Editable) {
-    return (
-        canvas: HTMLCanvasElement,
+const useCreateTool =
+    <L extends Spatial.Editable>(callbacks: Callbacks) =>
+    (
         phase: GesturePhase,
-        g: GestureState,
+        gesture: GestureState,
+        layer: Readonly<L>,
+        update: (draft: L) => void,
     ) => {
-        // console.warn('create', phase, g)
+        console.warn('yay')
     }
-}

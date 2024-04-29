@@ -14,8 +14,16 @@ import { GVec2 } from '../geometry'
 import * as rect from '../rect'
 
 import { EditableResource, EditableSubresource, open } from './state'
+import { AsyncOrSync } from 'ts-essentials'
+
+export interface DepictProps {
+    resourceId: Container.ItemID
+    resource: EditableSubresource
+    canvasSize: rect.Size
+}
 
 type SomeImage = OffscreenCanvas | HTMLCanvasElement | HTMLImageElement
+
 interface LiaisonData {
     openResources: EditableResource[]
 
@@ -44,23 +52,8 @@ interface LiaisonData {
         elementId: string | number | undefined, // if undefined, refresh all
     ) => void
 
-    redraw?: <R = unknown>(
-        canvas: HTMLCanvasElement,
-        layerId: Container.ItemID,
-        layer: EditableSubresource,
-        // memo?: R,
-    ) => void
-
-    depict?: (
-        layer: GenericResource.Editable,
-        elementId: string | number,
-    ) => React.ReactNode | unknown
-
-    // onRender?: (
-    // canvas: HTMLCanvasElement,
-    // camera: Matrix3Tuple,
-    // layer: Spatial.Editable<TSchema, any>,
-    // ) => React.ReactNode | void
+    /** map a layer to a react component */
+    Depict?: React.FunctionComponent<DepictProps>
 }
 
 const defaultClientData: LiaisonData = {
