@@ -7,6 +7,19 @@
 
 }
 
+#gbk-designer .card-whole-height {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+#gbk-designer .card-whole-height .bp5-section-card {
+    /* height: 100%; */
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+
 #gbk-designer .bp5-monospace-text {
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
 }
@@ -20,8 +33,11 @@
 }
 
 #gbk-designer .gbk-viewport {
-    cursor: help;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
     background-color: aliceblue;
+    cursor: help;
 }
 
 #gbk-designer .gbk-tool-no-use .gbk-viewport {

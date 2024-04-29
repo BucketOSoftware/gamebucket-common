@@ -2,6 +2,9 @@ import { GestureKey, Handler } from '@use-gesture/react'
 import invariant from 'tiny-invariant'
 // import { ToolContext } from './state'
 
+export const DRAG_ENTITY_THRESHOLD_MS = 200
+export const DRAG_ENTITY_THRESHOLD_DISTANCE = 1
+
 export type GestureType = GestureKey
 export type GestureState<G extends GestureType = GestureType> = Parameters<
     Handler<G>
@@ -65,8 +68,10 @@ export function gesturePhasePersists(
     phase: GesturePhase,
 ): GesturePhase | undefined {
     switch (phase) {
+        // These gesture phases don't need to be passed to the next invocation of the handlers
         case GesturePhase.DragCommit:
         case GesturePhase.Hover:
+        case GesturePhase.Tap:
             return
     }
 

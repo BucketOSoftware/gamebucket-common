@@ -27,6 +27,7 @@ import {
 import { LeaveMeAlone } from './util'
 import { Carte } from './common'
 import { Opaque } from 'ts-essentials'
+import { ResizeSensor } from '@blueprintjs/core'
 
 /** Normalized coordinates of the viewport, [0..1) on both axes. May be out of
  * those bounds if the gesture has gone outside of the viewport */
@@ -63,8 +64,7 @@ export const Viewport = (props: PropsWithChildren) => {
     const toolHandler = useTool()
     const p = useSelector((state) => state.ui.attribs)
 
-    useEffect(() => {
-        console.warn('Changggg...', canvasRef.current, loaded, redraw)
+    function redrawAll() {
         if (canvasRef.current && loaded && redraw) {
             // console.warn('Draw it all!', loaded)
             for (let layer of loaded.itemOrder) {
@@ -77,7 +77,32 @@ export const Viewport = (props: PropsWithChildren) => {
                 )
             }
         }
+    }
+
+    useEffect(() => {
+        console.warn('Changggg...', canvasRef.current, loaded, redraw)
+        requestAnimationFrame(redrawAll)
     }, [canvasRef.current, loaded, redraw])
+
+    const onResize = useCallback(
+        ([re]: ResizeObserverEntry[]) => {
+            // requestAnimationFrame(() => {
+            console.log(
+                canvasRef.current?.width,
+                canvasRef.current?.height,
+                re.contentBoxSize[0],
+                // re.borderBoxSize[0].blockSize,
+            )
+            // if (!canvasRef.current) return
+            invariant(canvasRef.current)
+            const w = Math.ceil(re.contentBoxSize[0].inlineSize)
+            const h = Math.ceil(re.contentBoxSize[0].blockSize)
+            canvasRef.current.width = w * window.devicePixelRatio
+            canvasRef.current.height = h * window.devicePixelRatio
+            redrawAll()
+        },
+        [canvasRef.current],
+    )
 
     const normalizeCoordinates = (v: [number, number]) => {
         // hope this works
@@ -147,18 +172,16 @@ export const Viewport = (props: PropsWithChildren) => {
     )
 
     return (
-        <Carte title="viewport">
-            <LeaveMeAlone>
+        <Carte title="viewport" wholeHeight>
+            {/* <LeaveMeAlone> */}
+            <ResizeSensor targetRef={canvasRef} onResize={onResize}>
                 <canvas
                     ref={canvasRef}
                     className="gbk-viewport"
-                    style={{
-                        margin: '5px',
-                        width: '100%',
-                        touchAction: 'none',
-                    }}
+             
                 />
-            </LeaveMeAlone>
+            </ResizeSensor>
+            {/* </LeaveMeAlone> */}
         </Carte>
     )
 }

@@ -9,9 +9,8 @@ import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/b
 import { PropsWithChildren } from 'react'
 
 import { type ToolID } from '../types'
-import { LAYER_TYPES as TYPES } from '../../formats'
+import { selectTool, useDispatch, useSelector } from '../state'
 
-/*
 export function Toolbar(
     props: PropsWithChildren<{ className?: CardProps['className'] }>,
 ) {
@@ -29,9 +28,8 @@ function ToolButton(
         children: string | JSX.Element
     }>,
 ) {
-    const update = useUpdate()
-    const layerType = useSelector((st) => st.activeLayer?.type)
-    const tool = useSelector((st) => layerType && st.currentTool[layerType])
+    const dispatch = useDispatch()
+    const tool = useSelector((st) => st.ui.tool)
 
     if (props.disabled) return null
 
@@ -46,21 +44,24 @@ function ToolButton(
             <Button
                 icon={props.icon}
                 large
-                disabled={!layerType}
+                // disabled={!layerType}
                 intent={tool === props.id ? 'primary' : 'none'}
                 onClick={() => {
-                    update((draft) => {
-                        draft.currentTool[layerType!] = props.id
-                    })
+                    console.log("DISPA!", props.id)
+                    dispatch(selectTool(props.id))
+                    // update((draft) => {
+                    // draft.currentTool[layerType!] = props.id
+                    // })
                 }}
             />
         </Tooltip>
     )
 }
 
-const { supportsCreate, supportsDraw, supportsSelect } = selectors.activeLayer
+// const { supportsCreate, supportsDraw, supportsSelect } = selectors.activeLayer
 export function CreateTool(props: unknown) {
-    const enabled = useSelector(supportsCreate)
+    // const enabled = useSelector(supportsCreate)
+    const enabled = true
 
     return (
         <ToolButton id="create" icon="new-object" disabled={!enabled}>
@@ -70,7 +71,8 @@ export function CreateTool(props: unknown) {
 }
 
 export function SelectTool(props: unknown) {
-    const enabled = useSelector(supportsSelect)
+    // const enabled = useSelector(supportsSelect)
+    const enabled = true
 
     return (
         <ToolButton id="select" icon="hand-up" disabled={!enabled}>
@@ -80,7 +82,8 @@ export function SelectTool(props: unknown) {
 }
 
 export function DrawTool(props: unknown) {
-    const enabled = useSelector(supportsDraw)
+    // const enabled = useSelector(supportsDraw)
+    const enabled = true
 
     return (
         <ToolButton id="draw" icon="draw" disabled={!enabled}>
@@ -88,4 +91,3 @@ export function DrawTool(props: unknown) {
         </ToolButton>
     )
 }
-*/
