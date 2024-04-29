@@ -9,32 +9,20 @@ interface CarteProps {
     title?: string
     lofted?: boolean
     wholeHeight?: boolean
+    stacking?: boolean
     // style?: CSSProperties
 }
+import classes from 'classnames'
 
 export function Carte(props: PropsWithChildren<CarteProps>) {
-    // const extraStyle = props.wholeHeight ? {
-    //     "100%"
-    // } : {}
-    return (
-        <Section
-            title={props.title}
-            compact
-            elevation={1}
-            className={props.wholeHeight ? 'card-whole-height' : ''}
-            style={{
+    const klass = classes({
+        'card-whole-height': props.wholeHeight,
+        'card-stacking-context': props.stacking,
+    })
 
-                // height: props.wholeHeight ? '100%' : undefined,
-            }}
-        >
-            <SectionCard
-                style={{
-                    // flexGrow: props.wholeHeight ? 1 : undefined,
-                    // overflow: props.wholeHeight ? 'hidden' : 'hidden scroll',
-                }}
-            >
-                {props.children}
-            </SectionCard>
+    return (
+        <Section title={props.title} compact elevation={1} className={klass}>
+            <SectionCard>{props.children}</SectionCard>
         </Section>
     )
 }

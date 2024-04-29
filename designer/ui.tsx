@@ -19,7 +19,7 @@ import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 
 import './ui.css'
 
-export function create(domElement: HTMLElement, App: ReactNode) {
+export function createApp(domElement: HTMLElement, App: ReactNode) {
     const liaison = new Liaison()
     const root = createRoot(domElement)
     root.render(

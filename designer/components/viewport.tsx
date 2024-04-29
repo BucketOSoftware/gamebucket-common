@@ -64,41 +64,33 @@ export const Viewport = (props: PropsWithChildren) => {
     const toolHandler = useTool()
     const p = useSelector((state) => state.ui.attribs)
 
-    function redrawAll() {
-        if (canvasRef.current && loaded && redraw) {
-            // console.warn('Draw it all!', loaded)
-            for (let layer of loaded.itemOrder) {
-                redraw(
-                    canvasRef.current,
-                    layer as Container.ItemID,
-                    loaded.items[
-                        layer as Container.ItemID
-                    ] as EditableSubresource,
-                )
-            }
-        }
-    }
+    const [canvasSize, setCanvasSize] = useState({ width: NaN, height: NaN })
+    // const [height, setHeight] = useState(0)
 
     useEffect(() => {
-        console.warn('Changggg...', canvasRef.current, loaded, redraw)
+        // console.warn('Changggg...', canvasRef.current, loaded, redraw)
         requestAnimationFrame(redrawAll)
     }, [canvasRef.current, loaded, redraw])
 
+    useEffect(() => {
+        const bound = canvasRef.current?.getBoundingClientRect()
+        // requestAnimationFrame(redrawAll)
+    }, [canvasRef.current])
+
     const onResize = useCallback(
+        // TODO: multiple??
         ([re]: ResizeObserverEntry[]) => {
-            // requestAnimationFrame(() => {
-            console.log(
-                canvasRef.current?.width,
-                canvasRef.current?.height,
-                re.contentBoxSize[0],
-                // re.borderBoxSize[0].blockSize,
-            )
-            // if (!canvasRef.current) return
             invariant(canvasRef.current)
-            const w = Math.ceil(re.contentBoxSize[0].inlineSize)
-            const h = Math.ceil(re.contentBoxSize[0].blockSize)
-            canvasRef.current.width = w * window.devicePixelRatio
-            canvasRef.current.height = h * window.devicePixelRatio
+
+            const { inlineSize: width, blockSize: height } =
+                re.contentBoxSize[0]
+            setCanvasSize({ width, height })
+            canvasRef.current.width =
+                Math.floor(width) * window.devicePixelRatio
+            canvasRef.current.height =
+                Math.floor(height) * window.devicePixelRatio
+
+            // this should be happening inside a rAF
             redrawAll()
         },
         [canvasRef.current],
@@ -143,7 +135,6 @@ export const Viewport = (props: PropsWithChildren) => {
         invariant(canvasRef.current)
         let memo = toolHandler(canvasRef.current, newPhase, gesture)
         phase.current = gesturePhasePersists(newPhase)
-        // console.log('Ope:', newPhase, phase.current)
 
         return memo
     }
@@ -171,38 +162,44 @@ export const Viewport = (props: PropsWithChildren) => {
         },
     )
 
+    function redrawAll() {
+        if (canvasRef.current && loaded && redraw) {
+            const ctx = canvasRef.current.getContext('2d')
+            ctx?.clearRect(
+                0,
+                0,
+                canvasRef.current.width,
+                canvasRef.current.height,
+            )
+            for (let layer of loaded.itemOrder) {
+                redraw(
+                    canvasRef.current,
+                    layer as Container.ItemID,
+                    loaded.items[
+                        layer as Container.ItemID
+                    ] as EditableSubresource,
+                )
+            }
+        }
+    }
+
     return (
-        <Carte title="viewport" wholeHeight>
-            {/* <LeaveMeAlone> */}
-            <ResizeSensor targetRef={canvasRef} onResize={onResize}>
-                <canvas
-                    ref={canvasRef}
-                    className="gbk-viewport"
-             
-                />
+        <Carte title="viewport" wholeHeight stacking>
+            <ResizeSensor onResize={onResize}>
+                <div className="layerboss">
+                    <canvas ref={canvasRef} className="gbk-viewport" />
+                    <div>
+                    </div>
+                    <svg
+                        style={{ left: 32, top: 32, width: 32, height: 32 }}
+                        className="marching-ants"
+                        viewBox="0 0 40 40"
+                        preserveAspectRatio="none"
+                    >
+                        <rect width="40" height="40" />
+                    </svg>
+                </div>
             </ResizeSensor>
-            {/* </LeaveMeAlone> */}
         </Carte>
     )
 }
-
-// maybe eac
-
-// function LayerCanvas(props: {
-//     layer: Spatial.Editable<2>
-//     layerID: Container.ItemID
-// }) {
-//     // This is to render onto, not to actually render. TODO: offscreencanvas?
-//     // const [canvas] = useState(document.createElement('canvas'))
-//     // useEffect(() => console.warn('NEW CANVAS:', canvas), [canvas])
-//     const canvy = useMemo(
-//         () => document.createElement('canvas'),
-//         [props.layerID],
-//     )
-
-//     // useLiaison
-//     // useEffect(() => {
-
-//     // }, [props.layer, props.layerID])
-//     // return <></>
-// }
