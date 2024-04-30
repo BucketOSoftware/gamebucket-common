@@ -2,6 +2,8 @@
     --line-thickness: 4px;
     --line-stride: 1.75;
 
+    --panel-gap: 8px;
+
     --palette-button-width: 32px;
     --palette-border-thickness: 2px;
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
@@ -10,7 +12,28 @@
 #gbk-designer .main {
     width: 100%;
     height: 100%;
+    padding: var(--panel-gap);
     overflow: hidden
+}
+
+#gbk-designer .columns {
+    gap: calc(var(--panel-gap) / 2);
+}
+
+#gbk-designer .resize-handle {
+    border-radius: 10px;
+    border: 5px double hsl(214, 17%, 75%);
+    background-color: #1c2127;
+    padding: 1px;
+}
+
+#gbk-designer .column {
+    display: flex;
+    flex-direction: column;
+    /* overflow-x: hidden;
+    overflow-y: scroll; */
+
+    gap: var(--panel-gap);
 }
 
 #gbk-designer .card-whole-height {

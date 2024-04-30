@@ -1,17 +1,15 @@
-import { ReactNode, StrictMode } from 'react'
+import { PropsWithChildren, ReactNode, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 // import invariant from 'tiny-invariant'
-
+import {
+    PanelGroup as Group,
+    Panel,
+    PanelResizeHandle as ResizeHandle,
+} from 'react-resizable-panels'
 import { Provider } from 'react-redux'
+
 import { store } from './state'
 import { Liaison, LiaisonProvider } from './liaison'
-
-export * from './components'
-export * from './gestures'
-export * from './state'
-export * from './types'
-export * from './resource'
-export { useLiaison } from './liaison'
 
 import 'normalize.css'
 import '@blueprintjs/core/lib/css/blueprint.css'
@@ -36,4 +34,36 @@ export function createApp(domElement: HTMLElement, App: ReactNode) {
             root.unmount()
         },
     ] as const
+}
+
+export function ColumnGroup({ children }: { children: JSX.Element[] }) {
+    return (
+        <Group direction="horizontal" className='columns'>
+            {children.flatMap((element, idx) => {
+                if (idx < children.length - 1) {
+                    return [element, <ResizeHandle className="resize-handle" />]
+                } else {
+                    return element
+                }
+            })}
+        </Group>
+    )
+}
+
+export function Column({ children }: PropsWithChildren) {
+    return <Panel className="resizable-column">{children}</Panel>
+}
+
+export function Sidebar({ children }: PropsWithChildren) {
+    return (
+        <Panel
+            className="resizable-column"
+            style={{ overflow: 'hidden auto' }}
+            defaultSize={30}
+            minSize={20}
+            maxSize={50}
+        >
+            <section className="column">{children}</section>
+        </Panel>
+    )
 }
