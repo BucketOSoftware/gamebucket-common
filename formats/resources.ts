@@ -17,9 +17,13 @@ export { Spatial } from './spatial'
 export namespace Container {
     export type ItemID = Opaque<string, 'CONTAINER_ITEM_ID'>
 
-    function isItemID(id: string | ItemID, c: Serialized<any>): id is ItemID {
+    export function isItemID(
+        id: string | ItemID,
+        c: Serialized<any>,
+    ): id is ItemID {
         return id in c.items
     }
+    
     type Properties = Record<keyof any, any> | void
 
     export interface Serialized<

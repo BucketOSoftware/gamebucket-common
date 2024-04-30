@@ -112,7 +112,7 @@ const useDrawTool =
 
         dispatch(
             editElement({
-                layer: 'ground' as Container.ItemID,
+                layer: 'tiles' as Container.ItemID,
                 id: 4,
                 property: 'tile',
                 newValue: 99,

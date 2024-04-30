@@ -6,6 +6,7 @@ import { CSSProperties, PropsWithChildren } from 'react'
 // }
 
 interface CarteProps {
+    className?: string
     title?: string
     lofted?: boolean
     wholeHeight?: boolean
@@ -15,7 +16,7 @@ interface CarteProps {
 import classes from 'classnames'
 
 export function Carte(props: PropsWithChildren<CarteProps>) {
-    const klass = classes({
+    const klass = classes(props.className, {
         'card-whole-height': props.wholeHeight,
         'card-stacking-context': props.stacking,
     })

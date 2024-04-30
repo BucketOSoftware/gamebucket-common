@@ -126,7 +126,7 @@ export namespace Spatial {
 
     export type Palettes<S extends TSchema> = S extends TObject
         ? { [P in keyof S['properties']]?: Palette }
-        : Palette | undefined
+        : Record<string, Palette> | Palette | undefined
 
     export type Editable<
         D extends Dimensions = Dimensions,

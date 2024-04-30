@@ -34,14 +34,16 @@ export type Palette<K extends PaletteID = PaletteID> =
     | ColorPicker
 
 /** User can select from the given items */
-type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
+export type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
 
 /** Select an arbitrary color. Use a PaletteDiscrete with swatches to select
  * from a specific set of colors */
 interface ColorPicker {
+    paletteType: 'COLOR_PICKER'
+
     // default is false
     alpha?: boolean
-    value: 'rgbtuple'
+    format: 'rgbtuple'
 }
 
 /** If icon/img/label are all omitted, the entry is considered "nil", i.e. no tile in this location or whatever */

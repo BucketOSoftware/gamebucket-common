@@ -4,10 +4,11 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import invariant from 'tiny-invariant'
 
-import { LayerID } from '../resource'
+// import { LayerID } from '../resource'
 import { RootState, selectLayer } from '../state'
+import { Container } from '../../formats'
 
-export function Layers(props: unknown) {
+export function Layers() {
     const dispatch = useDispatch()
 
     const resource = useSelector((state: RootState) => state.loaded[0])
@@ -16,8 +17,7 @@ export function Layers(props: unknown) {
 
     useEffect(() => {
         if (resource) {
-            console.log('Conna select', resource && resource.itemOrder[0])
-            dispatch(selectLayer(resource.itemOrder[0]))
+            dispatch(selectLayer(resource.itemOrder[0] as Container.ItemID))
         }
     }, [resource])
 
@@ -25,27 +25,28 @@ export function Layers(props: unknown) {
         return null
     }
 
-    function selectTheLayer<S extends TSchema>(seek: LayerID) {
+    function selectTheLayer<S extends TSchema>(seek: Container.ItemID) {
         // Confirm the layer is loaded
         const found = resource.itemOrder.find((id) => id === seek)
         invariant(found, 'Layer not found or no resource')
-        dispatch(selectLayer(found))
+        dispatch(selectLayer(seek))
     }
     return (
         <Section compact elevation={1} title="Layers" className="sidebar-panel">
             <SectionCard padded={false}>
                 <CardList compact bordered={false}>
                     {resource.itemOrder.map((id) => {
+                        invariant(Container.isItemID(id, resource))
+                        const label = resource.items[id].displayName || id
                         return (
                             <Card
-                                key={id.toString()}
+                                key={id}
                                 compact
                                 interactive
                                 selected={id === selectedLayer}
                                 onClick={() => selectTheLayer(id)}
                             >
-                                {resource.items[id].displayName ||
-                                    id.toString()}
+                                {label}
                             </Card>
                         )
                     })}

@@ -16,17 +16,18 @@ import { ResourceType, Container, Spatial, GenericResource } from '../formats'
 
 import { PaletteID } from './resource'
 import { ToolID } from './types'
-import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
-import { uniqueId, zipObject } from 'lodash-es'
+import {
+    PayloadAction,
+    configureStore,
+    createSelector,
+    createSlice,
+    current,
+} from '@reduxjs/toolkit'
+
+const PALETTES_MUTEX = true
 
 export type EditableSubresource = Spatial.Editable<2, TSchema, any>
 export type EditableResource = Container.Editable<EditableSubresource[]>
-
-// export const uiSlice = createSlice({
-//     name: 'ui',
-//     initialState: { tool: 'draw', attribs: {} } as {},
-//     reducers: {},
-// })
 
 export const designerSlice = createSlice({
     name: 'designer',
@@ -40,15 +41,30 @@ export const designerSlice = createSlice({
         loaded: EditableResource[]
     },
     reducers: {
-        selectTool: (state, { payload }: PayloadAction<ToolID>) => {
-            state.tool = payload
+        selectPalette: (
+            draft,
+            {
+                payload: [attribute, value],
+            }: PayloadAction<[string | undefined, any]>,
+        ) => {
+            invariant(attribute, 'TODO: single-attribute layers')
+            console.warn('SETTING:', attribute, value)
+            if (PALETTES_MUTEX) {
+                draft.attribs = { [attribute]: value }
+            } else {
+                draft.attribs[attribute] = value
+            }
+        },
+
+        selectTool: (draft, { payload }: PayloadAction<ToolID>) => {
+            draft.tool = payload
         },
 
         selectLayer: (
-            state,
+            draft,
             { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
-            state.layer = payload
+            draft.layer = payload
         },
 
         editElement: (
@@ -56,56 +72,46 @@ export const designerSlice = createSlice({
             {
                 payload,
             }: PayloadAction<{
-                layer: Container.ItemID,
+                layer: Container.ItemID
                 id: string | number
                 property: string
                 newValue: any
             }>,
         ) => {
-            // const { id, layer: layerId, property, newValue } = payload
-            console.log("Hi!", payload)
-            // [id]
-            /*
-            const layerObj = draft.loaded[0].items.find(i => i === layer)
-            const data = layerObj.data
+            const { id, layer: layerId, property, newValue } = payload
+            // console.log('Hi!', payload)
+            // console.log("yo", current(draft))
             invariant(
-                id in data,
-                `Invalid ID for layer ${layerId} '${layerObj.displayName}': ${id}`,
+                id in draft.loaded[0].items[layerId].data,
+                "Element doesn't exist",
             )
-            // @ts-expect-error
-            const element = data[id]
+
+            // const layerObj = draft.loaded[0].items.find(i => i === layer)
+            const data = draft.loaded[0].items[layerId].data
+
             // FIXME: element might not be an object!
-            console.log("setting", element, property, newValue)
-            element[property] = newValue
+            /*
+            console.log(
+                'setting',
+                current(data[id as keyof typeof data]),
+                property,
+                newValue,
+            )
             */
+            // @ts-expect-error
+            data[id as keyof typeof data][property] = newValue
         },
 
         open: (
             draft,
             { payload: resource }: PayloadAction<EditableResource>,
         ) => {
-            // console.warn('responding!!', resource)
             if (!resource) {
                 draft.loaded = []
                 return
             }
 
             // TODO: accept serialized form, convert to editable form.
-
-            // // TODO?: should we ever not auto-generate these?
-            // invariant(resource.items, 'No items??')
-            // const ids = resource.itemOrder.map((item) =>
-            //     uniqueId(`gbres/${item}/`),
-            // )
-            // const items = zipObject(ids, resource.items)
-
-            // draft.loaded = [
-            //     {
-            //         ...resource,
-            //         items,
-            //         itemOrder: ids,
-            //     },
-            // ]
 
             draft.loaded = [resource]
             console.log(
@@ -121,14 +127,19 @@ export const store = configureStore({
     reducer: designerSlice.reducer,
 })
 
-export const { open, selectLayer, selectTool,editElement } = designerSlice.actions
+export const { open, selectLayer, selectTool, selectPalette, editElement } =
+    designerSlice.actions
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>
 // Inferred type: {posts: PostsState, comments: CommentsState, users: UsersState}
 export type AppDispatch = typeof store.dispatch
 
-// export const useSelector = reduxUseSelector<RootState>
-// export const useDispatch = reduxUseDispatch/
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 export const useDispatch = reduxUseDispatch.withTypes<AppDispatch>() // Export a hook that can be reused to resolve types
+
+export const selectedLayer = createSelector(
+    [(state: RootState) => state.loaded[0], (state: RootState) => state.layer],
+    (loadedResource, layerId) =>
+        loadedResource && layerId ? loadedResource.items[layerId] : undefined,
+)
