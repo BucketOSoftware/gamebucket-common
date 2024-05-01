@@ -8,7 +8,19 @@ export interface Size {
 }
 
 /** An axis-aligned rectangle. `x` and `y` represent the minium coordinate in the rectangle, and `width` and `height` are the size/shape */
-export type Rect = GVec2 & Size
+export type Rect = {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+export type OptionalArea = {
+    x: number
+    y: number
+    width?: number
+    height?: number
+}
 
 export function build(
     x: number,

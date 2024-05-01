@@ -10,9 +10,8 @@ import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
-import { Tuple, Opaque } from 'ts-essentials'
 
-import { ResourceType, Container, Spatial, GenericResource } from '../formats'
+import { ResourceType, Container, Spatial } from '../formats'
 
 import { PaletteID } from './resource'
 import { ToolID } from './types'
@@ -28,6 +27,7 @@ const PALETTES_MUTEX = true
 
 export type EditableSubresource = Spatial.Editable<2, TSchema, any>
 export type EditableResource = Container.Editable<EditableSubresource[]>
+type ElementID = string | number
 
 export const designerSlice = createSlice({
     name: 'designer',
@@ -65,6 +65,24 @@ export const designerSlice = createSlice({
             { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
             draft.layer = payload
+        },
+
+        /** apply currently selected palette attributes to the given elements in the selected layer */
+        applyPalette: (draft, { payload: ids }: PayloadAction<ElementID[]>) => {
+            invariant(Container.isItemID(draft.layer!, draft.loaded[0]))
+            const layer = draft.loaded[0].items[draft.layer!]
+
+            const array = Array.isArray(layer.data) && layer.data
+            const record = !Array.isArray(layer.data) && layer.data
+            // TODO: coerce values to match layer schema?
+            for (let id of ids) {
+                const e =
+                    typeof id === 'number'
+                        ? array && array[id]
+                        : record && record[id]
+                invariant(e && typeof e === 'object', `Element ${id} not found`)
+                Object.assign(e, draft.attribs)
+            }
         },
 
         editElement: (
@@ -106,40 +124,54 @@ export const designerSlice = createSlice({
             draft,
             { payload: resource }: PayloadAction<EditableResource>,
         ) => {
-            if (!resource) {
-                draft.loaded = []
-                return
-            }
-
             // TODO: accept serialized form, convert to editable form.
-
             draft.loaded = [resource]
-            console.log(
-                Object.entries(resource.items).map(([k, v]) =>
-                    Object.values(v.data),
-                ),
-            )
         },
     },
 })
 
 export const store = configureStore({
     reducer: designerSlice.reducer,
+    middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+            // we're using immer, so I'm not sure we need this
+            immutableCheck: false,
+            serializableCheck: false,
+        }),
 })
-
-export const { open, selectLayer, selectTool, selectPalette, editElement } =
-    designerSlice.actions
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>
-// Inferred type: {posts: PostsState, comments: CommentsState, users: UsersState}
 export type AppDispatch = typeof store.dispatch
 
-export const useSelector = reduxUseSelector.withTypes<RootState>()
+// ---------
+//  Actions
+// ---------
+
 export const useDispatch = reduxUseDispatch.withTypes<AppDispatch>() // Export a hook that can be reused to resolve types
+
+export const {
+    open,
+    applyPalette,
+    selectLayer,
+    selectTool,
+    selectPalette,
+    editElement,
+} = designerSlice.actions
+
+// -----------------
+//  Retrieving Data
+// -----------------
+
+export const useSelector = reduxUseSelector.withTypes<RootState>()
 
 export const selectedLayer = createSelector(
     [(state: RootState) => state.loaded[0], (state: RootState) => state.layer],
     (loadedResource, layerId) =>
         loadedResource && layerId ? loadedResource.items[layerId] : undefined,
 )
+
+export const useCurrentPalettes = () =>
+    useSelector(
+        (state) => state.layer && state.loaded[0]?.items[state.layer]?.palettes,
+    )

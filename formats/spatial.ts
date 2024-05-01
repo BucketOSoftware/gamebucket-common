@@ -43,7 +43,7 @@ export namespace Spatial {
         D extends 2 ? ResourceType.SpatialDense2D : ResourceType.SpatialDense3D
     >
 
-    interface Sparse<
+    export interface Sparse<
         D extends Dimensions = Dimensions,
         S extends TSchema = TSchema,
         // P extends {} | void = void,
@@ -60,9 +60,9 @@ export namespace Spatial {
         data: Record<string, Static<S>>
     }
 
-    interface Dense<
-        D extends Dimensions,
-        S extends TSchema,
+    export interface Dense<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
         // P extends {} | void = void,
     > {
         type: D extends 2

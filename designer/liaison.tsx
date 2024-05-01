@@ -1,20 +1,19 @@
 import { Static, TSchema } from '@sinclair/typebox'
 import { produce } from 'immer'
 import {
-    createContext,
     PropsWithChildren,
+    createContext,
     useContext,
     useEffect,
     useSyncExternalStore,
 } from 'react'
 import { useDispatch } from 'react-redux'
 
-import { Container, GenericResource, Spatial } from '../formats'
+import { Container, Spatial } from '../formats'
 import { GVec2 } from '../geometry'
 import * as rect from '../rect'
 
 import { EditableResource, EditableSubresource, open } from './state'
-import { AsyncOrSync } from 'ts-essentials'
 
 export interface DepictProps {
     resourceId: Container.ItemID
@@ -22,10 +21,28 @@ export interface DepictProps {
     canvasSize: rect.Size
 }
 
-type SomeImage = OffscreenCanvas | HTMLCanvasElement | HTMLImageElement
-
 interface LiaisonData {
     openResources: EditableResource[]
+
+    /** Given two points in the viewport, and a presumably dense layer, return a list of elements */
+    selectLine?: (
+        coordinates: [to: GVec2, from: GVec2],
+        viewport: DOMRect,
+        layer: Spatial.Dense,
+    ) => Array<number> | undefined
+
+    /** Designer wants to know the ID sof the elements at the given coordinate in the viewport ( [0..1) in both directions)
+     * @param [area] position and optionally size of the area we're interested in
+     * @param [viewport] CSS size of the viewport in px
+     * @param [layer] which layer we want to know about.
+     *
+     * @todo: `undefined` for layer means consider all layers?
+     */
+    select?: (
+        area: rect.OptionalArea,
+        viewport: DOMRect,
+        layer: Spatial.Editable,
+    ) => Array<string | number> | undefined
 
     /** User has "dragged" the edit window by this amount (normalized coordinates) */
     onPan?: (normalizedMovement: GVec2) => void

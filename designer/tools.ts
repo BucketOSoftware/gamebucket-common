@@ -6,42 +6,35 @@ import { rect } from '..'
 import { Container, ResourceType, Spatial } from '../formats'
 
 import { GesturePhase, GestureState } from './gestures'
-import { editElement, useDispatch, useSelector } from './state'
+import { applyPalette, editElement, useDispatch, useSelector } from './state'
 import { useLiaison } from './liaison'
+import { ToolID } from './types'
 
-type Callbacks = ReturnType<typeof useLiaison>
+type LiaisonData = ReturnType<typeof useLiaison>
 
 export function useTool() {
     const liaisonData = useLiaison()
-    // const resource = useSelector((state) => state.edited.loaded[0])
-
     const toolName = useSelector((state) => state.tool)
-    console.log('hook for', toolName)
 
-    const getThing = useCallback(() => {
-        switch (toolName) {
-            case 'select':
-                return useSelectTool(liaisonData)
-            case 'draw':
-                return useDrawTool(liaisonData)
-            case 'create':
-                return useCreateTool(liaisonData)
-        }
-
-        throw new Error('Invalid tool: ' + toolName)
-    }, [toolName, liaisonData])
-
-    return getThing()
+    return useCallback(
+        () => toolCallbacks[toolName](liaisonData),
+        [toolName, liaisonData],
+    )()
 }
 
-const useSelectTool =
-    <L extends Spatial.Editable>(callbacks: Callbacks) =>
-    (
-        phase: GesturePhase,
-        gesture: GestureState,
-        layer: Readonly<L>,
-        dispatch: any,
-    ) => {
+type ToolFn<L extends Spatial.Editable> = (
+    phase: GesturePhase,
+    gesture: GestureState,
+    viewport: DOMRect,
+    layer: Readonly<L>,
+    dispatch: any,
+) => any
+
+const toolCallbacks: Record<
+    ToolID,
+    (liaison: LiaisonData) => ToolFn<Spatial.Editable>
+> = {
+    select: (liaison) => (phase, gesture, viewport, layer, dispatch) => {
         // console.warn("select", phase, layer)
         // @ts-expect-error
         const can_drag_elements = layer.isSparse
@@ -71,7 +64,7 @@ const useSelectTool =
                     // whatever we initially clicked on, now we're dragging it
                     // 1. show it somewhere else
                 } else if (big_enough_for_marquee) {
-                    invariant(callbacks.onMarquee, 'No marquee handler')
+                    invariant(liaison.onMarquee, 'No marquee handler')
                     /*
                     const inProgressSelectionItems = callbacks.onMarquee(
                         canvas,
@@ -86,6 +79,7 @@ const useSelectTool =
                 console.warn(
                     rect.fromCorners(...gesture.initial, ...gesture.values),
                 )
+                // console.debug(gesture)
                 if (gesture.memo) {
                     // finish dragging this object
                 } else {
@@ -94,44 +88,43 @@ const useSelectTool =
                 break
         }
         return
-    }
+    },
 
-const useDrawTool =
-    <L extends Spatial.Editable>(callbacks: Callbacks) =>
-    (
-        phase: GesturePhase,
-        gesture: GestureState,
-        layer: Readonly<L>,
-        dispatch: any,
-        // dispatch: typeof useDispatch,
-        // update: (draft: L) => void,
-    ) => {
-        const guff = layer as Spatial.Editable<2>
-        invariant(guff.type === ResourceType.SpatialDense2D)
-        // const elem = guff.data[4] as any
-
-        dispatch(
-            editElement({
-                layer: 'tiles' as Container.ItemID,
-                id: 4,
-                property: 'tile',
-                newValue: 99,
-            }),
+    draw: (liaison) => (phase, gesture, viewport, layer, dispatch) => {
+        invariant(
+            ResourceType.SpatialDense2D === layer.type,
+            'Draw only works on tilemaps (dense 2D layers)',
         )
 
-        // dispatch(
-        // TODO: need the update fn
-        // elem.tile = 97
-        // console.warn('draw', phase, g)
-    }
+        switch (phase) {
+            case GesturePhase.DragStart:
+            case GesturePhase.DragContinue: {
+                const pos = gestureVecToViewportRelative(
+                    gesture.values,
+                    viewport,
+                )
 
-const useCreateTool =
-    <L extends Spatial.Editable>(callbacks: Callbacks) =>
-    (
-        phase: GesturePhase,
-        gesture: GestureState,
-        layer: Readonly<L>,
-        update: (draft: L) => void,
-    ) => {
-        console.warn('yay')
-    }
+                const previous = gesture.memo ?? pos
+
+                const ids = liaison.selectLine!(
+                    [pos, previous],
+                    viewport,
+                    layer,
+                )
+                if (ids) {
+                    dispatch(applyPalette(ids!))
+                }
+                return pos
+            }
+        }
+    },
+    create: (liaison) => (phase, gesture, viewport, layer, dispatch) => {},
+} as const
+
+function gestureVecToViewportRelative(
+    [x, y]: [number, number],
+    { left, top }: DOMRect,
+) {
+    // TODO?: factor in window.scroll*?
+    return { x: x - left, y: y - top }
+}

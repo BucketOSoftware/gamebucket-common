@@ -7,33 +7,33 @@ import {
     Tooltip,
 } from '@blueprintjs/core'
 import classnames from 'classnames'
-import { useCallback } from 'react'
+import { Fragment, useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
 import { Palette, PaletteDiscrete, PaletteID, PaletteImage } from '../resource'
 import {
     selectPalette,
-    selectedLayer,
+    useCurrentPalettes,
     useDispatch,
     useSelector,
 } from '../state'
 
 /** Display possibilities for each attribute in the current layer */
-export function PaletteBox(props: unknown) {
-    const layer = useSelector(selectedLayer)
+export function PaletteBox() {
+    const palettes = useCurrentPalettes()
 
-    if (!layer?.palettes) return null
+    if (!palettes) return null
 
-    if (Array.isArray(layer.palettes)) {
+    if (Array.isArray(palettes)) {
         // it's just one palette
-        console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
-    } else if ('paletteType' in layer.palettes) {
-        console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
+        // console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
+    } else if ('paletteType' in palettes) {
+        // console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
     }
 
     return (
         <Section title="Palette" compact elevation={1}>
-            {Object.entries(layer.palettes).map(([attribute, palette]) => (
+            {Object.entries(palettes).map(([attribute, palette]) => (
                 <SectionCard key={attribute}>
                     <H6 className="bp5-text-muted">{attribute}</H6>
                     <SinglePalette
@@ -115,7 +115,12 @@ function PaletteButton<V extends PaletteID>({
 
     if (icon) {
         return (
-            <Tooltip content={label} placement="bottom">
+            <Tooltip
+                compact
+                disabled={!label}
+                content={label || ''}
+                placement="bottom"
+            >
                 <Button
                     value={value}
                     onClick={onClick}
