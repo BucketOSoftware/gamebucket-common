@@ -1,20 +1,3 @@
-import { Static, TSchema, TUnknown } from '@sinclair/typebox'
-
-// /** @param [K]: ID/key of things that can be placed in the layer */
-// export type Resource<
-//     T extends ResourceType = ResourceType,
-//     E extends TSchema | unknown = unknown,
-//     K extends PaletteID | unknown = unknown,
-// > =
-//     | Layer2D<
-//           E extends TSchema ? E : TUnknown,
-//           K extends PaletteID ? K : string | number
-//       >
-//     | MinimalResource<T>
-
-// export interface MinimalResource<T extends ResourceType = ResourceType>
-//     extends Metadata<T> {}
-
 // -----
 //  Palettes
 // -----
@@ -37,6 +20,7 @@ export type Palette<K extends PaletteID = PaletteID> =
 
 /** User can select from the given items */
 export type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
+
 
 /** Select an arbitrary color. Use a PaletteDiscrete with swatches to select
  * from a specific set of colors */
