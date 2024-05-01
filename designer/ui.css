@@ -21,10 +21,10 @@
 }
 
 #gbk-designer .resize-handle {
-    border-radius: 10px;
-    border: 5px double hsl(214, 17%, 75%);
+    border-radius: 1px;
+    border: 1px double hsl(214, 17%, 75%);
     background-color: #1c2127;
-    padding: 1px;
+    padding: 1.5px;
 }
 
 #gbk-designer .column {
@@ -137,7 +137,6 @@
 
 #gbk-designer .gbk-palette-button {
     border-radius: 4px;
-    /* box-sizing: content-box; */
     padding: 0px;
     box-shadow: 1px 1px rgba(0, 0, 0, 50%);
     border: var(--palette-border-thickness) solid rgba(0, 0, 0, 0%);
