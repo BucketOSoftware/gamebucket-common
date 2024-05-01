@@ -14,19 +14,21 @@ import {
     phaseFromGesture,
 } from '../gestures'
 import { useLiaison } from '../liaison'
-import { EditableSubresource, useDispatch, useSelector } from '../state'
+import {
+    EditableSubresource,
+    useDispatch,
+    useSelectedLayer,
+    useSelector,
+} from '../state'
 import { useTool } from '../tools'
 
 import { Carte } from './common'
 
 export const Viewport = (props: PropsWithChildren) => {
     const toolHandler = useTool()
-    const { Depict } = useLiaison()
 
     const dispatch = useDispatch()
-    const loaded = useSelector((state) => state.loaded[0])
-    const editedLayer = useSelector((state) => loaded?.items[state.layer!])
-    // const paletteSelections = useSelector((state) => state.attribs)
+    const editedLayer = useSelectedLayer()
 
     const phase = useRef<GesturePhase>()
     const viewportRef = useRef<HTMLDivElement>(null)
@@ -52,16 +54,13 @@ export const Viewport = (props: PropsWithChildren) => {
     ) => {
         // Track whether a gesture is ongoing, and ignore ones that aren't relevant
         const newPhase = phaseFromGesture(type, gesture, phase.current)
-
-        if (newPhase === IGNORE_GESTURE) {
-            return
-        }
+        if (newPhase === IGNORE_GESTURE) return
 
         let memo = toolHandler(
             newPhase,
             gesture,
             viewportSize,
-            editedLayer,
+            editedLayer!,
             dispatch,
         )
 
@@ -96,26 +95,40 @@ export const Viewport = (props: PropsWithChildren) => {
         <Carte title="viewport" wholeHeight stacking>
             <ResizeSensor targetRef={viewportRef} onResize={onResize}>
                 <div ref={viewportRef} className="layerboss gbk-viewport">
-                    {Depict &&
-                        loaded?.itemOrder.map((id) => {
-                            return (
-                                <Depict
-                                    key={id}
-                                    resourceId={id as Container.ItemID}
-                                    resource={
-                                        loaded.items[
-                                            id as Container.ItemID
-                                        ] as EditableSubresource
-                                    }
-                                    canvasSize={viewportSize}
-                                />
-                            )
-                        })}
-                    <MarchingAnts x={0} y={0} width={42} height={97} />
+                    <ViewportLayers viewportSize={viewportSize} />
+                    {/* <MarchingAnts x={0} y={0} width={27} height={97} /> */}
                 </div>
             </ResizeSensor>
         </Carte>
     )
+}
+
+function ViewportLayers({ viewportSize }: { viewportSize: DOMRect }) {
+    const { Depict } = useLiaison()
+    const loaded = useSelector((state) => state.loaded[0])
+
+    if (!Depict) {
+        return (
+            <div className="gbk-warning">
+                [!] No "Depict" component passed to designer.
+            </div>
+        )
+    }
+
+    if (!loaded) {
+        return <div className="gbk-warning">[!] No assets loaded.</div>
+    }
+
+    return loaded.itemOrder.map((id) => (
+        <Depict
+            key={id}
+            resourceId={id as Container.ItemID}
+            resource={
+                loaded.items[id as Container.ItemID] as EditableSubresource
+            }
+            canvasSize={viewportSize}
+        />
+    ))
 }
 
 function MarchingAnts(props: rect.Rect) {

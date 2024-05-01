@@ -31,15 +31,19 @@ type ElementID = string | number
 
 export const designerSlice = createSlice({
     name: 'designer',
-    initialState: { tool: 'select', attribs: {}, loaded: [] } as {
-        tool: ToolID
-        attribs: Record<string, PaletteID>
-        /** ID of the layer under edit */
-        layer?: Container.ItemID
+
+    initialState: { selected: { tool: 'select', attribs: {} }, loaded: [] } as {
+        selected: {
+            tool: ToolID
+            attribs: Record<string, PaletteID>
+            /** ID of the layer under edit */
+            layer?: Container.ItemID
+        }
 
         // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
         loaded: EditableResource[]
     },
+
     reducers: {
         selectPalette: (
             draft,
@@ -50,27 +54,29 @@ export const designerSlice = createSlice({
             invariant(attribute, 'TODO: single-attribute layers')
             console.warn('SETTING:', attribute, value)
             if (PALETTES_MUTEX) {
-                draft.attribs = { [attribute]: value }
+                draft.selected.attribs = { [attribute]: value }
             } else {
-                draft.attribs[attribute] = value
+                draft.selected.attribs[attribute] = value
             }
         },
 
         selectTool: (draft, { payload }: PayloadAction<ToolID>) => {
-            draft.tool = payload
+            draft.selected.tool = payload
         },
 
         selectLayer: (
             draft,
             { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
-            draft.layer = payload
+            draft.selected.layer = payload
         },
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
         applyPalette: (draft, { payload: ids }: PayloadAction<ElementID[]>) => {
-            invariant(Container.isItemID(draft.layer!, draft.loaded[0]))
-            const layer = draft.loaded[0].items[draft.layer!]
+            invariant(
+                Container.isItemID(draft.selected.layer!, draft.loaded[0]),
+            )
+            const layer = draft.loaded[0].items[draft.selected.layer!]
 
             const array = Array.isArray(layer.data) && layer.data
             const record = !Array.isArray(layer.data) && layer.data
@@ -81,7 +87,8 @@ export const designerSlice = createSlice({
                         ? array && array[id]
                         : record && record[id]
                 invariant(e && typeof e === 'object', `Element ${id} not found`)
-                Object.assign(e, draft.attribs)
+
+                Object.assign(e, draft.selected.attribs)
             }
         },
 
@@ -126,6 +133,7 @@ export const designerSlice = createSlice({
         ) => {
             // TODO: accept serialized form, convert to editable form.
             draft.loaded = [resource]
+            draft.selected.layer = resource.itemOrder[0]
         },
     },
 })
@@ -165,13 +173,16 @@ export const {
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
-export const selectedLayer = createSelector(
-    [(state: RootState) => state.loaded[0], (state: RootState) => state.layer],
-    (loadedResource, layerId) =>
-        loadedResource && layerId ? loadedResource.items[layerId] : undefined,
-)
+export const useSelectedLayer = () =>
+    useSelector(
+        (state) =>
+            state.selected.layer &&
+            state.loaded[0]?.items[state.selected.layer],
+    )
 
 export const useCurrentPalettes = () =>
     useSelector(
-        (state) => state.layer && state.loaded[0]?.items[state.layer]?.palettes,
+        (state) =>
+            state.selected.layer &&
+            state.loaded[0]?.items[state.selected.layer]?.palettes,
     )

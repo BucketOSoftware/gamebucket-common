@@ -29,7 +29,7 @@ function ToolButton(
     }>,
 ) {
     const dispatch = useDispatch()
-    const tool = useSelector((st) => st.tool)
+    const tool = useSelector(({ selected }) => selected.tool)
 
     if (props.disabled) return null
 
@@ -58,7 +58,6 @@ function ToolButton(
     )
 }
 
-// const { supportsCreate, supportsDraw, supportsSelect } = selectors.activeLayer
 export function CreateTool(props: unknown) {
     // const enabled = useSelector(supportsCreate)
     const enabled = true

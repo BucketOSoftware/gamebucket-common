@@ -7,7 +7,7 @@ import {
     Tooltip,
 } from '@blueprintjs/core'
 import classnames from 'classnames'
-import { Fragment, useCallback } from 'react'
+import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
 import { Palette, PaletteDiscrete, PaletteID, PaletteImage } from '../resource'
@@ -15,20 +15,20 @@ import {
     selectPalette,
     useCurrentPalettes,
     useDispatch,
+    useSelectedLayer,
     useSelector,
 } from '../state'
 
 /** Display possibilities for each attribute in the current layer */
 export function PaletteBox() {
     const palettes = useCurrentPalettes()
-
     if (!palettes) return null
 
     if (Array.isArray(palettes)) {
         // it's just one palette
-        // console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
+        console.warn('TODO: one-value schema?', palettes)
     } else if ('paletteType' in palettes) {
-        // console.warn('TODO: one-value schema?', layer.schema, layer.palettes)
+        console.warn('TODO: one-value schema?', palettes)
     }
 
     return (
@@ -56,13 +56,13 @@ function SinglePalette<V extends PaletteID>({
 }) {
     const dispatch = useDispatch()
 
-    const selected = useSelector(
-        (state) => attribute && state.attribs[attribute],
-    )
-
     const onSelect = useCallback(
         (value: V) => dispatch(selectPalette([attribute, value])),
         [dispatch, attribute],
+    )
+
+    const selectedValue = useSelector(
+        ({ selected }) => attribute && selected.attribs[attribute],
     )
 
     if ('paletteType' in palette) {
@@ -84,7 +84,7 @@ function SinglePalette<V extends PaletteID>({
             {palette.map((entry, _idx) => (
                 <PaletteButton
                     key={entry.value}
-                    selected={selected === entry.value}
+                    selected={selectedValue === entry.value}
                     onSelect={onSelect}
                     {...entry}
                 />
@@ -156,7 +156,6 @@ function PaletteButton<V extends PaletteID>({
     }
 
     invariant(label, 'Invalid palette entry')
-    // if (label) {
     return (
         <Tag
             interactive
@@ -167,7 +166,6 @@ function PaletteButton<V extends PaletteID>({
             {label}
         </Tag>
     )
-    // }
 }
 
 /** @todo This re-renders an awful lot, what gives */

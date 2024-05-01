@@ -14,7 +14,7 @@ type LiaisonData = ReturnType<typeof useLiaison>
 
 export function useTool() {
     const liaisonData = useLiaison()
-    const toolName = useSelector((state) => state.tool)
+    const toolName = useSelector((state) => state.selected.tool)
 
     return useCallback(
         () => toolCallbacks[toolName](liaisonData),

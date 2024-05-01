@@ -1,57 +1,38 @@
-import { Card, CardList, Section, SectionCard } from '@blueprintjs/core'
-import { TSchema } from '@sinclair/typebox'
-import { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import invariant from 'tiny-invariant'
+import { Card, CardList } from '@blueprintjs/core'
 
-// import { LayerID } from '../resource'
-import { RootState, selectLayer } from '../state'
 import { Container } from '../../formats'
+import { selectLayer, useDispatch, useSelector } from '../state'
+import { Carte } from './common'
 
 export function Layers() {
     const dispatch = useDispatch()
 
-    const resource = useSelector((state: RootState) => state.loaded[0])
+    const layerList = useSelector((state) =>
+        state.loaded[0]?.itemOrder.map((id) => ({
+            id: id as Container.ItemID,
+            label:
+                state.loaded[0].items[id as Container.ItemID].displayName || id,
+        })),
+    )
+    const selectedLayer = useSelector((state) => state.selected.layer)
 
-    const selectedLayer = useSelector((state: RootState) => state.layer)
+    if (!layerList?.length) return null
 
-    useEffect(() => {
-        if (resource) {
-            dispatch(selectLayer(resource.itemOrder[0] as Container.ItemID))
-        }
-    }, [resource])
-
-    if (!resource) {
-        return null
-    }
-
-    function selectTheLayer<S extends TSchema>(seek: Container.ItemID) {
-        // Confirm the layer is loaded
-        const found = resource.itemOrder.find((id) => id === seek)
-        invariant(found, 'Layer not found or no resource')
-        dispatch(selectLayer(seek))
-    }
     return (
-        <Section compact elevation={1} title="Layers" className="sidebar-panel">
-            <SectionCard padded={false}>
-                <CardList compact bordered={false}>
-                    {resource.itemOrder.map((id) => {
-                        invariant(Container.isItemID(id, resource))
-                        const label = resource.items[id].displayName || id
-                        return (
-                            <Card
-                                key={id}
-                                compact
-                                interactive
-                                selected={id === selectedLayer}
-                                onClick={() => selectTheLayer(id)}
-                            >
-                                {label}
-                            </Card>
-                        )
-                    })}
-                </CardList>
-            </SectionCard>
-        </Section>
+        <Carte title="Layers">
+            <CardList compact bordered={false}>
+                {layerList.map(({ id, label }) => (
+                    <Card
+                        key={id}
+                        compact
+                        interactive
+                        selected={id === selectedLayer}
+                        onClick={() => dispatch(selectLayer(id))}
+                    >
+                        {label}
+                    </Card>
+                ))}
+            </CardList>
+        </Carte>
     )
 }

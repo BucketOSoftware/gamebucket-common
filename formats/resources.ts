@@ -23,24 +23,23 @@ export namespace Container {
     ): id is ItemID {
         return id in c.items
     }
-    
+
     type Properties = Record<keyof any, any> | void
 
     export interface Serialized<
         L extends GenericResource.Serialized<ResourceType>[],
         P extends Properties = Properties,
-        K extends string = string,
+        K extends ItemID = ItemID,
     > extends GenericResource.Serialized<ResourceType.Container> {
         type: ResourceType.Container
-        // items: L
-        items: Record<ItemID, L[number]>
+        items: Record<K, L[number]>
         properties?: P
     }
 
     export interface Editable<
         L extends GenericResource.Editable<ResourceType>[],
         P extends Properties = Properties,
-        K extends string = string,
+        K extends ItemID = ItemID,
     > extends Serialized<L, P> {
         itemOrder: K[]
     }
