@@ -10,7 +10,7 @@ import classnames from 'classnames'
 import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
-import { Palette, PaletteDiscrete, PaletteID } from '../resource'
+import { Palette, PaletteDiscrete, PaletteID, PaletteImage } from '../resource'
 import {
     selectPalette,
     selectedLayer,
@@ -56,15 +56,14 @@ function SinglePalette<V extends PaletteID>({
 }) {
     const dispatch = useDispatch()
 
-    const onSelect = useCallback(
-        (value: V) => {
-            console.log('SEL', attribute, value)
-            dispatch(selectPalette([attribute, value]))
-        },
-        [dispatch, attribute],
+    const selected = useSelector(
+        (state) => attribute && state.attribs[attribute],
     )
 
-    useSelector((state) => attribute && state.attribs[attribute])
+    const onSelect = useCallback(
+        (value: V) => dispatch(selectPalette([attribute, value])),
+        [dispatch, attribute],
+    )
 
     if ('paletteType' in palette) {
         const { paletteType, format, alpha } = palette
@@ -85,7 +84,7 @@ function SinglePalette<V extends PaletteID>({
             {palette.map((entry, _idx) => (
                 <PaletteButton
                     key={entry.value}
-                    attribute={attribute}
+                    selected={selected === entry.value}
                     onSelect={onSelect}
                     {...entry}
                 />
@@ -99,21 +98,19 @@ function ColorPicker(props: any) {
 }
 
 function PaletteButton<V extends PaletteID>({
-    value,
-    attribute,
     label,
     img,
     icon,
     swatch,
+
+    value,
+    selected,
     onSelect,
 }: {
     value: V
-    attribute?: string
+    selected?: boolean
     onSelect: (value: V) => void
 } & PaletteDiscrete[number]) {
-    invariant(attribute, 'what do we do for this, huh')
-
-    const selected = useSelector((state) => state.attribs[attribute] === value)
     const onClick = useCallback(() => onSelect(value), [onSelect, value])
 
     if (icon) {
@@ -126,9 +123,7 @@ function PaletteButton<V extends PaletteID>({
                         ['gbk-palette-button-selected']: selected,
                     })}
                     minimal={!selected}
-                    rightIcon={
-                        <img className="gbk-palette-sizing" src={icon} />
-                    }
+                    rightIcon={<PaletteIcon icon={icon} />}
                 ></Button>
             </Tooltip>
         )
@@ -156,16 +151,45 @@ function PaletteButton<V extends PaletteID>({
     }
 
     invariant(label, 'Invalid palette entry')
-    if (label) {
+    // if (label) {
+    return (
+        <Tag
+            interactive
+            round
+            intent={selected ? 'primary' : 'none'}
+            onClick={onClick}
+        >
+            {label}
+        </Tag>
+    )
+    // }
+}
+
+/** @todo This re-renders an awful lot, what gives */
+function PaletteIcon({ icon }: { icon: PaletteImage }) {
+    if (Array.isArray(icon)) {
+        throw new Error('TODO')
+        /*
+        const [url, { x, y, width, height }] = icon
+
         return (
-            <Tag
-                interactive
-                round
-                intent={selected ? 'primary' : 'none'}
-                onClick={onClick}
-            >
-                {label}
-            </Tag>
+            <div
+                className="gbk-palette-sizing"
+                style={{
+                    width,
+                    height,
+                    imageRendering: 'pixelated',
+                    // transform: 'scale(3)',
+                    backgroundColor: 'hsl(0 0% 0%)',
+                    backgroundImage: `url("${url}")`,
+                    // backgroundSize: '100%',
+                    backgroundPositionX: -x,
+                    backgroundPositionY: -y,
+                }}
+            />
         )
+        */
+    } else {
+        return <img className="gbk-palette-icon" src={icon} />
     }
 }

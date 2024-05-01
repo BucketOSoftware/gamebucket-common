@@ -19,6 +19,8 @@ import { Static, TSchema, TUnknown } from '@sinclair/typebox'
 //  Palettes
 // -----
 
+import { Rect } from '../rect'
+
 // export function validID<T extends object>(
 //     o: T,
 //     v: string | number | symbol,
@@ -46,16 +48,20 @@ interface ColorPicker {
     format: 'rgbtuple'
 }
 
+// an image URL, or an image URL plus the portion of the image that should be displayed
+export type PaletteImage = string | [string, Rect]
+
+
 /** If icon/img/label are all omitted, the entry is considered "nil", i.e. no tile in this location or whatever */
 interface PaletteEntry<K extends PaletteID> {
     /** when this entry is drawn/placed/whatever, the data-adding logic will get
      * the position (and maybe area, if `this.area` is true), and this value */
     value: K
     /** src for an icon used to represent the thing */
-    icon?: string
+    icon?: PaletteImage
     /** src for an image of the thing, intended to be displayed as large as
-     * reasonable */
-    img?: string
+     * reasonable. @todo */
+    img?: never
     /** name of the thing, for tooltip */
     label?: string
     /** Swatch. Use a subset of CSS colors maybe?
