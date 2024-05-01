@@ -109,7 +109,7 @@ const toolCallbacks: Record<
                 const ids = liaison.selectLine!(
                     [pos, previous],
                     viewport,
-                    layer,
+                    layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
                 )
                 if (ids) {
                     dispatch(applyPalette(ids!))

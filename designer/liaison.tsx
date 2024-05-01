@@ -28,7 +28,7 @@ interface LiaisonData {
     selectLine?: (
         coordinates: [to: GVec2, from: GVec2],
         viewport: DOMRect,
-        layer: Spatial.Dense,
+        layer: Spatial.Dense<2>,
     ) => Array<number> | undefined
 
     /** Designer wants to know the ID sof the elements at the given coordinate in the viewport ( [0..1) in both directions)
