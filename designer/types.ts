@@ -5,6 +5,7 @@ export const TOOLS = [
     'draw',
     'select',
     'create',
+    'zoom',
     /*'line'*/
     /*'marquee',*/
 ] as const

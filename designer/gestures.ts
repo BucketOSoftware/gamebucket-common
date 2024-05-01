@@ -1,5 +1,8 @@
 import { GestureKey, Handler } from '@use-gesture/react'
+import { RefObject } from 'react'
 import invariant from 'tiny-invariant'
+import { createUseGesture, dragAction, moveAction } from '@use-gesture/react'
+const useGesture = createUseGesture([moveAction, dragAction])
 // import { ToolContext } from './state'
 
 export const DRAG_ENTITY_THRESHOLD_MS = 200
@@ -27,6 +30,32 @@ export type GestureFn<K extends GestureKey = GestureKey> = (
 */
 
 export const IGNORE_GESTURE = Symbol()
+
+export function useViewportGestures(
+    ref: RefObject<HTMLElement>,
+    handleGesture: <G extends 'move' | 'drag'>(
+        gesture: GestureState<G>,
+        type: G,
+    ) => any,
+) {
+    // const handlers = useMemo(() => {
+    // return {
+    const handlers = {
+        onMove: (gesture: GestureState<'move'>) =>
+            handleGesture(gesture, 'move'),
+        onDrag: (gesture: GestureState<'drag'>) =>
+            handleGesture(gesture, 'drag'),
+    }
+    // }, [handleGesture])
+
+    return useGesture(handlers, {
+        target: ref,
+        eventOptions: { passive: false, capture: true },
+        drag: {
+            from: [0, 0],
+        },
+    })
+}
 
 export function phaseFromGesture<G extends GestureKey>(
     type: G,

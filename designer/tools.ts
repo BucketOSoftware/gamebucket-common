@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import invariant from 'tiny-invariant'
 
 import { rect } from '..'
@@ -13,13 +13,14 @@ import { ToolID } from './types'
 type LiaisonData = ReturnType<typeof useLiaison>
 
 export function useTool() {
+    const dispatch = useDispatch()
     const liaisonData = useLiaison()
     const toolName = useSelector((state) => state.selected.tool)
 
-    return useCallback(
-        () => toolCallbacks[toolName](liaisonData),
-        [toolName, liaisonData],
-    )()
+    return useMemo(
+        () => toolCallbacks[toolName](dispatch, liaisonData),
+        [toolName, dispatch, liaisonData],
+    )
 }
 
 type ToolFn<L extends Spatial.Editable> = (
@@ -27,15 +28,16 @@ type ToolFn<L extends Spatial.Editable> = (
     gesture: GestureState,
     viewport: DOMRect,
     layer: Readonly<L>,
-    dispatch: any,
 ) => any
 
 const toolCallbacks: Record<
     ToolID,
-    (liaison: LiaisonData) => ToolFn<Spatial.Editable>
+    (
+        dispatch: ReturnType<typeof useDispatch>,
+        liaison: LiaisonData,
+    ) => ToolFn<Spatial.Editable>
 > = {
-    select: (liaison) => (phase, gesture, viewport, layer, dispatch) => {
-        // console.warn("select", phase, layer)
+    select: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
         // @ts-expect-error
         const can_drag_elements = layer.isSparse
         const has_held_still_for_enough_time =
@@ -90,7 +92,7 @@ const toolCallbacks: Record<
         return
     },
 
-    draw: (liaison) => (phase, gesture, viewport, layer, dispatch) => {
+    draw: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
         invariant(
             ResourceType.SpatialDense2D === layer.type,
             'Draw only works on tilemaps (dense 2D layers)',
@@ -118,13 +120,16 @@ const toolCallbacks: Record<
             }
         }
     },
-    create: (liaison) => (phase, gesture, viewport, layer, dispatch) => {},
+
+    create: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
+
+    zoom: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
 } as const
 
-function gestureVecToViewportRelative(
+///// utils
+
+// TODO?: factor in window.scroll*?
+const gestureVecToViewportRelative = (
     [x, y]: [number, number],
     { left, top }: DOMRect,
-) {
-    // TODO?: factor in window.scroll*?
-    return { x: x - left, y: y - top }
-}
+) => ({ x: x - left, y: y - top })

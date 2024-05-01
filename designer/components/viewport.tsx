@@ -1,9 +1,15 @@
 import { ResizeSensor } from '@blueprintjs/core'
-import { useGesture } from '@use-gesture/react'
-import { PropsWithChildren, useCallback, useRef, useState } from 'react'
-import invariant from 'tiny-invariant'
+import {
+    PropsWithChildren,
+    RefObject,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 
-import { Container, GenericResource, ResourceType } from '../../formats'
+import { Container } from '../../formats'
 import * as rect from '../../rect'
 
 import {
@@ -12,6 +18,7 @@ import {
     IGNORE_GESTURE,
     gesturePhasePersists,
     phaseFromGesture,
+    useViewportGestures,
 } from '../gestures'
 import { useLiaison } from '../liaison'
 import {
@@ -21,75 +28,42 @@ import {
     useSelector,
 } from '../state'
 import { useTool } from '../tools'
-
 import { Carte } from './common'
+import invariant from 'tiny-invariant'
 
 export const Viewport = (props: PropsWithChildren) => {
-    const toolHandler = useTool()
-
-    const dispatch = useDispatch()
-    const editedLayer = useSelectedLayer()
-
-    const phase = useRef<GesturePhase>()
     const viewportRef = useRef<HTMLDivElement>(null)
-
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
-
     const onResize = useCallback(
         // TODO: multiple??
         (_: ResizeObserverEntry[]) => {
-            if (!viewportRef.current) {
-                console.warn(viewportRef.current, 'no viewport?')
-                return
-            }
-
+            invariant(viewportRef.current)
             setViewportSize(viewportRef.current.getBoundingClientRect())
         },
-        [viewportRef.current],
+        [viewportRef],
     )
 
-    const handleGesture = <G extends 'move' | 'drag'>(
-        gesture: GestureState<G>,
-        type: G,
-    ) => {
-        // Track whether a gesture is ongoing, and ignore ones that aren't relevant
-        const newPhase = phaseFromGesture(type, gesture, phase.current)
-        if (newPhase === IGNORE_GESTURE) return
+    const dispatch = useDispatch()
+    const editedLayer = useSelectedLayer()
+    const toolHandler = useTool()
+    const phase = useRef<GesturePhase>()
 
-        let memo = toolHandler(
-            newPhase,
-            gesture,
-            viewportSize,
-            editedLayer!,
-            dispatch,
-        )
+    const handleGesture = useCallback(
+        <G extends 'move' | 'drag'>(gesture: GestureState<G>, type: G) => {
+            // Track whether a gesture is ongoing, and ignore ones that aren't relevant
+            const newPhase = phaseFromGesture(type, gesture, phase.current)
 
-        phase.current = gesturePhasePersists(newPhase)
+            if (newPhase === IGNORE_GESTURE || !editedLayer) return
 
-        return memo
-    }
+            let memo = toolHandler(newPhase, gesture, viewportSize, editedLayer)
+            phase.current = gesturePhasePersists(newPhase)
 
-    const onMove = useCallback(
-        (state: GestureState<'move'>) => handleGesture(state, 'move'),
-        [handleGesture],
-    )
-
-    const onDrag = useCallback(
-        (state: GestureState<'drag'>) => handleGesture(state, 'drag'),
-        [handleGesture],
-    )
-
-    useGesture(
-        { onMove, onDrag },
-        {
-            target: viewportRef,
-            eventOptions: { passive: false, capture: true },
-            drag: {
-                from: [0, 0],
-                filterTaps: false,
-            },
+            return memo
         },
+        [dispatch, phase, toolHandler, editedLayer],
     )
+
+    useViewportGestures(viewportRef, handleGesture)
 
     return (
         <Carte title="viewport" wholeHeight stacking>
