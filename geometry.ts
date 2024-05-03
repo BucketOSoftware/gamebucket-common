@@ -25,6 +25,7 @@ export type GVec3 = { x: number; y: number; z: number }
 /** A generic quaternion */
 export type GQuat = { w: number; x: number; y: number; z: number }
 
+export type GVec<D extends 2|3> = D extends 2 ? GVec2 : GVec3
 export const GVec2 = (x: number, y: number) => ({ x, y })
 export const GVec3 = (x: number, y: number, z: number) => ({ x, y, z })
 

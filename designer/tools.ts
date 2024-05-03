@@ -1,18 +1,16 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import invariant from 'tiny-invariant'
 
-import { rect } from '..'
-
-import { Container, ResourceType, Spatial } from '../formats'
-
+import { ResourceType, Spatial } from '../formats'
+import * as rect from '../rect'
 import { GesturePhase, GestureState } from './gestures'
-import { applyPalette, editElement, useDispatch, useSelector } from './state'
 import { useLiaison } from './liaison'
+import { applyPalette, useDispatch, useSelector } from './state'
 import { ToolID } from './types'
 
 type LiaisonData = ReturnType<typeof useLiaison>
 
-export function useTool() {
+export function useTool(): ToolFn<Spatial.Editable> {
     const dispatch = useDispatch()
     const liaisonData = useLiaison()
     const toolName = useSelector((state) => state.selected.tool)

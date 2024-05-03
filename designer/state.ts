@@ -1,33 +1,22 @@
-import {
-    TSchema,
-    ValueGuard,
-    Kind,
-    Hint,
-    OptionalKind,
-} from '@sinclair/typebox'
-import invariant from 'tiny-invariant'
+import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
+import { TSchema } from '@sinclair/typebox'
+import { Errors } from '@sinclair/typebox/errors'
+import { Check, ValuePointer } from '@sinclair/typebox/value'
 import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
+import invariant from 'tiny-invariant'
 
-import { ResourceType, Container, Spatial } from '../formats'
-
+import { Container, Spatial } from '../formats'
 import { PaletteID } from './resource'
 import { ToolID } from './types'
-import {
-    PayloadAction,
-    configureStore,
-    createSelector,
-    createSlice,
-    current,
-} from '@reduxjs/toolkit'
 
 const PALETTES_MUTEX = true
 
 export type EditableSubresource = Spatial.Editable<2, TSchema, any>
 export type EditableResource = Container.Editable<EditableSubresource[]>
-type ElementID = string | number
+export type ElementID<S extends string | number = string | number> = S
 
 export const designerSlice = createSlice({
     name: 'designer',
@@ -98,33 +87,32 @@ export const designerSlice = createSlice({
                 payload,
             }: PayloadAction<{
                 layer: Container.ItemID
-                id: string | number
-                property: string
-                newValue: any
+                id: ElementID
+                /** JSON pointer.
+                 * @see https://www.rfc-editor.org/rfc/rfc6901 */
+                pointer: string
+                value: unknown
             }>,
         ) => {
-            const { id, layer: layerId, property, newValue } = payload
-            // console.log('Hi!', payload)
-            // console.log("yo", current(draft))
+            const { id: elementId, layer: layerId, pointer, value } = payload
+
+            const { schema, data } = draft.loaded[0].items[layerId]
+            const element = data[elementId as keyof typeof data]
+
             invariant(
-                id in draft.loaded[0].items[layerId].data,
+                element && typeof element === 'object',
                 "Element doesn't exist",
             )
 
-            // const layerObj = draft.loaded[0].items.find(i => i === layer)
-            const data = draft.loaded[0].items[layerId].data
-
-            // FIXME: element might not be an object!
-            /*
-            console.log(
-                'setting',
-                current(data[id as keyof typeof data]),
-                property,
-                newValue,
-            )
-            */
-            // @ts-expect-error
-            data[id as keyof typeof data][property] = newValue
+            ValuePointer.Set(element, pointer, value)
+            if (!Check(schema, element)) {
+                console.error(
+                    'Invalid update to an element:',
+                    Array.from(
+                        Errors(schema, data[elementId as keyof typeof data]),
+                    ),
+                )
+            }
         },
 
         open: (

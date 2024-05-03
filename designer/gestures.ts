@@ -1,7 +1,12 @@
 import { GestureKey, Handler } from '@use-gesture/react'
 import { RefObject } from 'react'
 import invariant from 'tiny-invariant'
-import { createUseGesture, dragAction, moveAction } from '@use-gesture/react'
+import {
+    createUseGesture,
+    dragAction,
+    moveAction,
+    useGesture as UG,
+} from '@use-gesture/react'
 const useGesture = createUseGesture([moveAction, dragAction])
 // import { ToolContext } from './state'
 
@@ -106,32 +111,16 @@ export function gesturePhasePersists(
 
     return phase
 }
-/*
-function phaseFromGesture<G extends GestureKey>(
-    type: G,
-    gesture: GestureState<G>,
-    ongoingPhase: GesturePhase | undefined,
-) {
-    const nextPhase = shitPhaseFromGesture(type,gesture,ongoingPhase)
 
-
-switch (nextPhase) {
-    case IGNORE_GESTURE:
-        return
-    case GesturePhase.DragCommit:
-    case GesturePhase.Tap:
-        phase.current = undefined
-        break
-    case GesturePhase.DragStart:
-        phase.current = nextPhase
-        break
-    case GesturePhase.DragContinue:
-        invariant(phase.current === GesturePhase.DragStart)
-        break
-    default:
-        invariant(
-            !phase.current,
-            "I didn't understand this code enough I guess",
-        )
+// export type GestureState<
+export function useDrag(onDrag: Parameters<typeof useGesture>[0]['onDrag']) {
+    return useGesture(
+        { onDrag },
+        {
+            eventOptions: { passive: false, capture: true },
+            drag: {
+                from: [0, 0],
+            },
+        },
+    )
 }
-*/

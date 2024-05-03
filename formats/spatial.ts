@@ -12,12 +12,17 @@ import { Palette } from '../designer'
 import * as rect from '../rect'
 
 import { ResourceType } from './common'
+import { GVec, GVec2, GVec3 } from '../geometry'
 
 /** A dataset where elements are located by 2D or 3D coordinates, e.g. an area/level.
  * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
  */
 export namespace Spatial {
     const K_POSITION = 'position'
+    export type Position =
+        | [number, number]
+        | [number, number, number]
+        | number[]
 
     export type Dimensions = 2 | 3
 
@@ -27,7 +32,7 @@ export namespace Spatial {
      */
     export type IsSparse<S extends TSchema, Sparse, Dense> =
         Static<S> extends {
-            [K_POSITION]: [number, number] | [number, number, number] | number[]
+            [K_POSITION]: Position
         }
             ? Sparse
             : Dense
@@ -82,6 +87,10 @@ export namespace Spatial {
         S extends TSchema = TSchema,
         P extends {} | void = void,
     > = (Sparse<D, S> | Dense<D, S>) & (P extends void ? {} : { properties: P })
+
+    export interface SparseElement<D extends Dimensions = Dimensions> {
+        [K_POSITION]: Position
+    }
 
     interface SNEERerialized<
         D extends Dimensions = Dimensions,

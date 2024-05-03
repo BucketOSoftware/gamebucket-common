@@ -10,7 +10,7 @@ import {
 import { useDispatch } from 'react-redux'
 
 import { Container, Spatial } from '../formats'
-import { GVec2 } from '../geometry'
+import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
 import { EditableResource, EditableSubresource, open } from './state'
@@ -44,8 +44,17 @@ interface LiaisonData {
         layer: Spatial.Editable,
     ) => Array<string | number> | undefined
 
-    /** User has "dragged" the edit window by this amount (normalized coordinates) */
-    onPan?: (normalizedMovement: GVec2) => void
+    /** The user has moved an entity relative to the viewport
+     * @returns The entity's new `position` or `undefined` if it shouldn't move
+     */
+    translateElement?: (
+        element: Spatial.SparseElement,
+        viewportMovement: GVec2,
+        selectedLayer?: Spatial.Sparse,
+    ) => Spatial.Position | void
+
+    /** User has "dragged" the edit window by this amount */
+    onPan?: (pixelMovement: GVec2) => void
 
     /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     onMarquee?: <ID>(
