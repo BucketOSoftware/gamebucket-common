@@ -5,13 +5,15 @@ import {
     StrictMode,
     useCallback,
     useMemo,
+    useRef,
     useState,
 } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { GestureState, useDrag } from './gestures'
 
+import { type Rect } from '../rect'
+import { GestureState, useGesture } from './gestures'
 import { Liaison, LiaisonProvider } from './liaison'
 import { ElementID, store } from './state'
 
@@ -20,6 +22,8 @@ import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import 'normalize.css'
 
 import './ui.css'
+import { Clone } from '@sinclair/typebox'
+import { DragConfig } from '@use-gesture/react'
 
 export function createApp(domElement: HTMLElement, App: ReactNode) {
     const liaison = new Liaison()
@@ -85,7 +89,10 @@ interface MovableElementProps {
     properties: any
 }
 
-const MIN_DRAG_DISTANCE = 32
+const movableElementConfig: DragConfig = {
+    preventDefault: true,
+    from: [0, 0], // for .offset
+}
 /** Represent an entity as a draggable widget */
 export function MovableElement({
     id,
@@ -94,45 +101,65 @@ export function MovableElement({
     onMove,
     onSelect,
 }: MovableElementProps) {
-    const [dragOffset, setDragOffset] = useState<[number, number]>([0, 0])
+    const ref = useRef<HTMLDivElement>(null)
 
-    const dragHandler = useCallback(
+    const [dx, setDx] = useState(0)
+    const [dy, setDy] = useState(0)
+
+    const isDragging = dx || dy
+
+    const onDrag = useCallback(
         (state: GestureState<'drag'>) => {
+            // prevent the marquee box or whatever
+            state.event.stopPropagation()
+
             if (onSelect && state.tap) {
                 onSelect(id)
-            } else if (
-                onMove &&
-                state.distance[0] > MIN_DRAG_DISTANCE &&
-                state.distance[1] > MIN_DRAG_DISTANCE
-            ) {
-                if (state.last) {
-                    onMove(id, state.offset)
-                    setDragOffset([0, 0])
-                } else {
-                    setDragOffset([...state.offset])
+            } else if (onMove && state.intentional) {
+                const offset = state.movement
+                if (
+                    true
+                ) {
+                    if (state.last) {
+                        onMove(id, [offset[0], offset[1]])
+                        setDx(0)
+                        setDy(0)
+                        // setDragOffset([0, 0])
+                    } else {
+                        setDx(offset[0])
+                        setDy(offset[1])
+                    }
                 }
             }
         },
-        [id, onSelect, onMove, setDragOffset],
+        [id, onSelect, onMove, setDx, setDy],
     )
 
-    const dragAttrs = useDrag(dragHandler)()
+    useGesture(
+        { onDrag },
+        {
+            target: ref,
+            eventOptions: { passive: false, capture: false },
+
+            drag: movableElementConfig,
+        },
+    )
+
     const transform = useMemo(
-        () => `translate(${dragOffset[0]}px, ${dragOffset[1]}px)`,
-        [dragOffset[0], dragOffset[1]],
+        () => `translate(${dx + x}px, ${dy + y}px)`,
+        [x, y, dx, dy],
     )
-
     return (
         <div
-            {...dragAttrs}
+            ref={ref}
             className={classnames('gbk-viewport-entity', {
                 'gbk-viewport-entity-movable': onMove,
+                'gbk-viewport-entity-moving': isDragging,
             })}
-            key={id}
             style={{
                 transform,
-                left: x,
-                top: y,
+                left: 0,
+                top: 0,
                 backgroundPositionX: -sx,
                 backgroundPositionY: -sy,
             }}

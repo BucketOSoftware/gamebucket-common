@@ -7,8 +7,8 @@ import {
     moveAction,
     useGesture as UG,
 } from '@use-gesture/react'
-const useGesture = createUseGesture([moveAction, dragAction])
-// import { ToolContext } from './state'
+
+export const useGesture = createUseGesture([moveAction, dragAction])
 
 export const DRAG_ENTITY_THRESHOLD_MS = 200
 export const DRAG_ENTITY_THRESHOLD_DISTANCE = 1
@@ -48,15 +48,17 @@ export function useViewportGestures(
     const handlers = {
         onMove: (gesture: GestureState<'move'>) =>
             handleGesture(gesture, 'move'),
-        onDrag: (gesture: GestureState<'drag'>) =>
-            handleGesture(gesture, 'drag'),
+        onDrag: (gesture: GestureState<'drag'>) => { console.log("gest", gesture.event);
+            return handleGesture(gesture, 'drag')}
     }
     // }, [handleGesture])
 
     return useGesture(handlers, {
         target: ref,
-        eventOptions: { passive: false, capture: true },
+        eventOptions: { passive: false, capture: false },
         drag: {
+            delay:true,
+            preventDefault: true,
             from: [0, 0],
         },
     })
@@ -112,15 +114,16 @@ export function gesturePhasePersists(
     return phase
 }
 
-// export type GestureState<
-export function useDrag(onDrag: Parameters<typeof useGesture>[0]['onDrag']) {
-    return useGesture(
-        { onDrag },
-        {
-            eventOptions: { passive: false, capture: true },
-            drag: {
-                from: [0, 0],
-            },
-        },
-    )
-}
+// // export type GestureState<
+// export function useDrag(onDrag: Parameters<typeof useGesture>[0]['onDrag']) {
+//     return useGesture(
+//         { onDrag },
+//         {
+//             eventOptions: { passive: false, capture: true },
+//             drag: {
+//                 preventDefault: true,
+//                 from: [0, 0],
+//             },
+//         },
+//     )
+// }

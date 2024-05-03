@@ -33,6 +33,18 @@ export function build(
     return { x, y, width, height }
 }
 
+const getx = (v: GVec2) => v.x
+const gety = (v: GVec2) => v.y
+
+export function containingPoints(...points: GVec2[]) {
+    const x_min = Math.min(...points.map(getx))
+    const x_max = Math.max(...points.map(getx))
+    const y_min = Math.min(...points.map(gety))
+    const y_max = Math.max(...points.map(gety))
+
+    return { x: x_min, y: y_min, width: x_max - x_min, height: y_max - y_min }
+}
+
 export function fromCorners(
     x1: number,
     y1: number,

@@ -13,7 +13,7 @@ import { Container, Spatial } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
-import { EditableResource, EditableSubresource, open } from './state'
+import { EditableResource, EditableSubresource, ElementID, open } from './state'
 
 export interface DepictProps {
     resourceId: Container.ItemID
@@ -31,18 +31,11 @@ interface LiaisonData {
         layer: Spatial.Dense<2>,
     ) => Array<number> | undefined
 
-    /** Designer wants to know the ID sof the elements at the given coordinate in the viewport ( [0..1) in both directions)
-     * @param [area] position and optionally size of the area we're interested in
-     * @param [viewport] CSS size of the viewport in px
-     * @param [layer] which layer we want to know about.
-     *
-     * @todo: `undefined` for layer means consider all layers?
-     */
     select?: (
-        area: rect.OptionalArea,
-        viewport: DOMRect,
         layer: Spatial.Editable,
-    ) => Array<string | number> | undefined
+        viewportArea: rect.Rect,
+        marquee: (r: rect.Rect) => void,
+    ) => ElementID[]
 
     /** The user has moved an entity relative to the viewport
      * @returns The entity's new `position` or `undefined` if it shouldn't move

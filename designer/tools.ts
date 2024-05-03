@@ -5,7 +5,7 @@ import { ResourceType, Spatial } from '../formats'
 import * as rect from '../rect'
 import { GesturePhase, GestureState } from './gestures'
 import { useLiaison } from './liaison'
-import { applyPalette, useDispatch, useSelector } from './state'
+import { applyPalette, selectMarquee, useDispatch, useSelector } from './state'
 import { ToolID } from './types'
 
 type LiaisonData = ReturnType<typeof useLiaison>
@@ -47,13 +47,27 @@ const toolCallbacks: Record<
 
         // console.log(gesture.values)
         switch (phase) {
-            case GesturePhase.Hover:
-                // 1. get objects under the cursor and mark them as "hovered"
-                break
+            // case GesturePhase.Hover:
+            // 1. get objects under the cursor and mark them as "hovered"
+            // break
             case GesturePhase.DragStart:
+                return gesture.values
                 // do nothing
                 break
             case GesturePhase.DragContinue:
+                invariant(gesture.memo)
+                const selected = liaison.select!(
+                    layer,
+                    rect.containingPoints(
+                        gestureVecToViewportRelative(gesture.values, viewport),
+                        gestureVecToViewportRelative(gesture.memo, viewport),
+                    ),
+                    (r) => dispatch(selectMarquee(r)),
+                )
+
+                return gesture.memo
+            case GesturePhase.DragCommit:
+                return
                 if (already_dragging_something) {
                     // keep dragging: show the element(s) moved by this amount
                     return gesture.memo
@@ -76,9 +90,9 @@ const toolCallbacks: Record<
                 break
             case GesturePhase.DragCommit:
             case GesturePhase.Tap:
-                console.warn(
-                    rect.fromCorners(...gesture.initial, ...gesture.values),
-                )
+                // console.warn(
+                    // rect.fromCorners(...gesture.initial, ...gesture.values),
+                // )
                 // console.debug(gesture)
                 if (gesture.memo) {
                     // finish dragging this object

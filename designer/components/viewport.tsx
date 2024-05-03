@@ -48,6 +48,10 @@ export const Viewport = (props: PropsWithChildren) => {
     const toolHandler = useTool()
     const phase = useRef<GesturePhase>()
 
+    const ants = useSelector((state) => state.selected.marquee)
+
+    // does useCallback actually get us anything here?
+    // maybe we should move more of the tool-specific logic out of this, like it's just a dispatch
     const handleGesture = useCallback(
         <G extends 'move' | 'drag'>(gesture: GestureState<G>, type: G) => {
             // Track whether a gesture is ongoing, and ignore ones that aren't relevant
@@ -60,7 +64,7 @@ export const Viewport = (props: PropsWithChildren) => {
 
             return memo
         },
-        [dispatch, phase, toolHandler, editedLayer],
+        [dispatch, phase, toolHandler, editedLayer, viewportSize],
     )
 
     useViewportGestures(viewportRef, handleGesture)
@@ -70,7 +74,7 @@ export const Viewport = (props: PropsWithChildren) => {
             <ResizeSensor targetRef={viewportRef} onResize={onResize}>
                 <div ref={viewportRef} className="layerboss gbk-viewport">
                     <ViewportLayers viewportSize={viewportSize} />
-                    {/* <MarchingAnts x={0} y={0} width={27} height={97} /> */}
+                    {ants && <MarchingAnts {...ants} />}
                 </div>
             </ResizeSensor>
         </Carte>

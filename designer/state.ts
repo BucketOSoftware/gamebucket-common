@@ -9,6 +9,7 @@ import {
 import invariant from 'tiny-invariant'
 
 import { Container, Spatial } from '../formats'
+import * as rect from '../rect'
 import { PaletteID } from './resource'
 import { ToolID } from './types'
 
@@ -27,6 +28,8 @@ export const designerSlice = createSlice({
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
             layer?: Container.ItemID
+            /** If defined, viewport coordinates of the area currently being selected */
+            marquee?: rect.Rect
         }
 
         // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
@@ -58,6 +61,13 @@ export const designerSlice = createSlice({
             { payload }: PayloadAction<Container.ItemID | undefined>,
         ) => {
             draft.selected.layer = payload
+        },
+
+        selectMarquee: (
+            draft,
+            {payload}: PayloadAction<rect.Rect | undefined>,
+        ) => {
+            draft.selected.marquee = payload
         },
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
@@ -149,10 +159,11 @@ export const useDispatch = reduxUseDispatch.withTypes<AppDispatch>() // Export a
 export const {
     open,
     applyPalette,
+    editElement,
     selectLayer,
     selectTool,
     selectPalette,
-    editElement,
+    selectMarquee,
 } = designerSlice.actions
 
 // -----------------
