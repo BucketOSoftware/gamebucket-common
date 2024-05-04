@@ -65,7 +65,7 @@ export const SelectTool: ToolDef<'select'> = {
 
     enabled(state) {
         return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
-        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type === 
+        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type ===
     },
 
     viewportHandler(dispatch, liaison) {
@@ -111,27 +111,29 @@ export const SelectTool: ToolDef<'select'> = {
     },
 }
 
-
 export const CreateTool: ToolDef<'create'> = {
     id: 'create',
     icon: 'new-object',
     displayName: 'Create',
 
     enabled(state) {
-        return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
+        return false
+        // return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
     },
 
-    viewportHandler
+    viewportHandler(dispatch, liaison) {
+        return (phase, gesture, viewport, layer) => {}
+    },
 }
 
 export const PlotTool: ToolDef<'plot'> = {
     id: 'plot',
     icon: 'draw',
     displayName: 'Draw',
-    
+
     enabled(state) {
         return getSelectedLayer(state)?.type === ResourceType.SpatialDense2D
-        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type === 
+        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type ===
     },
 
     viewportHandler(dispatch, liaison) {
