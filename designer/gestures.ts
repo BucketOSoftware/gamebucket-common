@@ -1,17 +1,18 @@
-import { GestureKey, Handler } from '@use-gesture/react'
-import { RefObject } from 'react'
-import invariant from 'tiny-invariant'
 import {
+    DragConfig,
+    GestureKey,
+    Handler,
     createUseGesture,
     dragAction,
     moveAction,
-    useGesture as UG,
 } from '@use-gesture/react'
+import { RefObject, useCallback, useMemo, useState } from 'react'
+import invariant from 'tiny-invariant'
 
 export const useGesture = createUseGesture([moveAction, dragAction])
 
 export const DRAG_ENTITY_THRESHOLD_MS = 200
-export const DRAG_ENTITY_THRESHOLD_DISTANCE = 1
+// export const DRAG_ENTITY_THRESHOLD_DISTANCE = 1
 
 export type GestureType = GestureKey
 export type GestureState<G extends GestureType = GestureType> = Parameters<
@@ -26,15 +27,12 @@ export enum GesturePhase {
     Tap = 'TAP',
 }
 
-/*
-export type GestureFn<K extends GestureKey = GestureKey> = (
-    phase: GesturePhase,
-    gesture: GestureState<K>,
-    context: ToolContext,
-) => unknown
-*/
-
-export const IGNORE_GESTURE = Symbol()
+const uVG_eventOptions = { passive: false } as const
+const uVG_dragOptions: DragConfig = {
+    delay: true,
+    preventDefault: true,
+    from: [0, 0],
+} as const
 
 export function useViewportGestures(
     ref: RefObject<HTMLElement>,
@@ -43,26 +41,24 @@ export function useViewportGestures(
         type: G,
     ) => any,
 ) {
-    // const handlers = useMemo(() => {
-    // return {
-    const handlers = {
-        onMove: (gesture: GestureState<'move'>) =>
-            handleGesture(gesture, 'move'),
-        onDrag: (gesture: GestureState<'drag'>) => { console.log("gest", gesture.event);
-            return handleGesture(gesture, 'drag')}
-    }
-    // }, [handleGesture])
+    const handlers = useMemo(
+        () => ({
+            onMove: (gesture: GestureState<'move'>) =>
+                handleGesture(gesture, 'move'),
+            onDrag: (gesture: GestureState<'drag'>) =>
+                handleGesture(gesture, 'drag'),
+        }),
+        [handleGesture],
+    )
 
     return useGesture(handlers, {
         target: ref,
-        eventOptions: { passive: false, capture: false },
-        drag: {
-            delay:true,
-            preventDefault: true,
-            from: [0, 0],
-        },
+        eventOptions: uVG_eventOptions,
+        drag: uVG_dragOptions,
     })
 }
+
+export const IGNORE_GESTURE = Symbol()
 
 export function phaseFromGesture<G extends GestureKey>(
     type: G,
@@ -114,16 +110,47 @@ export function gesturePhasePersists(
     return phase
 }
 
-// // export type GestureState<
-// export function useDrag(onDrag: Parameters<typeof useGesture>[0]['onDrag']) {
-//     return useGesture(
-//         { onDrag },
-//         {
-//             eventOptions: { passive: false, capture: true },
-//             drag: {
-//                 preventDefault: true,
-//                 from: [0, 0],
-//             },
-//         },
-//     )
-// }
+const draggableConfig: DragConfig = {
+    preventDefault: true,
+    from: [0, 0], // for .offset
+}
+
+export type DraggableCallback = (value: true | [dx: number, dy: number]) => void
+export function useDraggable<T extends HTMLElement>(
+    ref: RefObject<T>,
+    callback: DraggableCallback,
+) {
+    const [displacement, setDisplacement] = useState([0, 0])
+
+    const onDrag = useCallback(
+        (state: GestureState<'drag'>) => {
+            // prevent events from bubbling to elements behind this one
+            state.event.stopPropagation()
+
+            if (state.tap) {
+                callback(true)
+            } else {
+                const [dx, dy] = state.movement
+                if (state.last) {
+                    callback([dx, dy])
+                    setDisplacement([0, 0])
+                } else {
+                    setDisplacement([dx, dy])
+                }
+            }
+        },
+        [callback],
+    )
+
+    useGesture(
+        { onDrag },
+        {
+            target: ref,
+            eventOptions: { passive: false, capture: false },
+
+            drag: draggableConfig,
+        },
+    )
+
+    return displacement
+}

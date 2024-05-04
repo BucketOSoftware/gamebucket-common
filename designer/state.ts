@@ -24,10 +24,18 @@ export const designerSlice = createSlice({
 
     initialState: { selected: { tool: 'select', attribs: {} }, loaded: [] } as {
         selected: {
+            /** currently active tool */
             tool: ToolID
+            /** items selected from the palette */
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
             layer?: Container.ItemID
+
+            /** Area selected OR elements selected
+             * @todo unfortunately element IDs are unique to the LAYER, but not globally...
+             */
+            elements?: rect.Rect | ElementID[]
+
             /** If defined, viewport coordinates of the area currently being selected */
             marquee?: rect.Rect
         }
@@ -65,9 +73,24 @@ export const designerSlice = createSlice({
 
         selectMarquee: (
             draft,
-            {payload}: PayloadAction<rect.Rect | undefined>,
+            { payload }: PayloadAction<rect.Rect | undefined>,
         ) => {
             draft.selected.marquee = payload
+        },
+
+        selectElements: (
+            draft,
+            {
+                payload: [layer, elements],
+            }: PayloadAction<
+                [layer: Container.ItemID | undefined, elements: ElementID[]]
+            >,
+        ) => {
+            if (layer) {
+                // TODO: this is very iffy
+                draft.selected.layer = layer
+            }
+            draft.selected.elements = elements
         },
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
@@ -124,6 +147,31 @@ export const designerSlice = createSlice({
                 )
             }
         },
+        editSelectedElements: (
+            draft,
+            {
+                payload: { pointer, value, limit },
+            }: PayloadAction<{
+                pointer: string
+                value: unknown
+                limit?: number
+            }>,
+        ) => {
+            // TODO: check type as well?
+            invariant(
+                Array.isArray(draft.selected.elements),
+                "Can't edit a rect or undefined",
+            )
+
+            const layer = getSelectedLayer(draft)
+            invariant(layer, 'Layer not found')
+
+            const elementId = draft.selected.elements[0]
+            const element = layer.data[elementId as keyof typeof layer.data]
+            invariant(element, 'Element not found')
+
+            ValuePointer.Set(element, pointer, value)
+        },
 
         open: (
             draft,
@@ -160,6 +208,8 @@ export const {
     open,
     applyPalette,
     editElement,
+    editSelectedElements,
+    selectElements,
     selectLayer,
     selectTool,
     selectPalette,
@@ -170,18 +220,13 @@ export const {
 //  Retrieving Data
 // -----------------
 
+const getSelectedLayer = (state: RootState) =>
+    state.selected.layer && state.loaded[0]?.items[state.selected.layer]
+
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
 export const useSelectedLayer = () =>
-    useSelector(
-        (state) =>
-            state.selected.layer &&
-            state.loaded[0]?.items[state.selected.layer],
-    )
+    useSelector((state) => getSelectedLayer(state))
 
 export const useCurrentPalettes = () =>
-    useSelector(
-        (state) =>
-            state.selected.layer &&
-            state.loaded[0]?.items[state.selected.layer]?.palettes,
-    )
+    useSelector((state) => getSelectedLayer(state)?.palettes)

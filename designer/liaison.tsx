@@ -24,16 +24,19 @@ export interface DepictProps {
 interface LiaisonData {
     openResources: EditableResource[]
 
-    /** Given two points in the viewport, and a presumably dense layer, return a list of elements */
+    /** Given two points in the viewport, and a presumably dense layer, return a list of elements
+     * @param [coordinates] Points in viewport space
+     */
     selectLine?: (
-        coordinates: [to: GVec2, from: GVec2],
-        viewport: DOMRect,
         layer: Spatial.Dense<2>,
+        viewport: DOMRect,
+        coordinates: Readonly<[to: GVec2, from: GVec2]>,
     ) => Array<number> | undefined
 
     select?: (
         layer: Spatial.Editable,
-        viewportArea: rect.Rect,
+        viewport: DOMRect,
+        coordinates: Readonly<[to: GVec2, from: GVec2]>,
         marquee: (r: rect.Rect) => void,
     ) => ElementID[]
 

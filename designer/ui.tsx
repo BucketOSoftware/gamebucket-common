@@ -13,7 +13,12 @@ import { Provider } from 'react-redux'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
 import { type Rect } from '../rect'
-import { GestureState, useGesture } from './gestures'
+import {
+    DraggableCallback,
+    GestureState,
+    useDraggable,
+    useGesture,
+} from './gestures'
 import { Liaison, LiaisonProvider } from './liaison'
 import { ElementID, store } from './state'
 
@@ -24,6 +29,7 @@ import 'normalize.css'
 import './ui.css'
 import { Clone } from '@sinclair/typebox'
 import { DragConfig } from '@use-gesture/react'
+import invariant from 'tiny-invariant'
 
 export function createApp(domElement: HTMLElement, App: ReactNode) {
     const liaison = new Liaison()
@@ -74,95 +80,3 @@ export function Sidebar({ children }: PropsWithChildren) {
     )
 }
 
-interface MovableElementProps {
-    /** Arbitrary unique ID */
-    id: ElementID<string>
-    /** Pixel position */
-    position: [number, number]
-    /** Top-left of the part of the image to use. (size is dictated by CSS) */
-    source: [number, number, ...number[]]
-    /** Called when the user wants to move the element by this many viewport pixels */
-    onMove?: (id: string, movement: [number, number]) => void
-    /** Called when the user taps the entity */
-    onSelect?: (id: string) => void
-    /** @todo */
-    properties: any
-}
-
-const movableElementConfig: DragConfig = {
-    preventDefault: true,
-    from: [0, 0], // for .offset
-}
-/** Represent an entity as a draggable widget */
-export function MovableElement({
-    id,
-    position: [x, y],
-    source: [sx, sy],
-    onMove,
-    onSelect,
-}: MovableElementProps) {
-    const ref = useRef<HTMLDivElement>(null)
-
-    const [dx, setDx] = useState(0)
-    const [dy, setDy] = useState(0)
-
-    const isDragging = dx || dy
-
-    const onDrag = useCallback(
-        (state: GestureState<'drag'>) => {
-            // prevent the marquee box or whatever
-            state.event.stopPropagation()
-
-            if (onSelect && state.tap) {
-                onSelect(id)
-            } else if (onMove && state.intentional) {
-                const offset = state.movement
-                if (
-                    true
-                ) {
-                    if (state.last) {
-                        onMove(id, [offset[0], offset[1]])
-                        setDx(0)
-                        setDy(0)
-                        // setDragOffset([0, 0])
-                    } else {
-                        setDx(offset[0])
-                        setDy(offset[1])
-                    }
-                }
-            }
-        },
-        [id, onSelect, onMove, setDx, setDy],
-    )
-
-    useGesture(
-        { onDrag },
-        {
-            target: ref,
-            eventOptions: { passive: false, capture: false },
-
-            drag: movableElementConfig,
-        },
-    )
-
-    const transform = useMemo(
-        () => `translate(${dx + x}px, ${dy + y}px)`,
-        [x, y, dx, dy],
-    )
-    return (
-        <div
-            ref={ref}
-            className={classnames('gbk-viewport-entity', {
-                'gbk-viewport-entity-movable': onMove,
-                'gbk-viewport-entity-moving': isDragging,
-            })}
-            style={{
-                transform,
-                left: 0,
-                top: 0,
-                backgroundPositionX: -sx,
-                backgroundPositionY: -sy,
-            }}
-        />
-    )
-}

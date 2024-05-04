@@ -5,8 +5,15 @@ import { ResourceType, Spatial } from '../formats'
 import * as rect from '../rect'
 import { GesturePhase, GestureState } from './gestures'
 import { useLiaison } from './liaison'
-import { applyPalette, selectMarquee, useDispatch, useSelector } from './state'
+import {
+    applyPalette,
+    selectElements,
+    selectMarquee,
+    useDispatch,
+    useSelector,
+} from './state'
 import { ToolID } from './types'
+import { noop } from 'ts-essentials'
 
 type LiaisonData = ReturnType<typeof useLiaison>
 
@@ -36,6 +43,8 @@ const toolCallbacks: Record<
     ) => ToolFn<Spatial.Editable>
 > = {
     select: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
+        invariant(liaison.select)
+
         // @ts-expect-error
         const can_drag_elements = layer.isSparse
         const has_held_still_for_enough_time =
@@ -44,6 +53,14 @@ const toolCallbacks: Record<
         const already_dragging_something = gesture.memo
 
         const big_enough_for_marquee = true
+
+        const marqueeArea = [
+            gestureVecToViewportRelative(gesture.values, viewport),
+            gestureVecToViewportRelative(
+                gesture.memo ?? gesture.values,
+                viewport,
+            ),
+        ] as const
 
         // console.log(gesture.values)
         switch (phase) {
@@ -54,20 +71,28 @@ const toolCallbacks: Record<
                 return gesture.values
                 // do nothing
                 break
-            case GesturePhase.DragContinue:
+            case GesturePhase.DragContinue: {
                 invariant(gesture.memo)
-                const selected = liaison.select!(
+                const selected = liaison.select(
                     layer,
-                    rect.containingPoints(
-                        gestureVecToViewportRelative(gesture.values, viewport),
-                        gestureVecToViewportRelative(gesture.memo, viewport),
-                    ),
+                    viewport,
+                    marqueeArea,
                     (r) => dispatch(selectMarquee(r)),
                 )
 
                 return gesture.memo
+            }
             case GesturePhase.DragCommit:
-                return
+                {
+                    dispatch(
+                        selectElements([
+                            undefined,
+                            liaison.select(layer, viewport, marqueeArea, noop),
+                        ]),
+                    )
+                    dispatch(selectMarquee())
+                    return
+                }
                 if (already_dragging_something) {
                     // keep dragging: show the element(s) moved by this amount
                     return gesture.memo
@@ -91,7 +116,7 @@ const toolCallbacks: Record<
             case GesturePhase.DragCommit:
             case GesturePhase.Tap:
                 // console.warn(
-                    // rect.fromCorners(...gesture.initial, ...gesture.values),
+                // rect.fromCorners(...gesture.initial, ...gesture.values),
                 // )
                 // console.debug(gesture)
                 if (gesture.memo) {
@@ -105,6 +130,7 @@ const toolCallbacks: Record<
     },
 
     draw: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
+        invariant(liaison.selectLine, 'No selectLine handler')
         invariant(
             ResourceType.SpatialDense2D === layer.type,
             'Draw only works on tilemaps (dense 2D layers)',
@@ -120,11 +146,12 @@ const toolCallbacks: Record<
 
                 const previous = gesture.memo ?? pos
 
-                const ids = liaison.selectLine!(
-                    [pos, previous],
-                    viewport,
+                const ids = liaison.selectLine(
                     layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
+                    viewport,
+                    [pos, previous],
                 )
+
                 if (ids) {
                     dispatch(applyPalette(ids!))
                 }
