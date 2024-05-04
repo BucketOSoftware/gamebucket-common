@@ -1,30 +1,39 @@
-import { Section, SectionCard } from '@blueprintjs/core'
 import { Type, TypeGuard, ValueGuard } from '@sinclair/typebox'
 import { Check } from '@sinclair/typebox/value'
-import { useSelector } from '../state'
-import { FormControl } from './forms'
+
+import { ResourceType } from '../../formats'
+import { useSelectedLayer, useSelector } from '../store'
+import { Carte } from './common'
+import FormControl from './form'
 
 export function PropertiesBox(props: unknown) {
-    const layer = useSelector((st) => st.activeLayer)
-    const selection = useSelector((st) => st.selection)
+    const layer = useSelectedLayer()
+    const selectedIds = useSelector((st) => st.selected.elements)
 
-    const schema = layer?.elementSchema
-    if (!(schema && selection.length)) {
+    const correctType = layer?.type === ResourceType.SpatialSparse2D
+    const schema = layer?.schema
+    if (
+        !(
+            correctType &&
+            schema &&
+            Array.isArray(selectedIds) &&
+            selectedIds.length
+        )
+    ) {
         return null
     }
 
-    if (selection.length > 1) {
+    if (selectedIds.length > 1) {
         return (
-            <Section compact elevation={1} title="Entity">
-                <SectionCard>
-                    [!] {selection.length} entities selected
-                </SectionCard>
-            </Section>
+            <Carte title="Entity">
+                [!] {selectedIds.length} entities selected
+            </Carte>
         )
     } else {
+        const selection = selectedIds.map((id) => layer.data[id])
         let effectiveSchema = schema
 
-        const obj = selection[0]
+        const [obj] = selection
         if (TypeGuard.IsUnion(schema)) {
             const matching = schema.anyOf.filter((s) => Check(s, obj))
 
@@ -32,8 +41,8 @@ export function PropertiesBox(props: unknown) {
                 effectiveSchema = matching[0]
             } else {
                 // probably not going to work very well, but attempt to edit what fields we can
-                console.warn('Editing with union schema:', effectiveSchema)
                 effectiveSchema = Type.Intersect(matching)
+                console.warn('Editing with union schema:', effectiveSchema)
             }
         }
 
@@ -44,17 +53,11 @@ export function PropertiesBox(props: unknown) {
                 : 'Entity'
 
         return (
-            <Section compact elevation={1} title={title}>
-                <SectionCard>
-                    <form>
-                        <FormControl
-                            path=""
-                            schema={effectiveSchema}
-                            value={obj}
-                        />
-                    </form>
-                </SectionCard>
-            </Section>
+            <Carte title={title}>
+                <form>
+                    <FormControl path="" schema={effectiveSchema} value={obj} />
+                </form>
+            </Carte>
         )
     }
 }

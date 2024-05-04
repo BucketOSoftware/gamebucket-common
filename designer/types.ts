@@ -1,25 +1,8 @@
 import { NumberOptions, Type, type SchemaOptions } from '@sinclair/typebox'
-import invariant from 'tiny-invariant'
-
-import { Metadata } from '../formats/common'
-
-import { ResourceAdapter } from './resource'
-
-export const TOOLS = [
-    'draw',
-    'select',
-    'create',
-    /*'line'*/
-    /*'marquee',*/
-] as const
-
-export type ToolID = (typeof TOOLS)[number]
 
 // -----
 //  JSON schema "presets"
 // -----
-
-const VecTitles = ['x', 'y'] as const
 
 /** @todo Allow user to specify integer, etc.  */
 export function TVec2(
@@ -28,68 +11,58 @@ export function TVec2(
 ) {
     return Type.Tuple(
         [
-            Type.Number({ ...numberOpts, title: VecTitles[0] }),
-            Type.Number({ ...numberOpts, title: VecTitles[1] }),
+            Type.Number({ ...numberOpts, title: 'x' }),
+            Type.Number({ ...numberOpts, title: 'y' }),
         ],
         tupleOpts,
     )
 }
 
-// -------------------
-// #region Resource adapters
-// -------------------
-
-// ----------------
-//  Tool callbacks
-// ----------------
-
 // -----
 //  Palettes
 // -----
 
-export function validID<T extends object>(
-    o: T,
-    v: string | number | symbol,
-): asserts v is keyof T {
-    invariant(v in o, 'Not a valid key')
+import { Rect } from '../rect'
+
+export type PaletteID = string
+
+/** Information on which values are valid for a given property */
+export type Palette<K extends PaletteID = PaletteID> =
+    | PaletteDiscrete<K>
+    | ColorPicker
+
+/** User can select from the given items */
+export type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
+
+/** Select an arbitrary color. Use a PaletteDiscrete with swatches to select
+ * from a specific set of colors */
+interface ColorPicker {
+    paletteType: 'COLOR_PICKER'
+
+    // default is false
+    alpha?: boolean
+    format: 'rgbtuple'
 }
 
-export type PaletteID = string | number
+// an image URL, or an image URL plus the portion of the image that should be displayed
+export type PaletteImage = string | [string, Rect]
 
-export type Palette<
-    ID extends PaletteID = PaletteID,
-    E extends PaletteEntry = PaletteEntry,
-> = Record<ID, E>
-
-export type PaletteEntry = PaletteEntryText | PaletteEntryIcon
-// | PaletteEntryImage
-
-interface PaletteEntryText {
-    icon?: undefined
-    img?: undefined
-    label: string
-
-    /** if true, this item occupies a rectangular area rather than a point */
-    area?: boolean
-}
-
-interface PaletteEntryImage {
-    icon?: undefined
-    // src for an image of the thing, intended to be displayed as large as reasonable
-    img: string
-    // name of the thing, for tooltip
+/** If icon/img/label are all omitted, the entry is considered "nil", i.e. no tile in this location or whatever */
+interface PaletteEntry<K extends PaletteID> {
+    /** when this entry is drawn/placed/whatever, the data-adding logic will get
+     * the position (and maybe area, if `this.area` is true), and this value */
+    value: K
+    /** src for an icon used to represent the thing */
+    icon?: PaletteImage
+    /** src for an image of the thing, intended to be displayed as large as
+     * reasonable. @todo */
+    img?: never
+    /** name of the thing, for tooltip */
     label?: string
-
-    /** if true, this item occupies a rectangular area rather than a point */
-    area?: boolean
-}
-
-interface PaletteEntryIcon {
-    // src for an icon used to represent the thing
-    icon: string
-    img?: undefined
-    // name of the thing, for tooltip
-    label?: string
+    /** Swatch. Use a subset of CSS colors maybe?
+     * @see https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
+     */
+    swatch?: string
 
     /** if true, this item occupies a rectangular area rather than a point */
     area?: boolean

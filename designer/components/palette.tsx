@@ -1,87 +1,197 @@
-import { Button, Section, SectionCard, Tag } from '@blueprintjs/core'
-import { MouseEventHandler, useCallback } from 'react'
+import {
+    Button,
+    H6,
+    Section,
+    SectionCard,
+    Tag,
+    Tooltip,
+} from '@blueprintjs/core'
+import classnames from 'classnames'
+import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
-import { selectors, useSelector, useUpdate } from '../state'
-import { Palette, PaletteID } from '../types'
+import { Palette, PaletteDiscrete, PaletteID, PaletteImage } from '../resource'
+import {
+    selectPalette,
+    useCurrentPalettes,
+    useDispatch,
+    useSelector,
+} from '../store'
 
-/** Display a selection of possible  */
+/** Display possibilities for each attribute in the current layer */
+export function PaletteBox() {
+    const palettes = useCurrentPalettes()
+    if (!palettes) return null
 
-export function PaletteBox(props: unknown) {
-    const palette: Palette<PaletteID> | undefined = useSelector(
-        selectors.activeLayer.palette,
-    )
-    if (!palette) return null
-
-    let klass = ''
-    if (palette.length) {
-        if (palette[0].icon || palette[0].img) {
-            klass = 'palette-grid'
-        } else if (palette[0].label) {
-            klass = 'palette-tags'
-        }
+    if (Array.isArray(palettes)) {
+        // it's just one palette
+        console.warn('TODO: one-value schema?', palettes)
+    } else if ('paletteType' in palettes) {
+        console.warn('TODO: one-value schema?', palettes)
     }
-    // TODO: real keys
+
     return (
         <Section title="Palette" compact elevation={1}>
-            <SectionCard padded className={klass}>
-                {Object.entries(palette).map(([id, entry], idx) => (
-                    <PaletteButton id={id} item={entry} key={id} />
-                    // <Button key={idx} icon={getIcon(choice)} />
-                ))}
-            </SectionCard>
+            {Object.entries(palettes).map(([attribute, palette]) => (
+                <SectionCard key={attribute}>
+                    <H6 className="bp5-text-muted">{attribute}</H6>
+                    <SinglePalette
+                        key={attribute}
+                        attribute={attribute}
+                        palette={palette}
+                    />
+                </SectionCard>
+            ))}
         </Section>
     )
 }
 
-function PaletteButton(props: { id: PaletteID; item: Palette[number] }) {
-    const update = useUpdate()
-    const layer = useSelector(selectors.activeLayer.get)
-    const palette = layer.palette
+function SinglePalette<V extends PaletteID>({
+    attribute,
+    palette,
+}: {
+    attribute?: string
+    palette: Palette<V>
+}) {
+    const dispatch = useDispatch()
 
-    const selected = useSelector(
-        (st) => st.activePaletteItem.get(palette) === props.id,
+    const onSelect = useCallback(
+        (value: V) => dispatch(selectPalette([attribute, value])),
+        [dispatch, attribute],
     )
 
-    const { id, item } = props
-
-    const onClick: MouseEventHandler<HTMLElement> = useCallback(
-        (ev) => {
-            update((draft) => {
-                draft.activePaletteItem.set(palette, id)
-            })
-        },
-        [id, palette],
+    const selectedValue = useSelector(
+        ({ selected }) => attribute && selected.attribs[attribute],
     )
-6
-    if (item.icon) {
+
+    if ('paletteType' in palette) {
+        const { paletteType, format, alpha } = palette
+        invariant(paletteType === 'COLOR_PICKER')
+
         return (
-            <Button active={selected} minimal onClick={onClick}>
-                <img
-                    src={item.icon}
-                    width={24}
-                    height={24}
-                    title={item.label}
+            <ColorPicker
+                attribute={attribute}
+                onSelect={onSelect}
+                outputFormat={format}
+                alpha={alpha}
+            />
+        )
+    }
+
+    return (
+        <div className="palette-grid">
+            {palette.map((entry, _idx) => (
+                <PaletteButton
+                    key={entry.value}
+                    selected={selectedValue === entry.value}
+                    onSelect={onSelect}
+                    {...entry}
                 />
-            </Button>
-        )
-    }
+            ))}
+        </div>
+    )
+}
 
-    if (item.img) {
-        throw new Error('TODO')
-    }
+function ColorPicker(props: any) {
+    return <div className="palette-grid">TODO: Color Picker</div>
+}
 
-    invariant(item.label, 'Invalid palette entry')
-    if (item.label) {
+function PaletteButton<V extends PaletteID>({
+    label,
+    img,
+    icon,
+    swatch,
+
+    value,
+    selected,
+    onSelect,
+}: {
+    value: V
+    selected?: boolean
+    onSelect: (value: V) => void
+} & PaletteDiscrete[number]) {
+    const onClick = useCallback(() => onSelect(value), [onSelect, value])
+
+    if (icon) {
         return (
-            <Tag
-                round
-                intent={selected ? 'primary' : 'none'}
-                interactive
-                onClick={onClick}
+            <Tooltip
+                compact
+                disabled={!label}
+                content={label || ''}
+                placement="bottom"
             >
-                {item.label}
-            </Tag>
+                <Button
+                    value={value}
+                    onClick={onClick}
+                    className={classnames('gbk-palette-button', {
+                        ['gbk-palette-button-selected']: selected,
+                    })}
+                    minimal={!selected}
+                    rightIcon={<PaletteIcon icon={icon} />}
+                ></Button>
+            </Tooltip>
         )
+    }
+
+    if (img) {
+        throw new Error(`TODO: ${img}`)
+    }
+
+    if (swatch) {
+        return (
+            <Button
+                value={value}
+                onClick={onClick}
+                minimal={!selected}
+                className={classnames(
+                    'gbk-palette-button',
+                    'gbk-palette-sizing',
+                    'gbk-palette-swatch', // TODO: style this
+                    { ['gbk-palette-button-selected']: selected },
+                )}
+                style={{ backgroundColor: swatch }}
+            />
+        )
+    }
+
+    invariant(label, 'Invalid palette entry')
+    return (
+        <Tag
+            interactive
+            round
+            intent={selected ? 'primary' : 'none'}
+            onClick={onClick}
+        >
+            {label}
+        </Tag>
+    )
+}
+
+/** @todo This re-renders an awful lot, what gives */
+function PaletteIcon({ icon }: { icon: PaletteImage }) {
+    if (Array.isArray(icon)) {
+        throw new Error('TODO')
+        /*
+        const [url, { x, y, width, height }] = icon
+
+        return (
+            <div
+                className="gbk-palette-sizing"
+                style={{
+                    width,
+                    height,
+                    imageRendering: 'pixelated',
+                    // transform: 'scale(3)',
+                    backgroundColor: 'hsl(0 0% 0%)',
+                    backgroundImage: `url("${url}")`,
+                    // backgroundSize: '100%',
+                    backgroundPositionX: -x,
+                    backgroundPositionY: -y,
+                }}
+            />
+        )
+        */
+    } else {
+        return <img className="gbk-palette-icon" src={icon} />
     }
 }

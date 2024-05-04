@@ -1,69 +1,153 @@
-import type { Matrix3Tuple } from 'three'
+import type { Matrix3Tuple, Matrix4Tuple } from 'three'
+import { Static, TObject, TSchema } from '@sinclair/typebox'
 
+import { Palette } from '../designer'
 import * as rect from '../rect'
-import { Metadata, LAYER_TYPES } from './common'
-import { Static, TSchema, Type } from '@sinclair/typebox'
 
-/** A dataset where elements are located by 2D coordinates, e.g. an area/level.
- * Contains layers in a defined order. Extend to add metadata.
- * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size? */
+import { ResourceType } from './common'
 
-export interface Spatial2D<
-    L extends [...Layer2D<TSchema>[]],
-    P extends {} | undefined,
-> extends Metadata {
-    type: 'resource/spatial2d'
-    layers: L
-    properties: P
-}
+/** A dataset where elements are located by 2D or 3D coordinates, e.g. an area/level.
+ * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
+ */
+export namespace Spatial {
+    const K_POSITION = 'position'
+    export type Position =
+        | [number, number]
+        | [number, number, number]
+        | number[]
 
-// export type Map2D<L> = Spatial2D<L>
-
-export type Layer2D<S extends TSchema> = TileMapLayer<S> | EntityLayer<S>
-
-const DefaultTileSchema = Type.Object({ tile: Type.Integer() })
-/** Generic 2D map layer with implicit coordinates, in row-major (?) order */
-export interface TileMapLayer<
-    S extends TSchema = typeof DefaultTileSchema,
-    K extends string | number = number,
-    Tile = { src: string }, // TODO
-> {
-    type: typeof LAYER_TYPES.TILE_MAP
-    size: rect.Size
-
-    /** Allows a map to have layers with different origins/orientations
-     * @todo Probably just accept integer translations to start, the rest can come later
-     * @default Identity matrix.
-     */
-    worldTransform?: Matrix3Tuple
-
-    /** The schema for each element. @todo make another attempt to derive `Element` from this */
-    schema: S
+    export type Dimensions = 2 | 3
 
     /**
-     * Data
-     * @todo Store as struct of arrays, or save that for the actual game?
+     * Determine whether the schema is densely- or sparsely-addressed
+     * @todo Enforce that POSITION is actually a vector
      */
-    data: Static<S>[]
+    export type IsSparse<S extends TSchema, Sparse, Dense> =
+        Static<S> extends {
+            [K_POSITION]: Position
+        }
+            ? Sparse
+            : Dense
 
-    /** The `tile` field of `data` is an array of indexes into this. Can contain
-     * whatever properties are needed to render the map. Could be stored in a
-     * separate shared file. */
-    tileset: Record<K, Tile>
-}
+    type SpatialResourceType<
+        D extends Dimensions,
+        S extends TSchema,
+    > = IsSparse<
+        S,
+        D extends 2
+            ? ResourceType.SpatialSparse2D
+            : ResourceType.SpatialSparse3D,
+        D extends 2 ? ResourceType.SpatialDense2D : ResourceType.SpatialDense3D
+    >
 
-// export interface EntityLayer<Element> {
-export interface EntityLayer<
-    S extends TSchema,
-    ID extends string | number | symbol = string | number | symbol,
-> {
-    type: typeof LAYER_TYPES.ENTITY_LIST
+    export interface Sparse<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        // P extends {} | void = void,
+    > {
+        type: D extends 2
+            ? ResourceType.SpatialSparse2D
+            : ResourceType.SpatialSparse3D
+        displayName?: string
 
-    schema: S
-    /**
-     * Simple array of things. Not even confined to the bounds of the map,
-     * because that may have some function in the game, or they may be temporary,
-     * or whatever
-     */
-    data: Record<ID, Static<S>>
+        size?: rect.Size
+        worldTransform?: Matrix3Tuple | Matrix4Tuple
+
+        schema: S
+        data: Record<string, Static<S>>
+    }
+
+    export interface Dense<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        // P extends {} | void = void,
+    > {
+        type: D extends 2
+            ? ResourceType.SpatialDense2D
+            : ResourceType.SpatialDense3D
+        displayName?: string
+
+        size: rect.Size
+        worldTransform?: Matrix3Tuple | Matrix4Tuple
+
+        schema: S
+        data: Static<S>[]
+    }
+
+    export type Serialized<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        P extends {} | void = void,
+    > = (Sparse<D, S> | Dense<D, S>) & (P extends void ? {} : { properties: P })
+
+    export interface SparseElement<D extends Dimensions = Dimensions> {
+        [K_POSITION]: Position
+    }
+
+    interface SNEERerialized<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        P extends {} | void = void,
+    > {
+        type: SpatialResourceType<D, S>
+
+        /** Label for the designer UI or user's own benefit */
+        displayName?: string
+
+        /** Size of the layer. Valid coordinates range from [0..width), [0..height)
+         * @todo Make optional if it's a sparse layer
+         */
+        size: IsSparse<S, rect.Size | undefined, rect.Size>
+
+        /** Transformation to turn an [x,y] coordinate on this layer into a
+         * coordinate in world space. If this is a Matrix4Tuple, the coordinates
+         * should be coerced into 3D coordinates with a z coordinate of 0 and
+         * then transformed (e.g., to "stack" 2D layers to create a 3D world)
+         * @todo Probably just accept integer translations to start, the rest can come later
+         * @default [1,0,0,0,1,0,0,0,1]
+         */
+        worldTransform?: Matrix3Tuple | Matrix4Tuple
+
+        /** The schema for each element
+         * @todo Should this be optional when stored in a file, if the game code is going to know the right one?
+         */
+        schema: S
+
+        /** The elements in this layer. Can be an array or an object; either way
+         * the key uniquely identifies the element.
+         *  - If schema has a key named [POSITION], this is a sparse layer and
+         *    that property will be the element's position.
+         * - If not, this is a dense layer and the element's position is based
+         *   on its key, i.e. itssequential position in the array. */
+        // data: IndexedData<Static<S>, IsSparse<S, string | number, number>>
+        data: IsSparse<S, Record<string, Static<S>>, Record<number, Static<S>>>
+
+        properties?: P
+    }
+
+    export type Palettes<S extends TSchema> = S extends TObject
+        ? { [P in keyof S['properties']]?: Palette }
+        : Record<string, Palette> | Palette | undefined
+
+    export type Editable<
+        D extends Dimensions = Dimensions,
+        S extends TSchema = TSchema,
+        P extends {} | void = void,
+    > = Serialized<D, S, P> & {
+        /** For each field in the schema, the palette provides information for the editor to create an interface. If a given property doesn't have a palette, it's assumed that the schema data will be enough to present form elements to edit the value (for an entity list this would be the typical case, but maybe we want to use it for metadata, e.g. this one property is a color and should have a color picker
+         */
+        palettes: Palettes<S>
+    }
+
+    // export function check<S extends TSchema, D extends Data<Static<S>>>(
+    //     layer: Editable<S, D>,
+    // ): Editable<S, D> {
+    //     // serialied or editable?
+    //     return layer
+    // }
+
+    /** @todo ensure that `data.length === rect.area(size)`, worldTransform is a valid matrix if present, there are enough tiles to fill out the space if it's a dense coord, etc. */
+    export function validate<D extends 2 | 3>(layer: Serialized<D, any>) {
+        return true
+    }
 }
