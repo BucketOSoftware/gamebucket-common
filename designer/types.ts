@@ -1,16 +1,4 @@
 import { NumberOptions, Type, type SchemaOptions } from '@sinclair/typebox'
-import invariant from 'tiny-invariant'
-
-export const TOOLS = [
-    'draw',
-    'select',
-    'create',
-    'zoom',
-    /*'line'*/
-    /*'marquee',*/
-] as const
-
-export type ToolID = (typeof TOOLS)[number]
 
 // -----
 //  JSON schema "presets"

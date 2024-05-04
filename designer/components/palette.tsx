@@ -17,7 +17,7 @@ import {
     useDispatch,
     useSelectedLayer,
     useSelector,
-} from '../state'
+} from '../store'
 
 /** Display possibilities for each attribute in the current layer */
 export function PaletteBox() {

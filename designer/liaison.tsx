@@ -13,7 +13,8 @@ import { Container, Spatial } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
-import { EditableResource, EditableSubresource, ElementID, open } from './state'
+import { EditableResource, EditableSubresource, ElementID, open } from './store'
+import { ToolDef } from './tools'
 
 export interface DepictProps {
     resourceId: Container.ItemID
@@ -23,6 +24,7 @@ export interface DepictProps {
 
 interface LiaisonData {
     openResources: EditableResource[]
+    tools: ToolDef<string>[]
 
     /** Given two points in the viewport, and a presumably dense layer, return a list of elements
      * @param [coordinates] Points in viewport space
@@ -78,14 +80,19 @@ interface LiaisonData {
     Depict?: React.FunctionComponent<DepictProps>
 }
 
-const defaultClientData: LiaisonData = {
+const defaultClientData = {
     openResources: [],
-} as const
+    tools: [],
+} satisfies LiaisonData
 
-const LiaisonContext = createContext(defaultClientData)
+const LiaisonContext = createContext<LiaisonData>(defaultClientData)
 
 export class Liaison {
-    private snapshot: LiaisonData = defaultClientData
+    private snapshot: LiaisonData
+
+    constructor(tools: ToolDef<string>[]) {
+        this.snapshot = { ...defaultClientData, tools }
+    }
 
     private subscribers = new Set<() => void>()
 
@@ -135,7 +142,6 @@ export function LiaisonProvider({
 
     // notify of new data from the user. TODO: will updating callbacks trigger the right stuff, or do we have to do those individually?
     useEffect(() => {
-        console.log('Got resources...', clientData)
         dispatch(open(clientData.openResources[0]))
     }, [clientData.openResources])
 

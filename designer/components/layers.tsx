@@ -1,7 +1,7 @@
 import { Card, CardList } from '@blueprintjs/core'
 
 import { Container } from '../../formats'
-import { selectLayer, useDispatch, useSelector } from '../state'
+import { selectLayer, useDispatch, useSelector } from '../store'
 import { Carte } from './common'
 
 export function Layers() {

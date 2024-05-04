@@ -11,7 +11,6 @@ import invariant from 'tiny-invariant'
 import { Container, Spatial } from '../formats'
 import * as rect from '../rect'
 import { PaletteID } from './resource'
-import { ToolID } from './types'
 
 const PALETTES_MUTEX = true
 
@@ -24,8 +23,8 @@ export const designerSlice = createSlice({
 
     initialState: { selected: { tool: 'select', attribs: {} }, loaded: [] } as {
         selected: {
-            /** currently active tool */
-            tool: ToolID
+            /** currently active tool. @todo Type? */
+            tool: string
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
@@ -60,7 +59,7 @@ export const designerSlice = createSlice({
             }
         },
 
-        selectTool: (draft, { payload }: PayloadAction<ToolID>) => {
+        selectTool: (draft, { payload }: PayloadAction<string>) => {
             draft.selected.tool = payload
         },
 
@@ -220,7 +219,7 @@ export const {
 //  Retrieving Data
 // -----------------
 
-const getSelectedLayer = (state: RootState) =>
+export const getSelectedLayer = (state: Readonly<RootState>) =>
     state.selected.layer && state.loaded[0]?.items[state.selected.layer]
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()

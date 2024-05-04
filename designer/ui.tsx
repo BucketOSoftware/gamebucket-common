@@ -11,6 +11,9 @@ import {
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { Clone } from '@sinclair/typebox'
+import { DragConfig } from '@use-gesture/react'
+import invariant from 'tiny-invariant'
 
 import { type Rect } from '../rect'
 import {
@@ -20,19 +23,22 @@ import {
     useGesture,
 } from './gestures'
 import { Liaison, LiaisonProvider } from './liaison'
-import { ElementID, store } from './state'
+import { ElementID, store } from './store'
 
 import '@blueprintjs/core/lib/css/blueprint.css'
 import '@blueprintjs/icons/lib/css/blueprint-icons.css'
 import 'normalize.css'
 
 import './ui.css'
-import { Clone } from '@sinclair/typebox'
-import { DragConfig } from '@use-gesture/react'
-import invariant from 'tiny-invariant'
 
-export function createApp(domElement: HTMLElement, App: ReactNode) {
-    const liaison = new Liaison()
+import { ToolDef } from './tools'
+
+export function createApp<T extends string>(
+    domElement: HTMLElement,
+    App: ReactNode,
+    tools: ToolDef<T>[],
+) {
+    const liaison = new Liaison(tools)
     const root = createRoot(domElement)
     root.render(
         <StrictMode>
@@ -79,4 +85,3 @@ export function Sidebar({ children }: PropsWithChildren) {
         </Panel>
     )
 }
-

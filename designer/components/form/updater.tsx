@@ -3,7 +3,7 @@ import { Check, Convert } from '@sinclair/typebox/value'
 import { debounce } from 'lodash-es'
 import { useCallback, useEffect, useState } from 'react'
 
-import { editSelectedElements, useDispatch } from '../../state'
+import { editSelectedElements, useDispatch } from '../../store'
 
 /**
  * @param [S] Schema for acceptable values for the control

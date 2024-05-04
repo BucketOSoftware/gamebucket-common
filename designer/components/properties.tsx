@@ -2,7 +2,7 @@ import { Type, TypeGuard, ValueGuard } from '@sinclair/typebox'
 import { Check } from '@sinclair/typebox/value'
 
 import { ResourceType } from '../../formats'
-import { useSelectedLayer, useSelector } from '../state'
+import { useSelectedLayer, useSelector } from '../store'
 import { Carte } from './common'
 import FormControl from './form'
 

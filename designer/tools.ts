@@ -1,30 +1,46 @@
-import { useMemo } from 'react'
+import { noop } from 'ts-essentials'
+import { ButtonProps, MaybeElement } from '@blueprintjs/core'
+import { createContext, useMemo } from 'react'
 import invariant from 'tiny-invariant'
 
-import { ResourceType, Spatial } from '../formats'
-import * as rect from '../rect'
+import { Container, ResourceType, Spatial } from '../formats'
 import { GesturePhase, GestureState } from './gestures'
 import { useLiaison } from './liaison'
 import {
+    RootState,
     applyPalette,
+    getSelectedLayer,
     selectElements,
     selectMarquee,
     useDispatch,
+    useSelectedLayer,
     useSelector,
-} from './state'
-import { ToolID } from './types'
-import { noop } from 'ts-essentials'
+} from './store'
 
 type LiaisonData = ReturnType<typeof useLiaison>
+
+// export function useTool(): ToolFn<Spatial.Editable> {
+//     const dispatch = useDispatch()
+//     const liaisonData = useLiaison()
+//     const toolName = useSelector((state) => state.selected.tool)
+
+//     return useMemo(
+//         () => toolCallbacks[toolName](dispatch, liaisonData),
+//         [toolName, dispatch, liaisonData],
+//     )
+// }
 
 export function useTool(): ToolFn<Spatial.Editable> {
     const dispatch = useDispatch()
     const liaisonData = useLiaison()
-    const toolName = useSelector((state) => state.selected.tool)
+    const selectedTool = useSelector((state) => state.selected.tool)
 
     return useMemo(
-        () => toolCallbacks[toolName](dispatch, liaisonData),
-        [toolName, dispatch, liaisonData],
+        () =>
+            liaisonData.tools
+                .find((toolDef) => toolDef.id == selectedTool)!
+                .viewportHandler(dispatch, liaisonData),
+        [selectedTool, dispatch, liaisonData],
     )
 }
 
@@ -35,55 +51,47 @@ type ToolFn<L extends Spatial.Editable> = (
     layer: Readonly<L>,
 ) => any
 
-const toolCallbacks: Record<
-    ToolID,
-    (
-        dispatch: ReturnType<typeof useDispatch>,
-        liaison: LiaisonData,
-    ) => ToolFn<Spatial.Editable>
-> = {
-    select: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
-        invariant(liaison.select)
+// const toolCallbacks: Record<
+//     ToolID,
+//     (
+//         dispatch: ReturnType<typeof useDispatch>,
+//         liaison: LiaisonData,
+//     ) => ToolFn<Spatial.Editable>
+// > = {
+export const SelectTool: ToolDef<'select'> = {
+    id: 'select',
+    displayName: 'Select',
+    icon: 'hand-up',
 
-        // @ts-expect-error
-        const can_drag_elements = layer.isSparse
-        const has_held_still_for_enough_time =
-            // @ts-expect-error
-            gesture.total_movement < 1 && gesture.duration > 200
-        const already_dragging_something = gesture.memo
+    enabled(state) {
+        return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
+        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type === 
+    },
 
-        const big_enough_for_marquee = true
+    viewportHandler(dispatch, liaison) {
+        return (phase, gesture, viewport, layer) => {
+            invariant(liaison.select)
 
-        const marqueeArea = [
-            gestureVecToViewportRelative(gesture.values, viewport),
-            gestureVecToViewportRelative(
-                gesture.memo ?? gesture.values,
-                viewport,
-            ),
-        ] as const
-
-        // console.log(gesture.values)
-        switch (phase) {
-            // case GesturePhase.Hover:
-            // 1. get objects under the cursor and mark them as "hovered"
-            // break
-            case GesturePhase.DragStart:
-                return gesture.values
-                // do nothing
-                break
-            case GesturePhase.DragContinue: {
-                invariant(gesture.memo)
-                const selected = liaison.select(
-                    layer,
+            const marqueeArea = [
+                gestureVecToViewportRelative(gesture.values, viewport),
+                gestureVecToViewportRelative(
+                    gesture.memo ?? gesture.values,
                     viewport,
-                    marqueeArea,
-                    (r) => dispatch(selectMarquee(r)),
-                )
+                ),
+            ] as const
 
-                return gesture.memo
-            }
-            case GesturePhase.DragCommit:
-                {
+            switch (phase) {
+                case GesturePhase.DragStart:
+                    return gesture.values
+                case GesturePhase.DragContinue:
+                    invariant(gesture.memo)
+
+                    liaison.select(layer, viewport, marqueeArea, (r) =>
+                        dispatch(selectMarquee(r)),
+                    )
+
+                    return gesture.memo
+                case GesturePhase.DragCommit:
                     dispatch(
                         selectElements([
                             undefined,
@@ -92,78 +100,77 @@ const toolCallbacks: Record<
                     )
                     dispatch(selectMarquee())
                     return
-                }
-                if (already_dragging_something) {
-                    // keep dragging: show the element(s) moved by this amount
-                    return gesture.memo
-                } else if (
-                    can_drag_elements &&
-                    has_held_still_for_enough_time
-                ) {
-                    // whatever we initially clicked on, now we're dragging it
-                    // 1. show it somewhere else
-                } else if (big_enough_for_marquee) {
-                    invariant(liaison.onMarquee, 'No marquee handler')
-                    /*
-                    const inProgressSelectionItems = callbacks.onMarquee(
-                        canvas,
-                        layer,
-                        rect.fromCorners(...gesture.initial, ...gesture.values),
-                    )
-                    */
-                }
-                break
-            case GesturePhase.DragCommit:
-            case GesturePhase.Tap:
-                // console.warn(
-                // rect.fromCorners(...gesture.initial, ...gesture.values),
-                // )
-                // console.debug(gesture)
-                if (gesture.memo) {
-                    // finish dragging this object
-                } else {
-                    // select items at this coordinate
-                }
-                break
+                default:
+                // TODO?
+                // case GesturePhase.Tap:
+                // case GesturePhase.Hover:
+            }
+
+            return
         }
-        return
+    },
+}
+
+
+export const CreateTool: ToolDef<'create'> = {
+    id: 'create',
+    icon: 'new-object',
+    displayName: 'Create',
+
+    enabled(state) {
+        return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
     },
 
-    draw: (dispatch, liaison) => (phase, gesture, viewport, layer) => {
-        invariant(liaison.selectLine, 'No selectLine handler')
-        invariant(
-            ResourceType.SpatialDense2D === layer.type,
-            'Draw only works on tilemaps (dense 2D layers)',
-        )
+    viewportHandler
+}
 
-        switch (phase) {
-            case GesturePhase.DragStart:
-            case GesturePhase.DragContinue: {
-                const pos = gestureVecToViewportRelative(
-                    gesture.values,
-                    viewport,
-                )
+export const PlotTool: ToolDef<'plot'> = {
+    id: 'plot',
+    icon: 'draw',
+    displayName: 'Draw',
+    
+    enabled(state) {
+        return getSelectedLayer(state)?.type === ResourceType.SpatialDense2D
+        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type === 
+    },
 
-                const previous = gesture.memo ?? pos
+    viewportHandler(dispatch, liaison) {
+        return (phase, gesture, viewport, layer) => {
+            invariant(liaison.selectLine, 'No selectLine handler')
+            invariant(
+                ResourceType.SpatialDense2D === layer.type,
+                'Draw only works on tilemaps (dense 2D layers)',
+            )
 
-                const ids = liaison.selectLine(
-                    layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
-                    viewport,
-                    [pos, previous],
-                )
+            switch (phase) {
+                case GesturePhase.DragStart:
+                case GesturePhase.DragContinue: {
+                    const pos = gestureVecToViewportRelative(
+                        gesture.values,
+                        viewport,
+                    )
 
-                if (ids) {
-                    dispatch(applyPalette(ids!))
+                    const previous = gesture.memo ?? pos
+
+                    const ids = liaison.selectLine(
+                        layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
+                        viewport,
+                        [pos, previous],
+                    )
+
+                    if (ids) {
+                        dispatch(applyPalette(ids!))
+                    }
+                    return pos
                 }
-                return pos
             }
         }
     },
+}
+// create: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
 
-    create: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
-
-    zoom: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
-} as const
+// zoom: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
+// }
 
 ///// utils
 
@@ -172,3 +179,28 @@ const gestureVecToViewportRelative = (
     [x, y]: [number, number],
     { left, top }: DOMRect,
 ) => ({ x: x - left, y: y - top })
+
+export interface ToolDef<
+    ID extends string,
+    Layer extends Spatial.Editable = Spatial.Editable,
+> {
+    readonly id: ID
+    readonly icon: ButtonProps['icon']
+    readonly displayName: string
+
+    readonly viewportHandler: (
+        dispatch: ReturnType<typeof useDispatch>,
+        liaison: LiaisonData,
+    ) => ToolFn<Layer>
+
+    readonly enabled?: (state: Readonly<RootState>) => boolean
+
+    // readonly viewportClass: (state: Readonly<RootState>) => string
+}
+
+export const Toolboxy = createContext<ToolDef<string, Spatial.Editable>[]>([])
+
+// function Buh () {
+//     return (<Toolboxy.Provider values={}></Toolboxy.Provider>)
+// // return <Toolbox.Provider ><div/></Toolbox.Provider>
+// }
