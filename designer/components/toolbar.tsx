@@ -1,17 +1,12 @@
-import {
-    Button,
-    ButtonGroup,
-    MaybeElement,
-    Tooltip,
-} from '@blueprintjs/core'
+import { Button, ButtonGroup, MaybeElement, Tooltip } from '@blueprintjs/core'
 import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
-import { PropsWithChildren  } from 'react'
+import { PropsWithChildren } from 'react'
 
 import { selectTool, useDispatch, useSelector } from '../store'
 import { useLiaison } from '../liaison'
 import { Carte } from './common'
 
-export default function Toolbar() {
+export  function Toolbar() {
     const liaison = useLiaison()
 
     const enabledTools = liaison.tools.filter((toolDef) => {
@@ -59,7 +54,6 @@ function ToolButton(
             <Button
                 icon={props.icon}
                 large
-                // disabled={!layerType}
                 intent={tool === props.id ? 'primary' : 'none'}
                 onClick={() => {
                     dispatch(selectTool(props.id))

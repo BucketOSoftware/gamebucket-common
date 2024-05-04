@@ -7,7 +7,6 @@ import { Carte } from './common'
 import FormControl from './form'
 
 export function PropertiesBox(props: unknown) {
-    // const layer = useSelector((st) => st.activeLayer)
     const layer = useSelectedLayer()
     const selectedIds = useSelector((st) => st.selected.elements)
 
@@ -42,7 +41,6 @@ export function PropertiesBox(props: unknown) {
                 effectiveSchema = matching[0]
             } else {
                 // probably not going to work very well, but attempt to edit what fields we can
-                // console.warn('Editing with union schema:', effectiveSchema)
                 effectiveSchema = Type.Intersect(matching)
                 console.warn('Editing with union schema:', effectiveSchema)
             }

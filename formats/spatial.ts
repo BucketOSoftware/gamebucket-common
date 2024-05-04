@@ -1,18 +1,10 @@
 import type { Matrix3Tuple, Matrix4Tuple } from 'three'
-import {
-    Static,
-    TObject,
-    TSchema,
-    TTuple,
-    TUnion,
-    Type,
-} from '@sinclair/typebox'
+import { Static, TObject, TSchema } from '@sinclair/typebox'
 
 import { Palette } from '../designer'
 import * as rect from '../rect'
 
 import { ResourceType } from './common'
-import { GVec, GVec2, GVec3 } from '../geometry'
 
 /** A dataset where elements are located by 2D or 3D coordinates, e.g. an area/level.
  * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
@@ -159,10 +151,3 @@ export namespace Spatial {
         return true
     }
 }
-
-// const v = Spatial2D.check({
-//     type: ResourceType.SpatialDense2D,
-//     schema: Type.Integer({ minimum: 0 }),
-//     data: [1, 2, 3],
-//     size: { width: 50, height: 50 },
-// })

@@ -149,7 +149,7 @@ export const designerSlice = createSlice({
         editSelectedElements: (
             draft,
             {
-                payload: { pointer, value, limit },
+                payload: { pointer, value },
             }: PayloadAction<{
                 pointer: string
                 value: unknown
@@ -219,10 +219,10 @@ export const {
 //  Retrieving Data
 // -----------------
 
+export const useSelector = reduxUseSelector.withTypes<RootState>()
+
 export const getSelectedLayer = (state: Readonly<RootState>) =>
     state.selected.layer && state.loaded[0]?.items[state.selected.layer]
-
-export const useSelector = reduxUseSelector.withTypes<RootState>()
 
 export const useSelectedLayer = () =>
     useSelector((state) => getSelectedLayer(state))

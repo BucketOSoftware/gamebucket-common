@@ -15,7 +15,6 @@ import {
     selectPalette,
     useCurrentPalettes,
     useDispatch,
-    useSelectedLayer,
     useSelector,
 } from '../store'
 

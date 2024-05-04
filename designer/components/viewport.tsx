@@ -8,6 +8,7 @@ import {
     useRef,
     useState,
 } from 'react'
+import classnames from 'classnames'
 
 import { Container } from '../../formats'
 import * as rect from '../../rect'
@@ -34,21 +35,22 @@ import invariant from 'tiny-invariant'
 export const Viewport = (props: PropsWithChildren) => {
     const viewportRef = useRef<HTMLDivElement>(null)
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
-    const onResize = useCallback(
-        // TODO: multiple??
-        (_: ResizeObserverEntry[]) => {
-            invariant(viewportRef.current)
-            setViewportSize(viewportRef.current.getBoundingClientRect())
-        },
-        [viewportRef],
-    )
-
     const dispatch = useDispatch()
     const editedLayer = useSelectedLayer()
     const toolHandler = useTool()
     const phase = useRef<GesturePhase>()
 
     const ants = useSelector((state) => state.selected.marquee)
+    const toolId = useSelector((state) => state.selected.tool)
+
+    const onResize = useCallback(
+        // TODO: why are there multiple entries? Do we have to care?
+        (_: ResizeObserverEntry[]) => {
+            invariant(viewportRef.current)
+            setViewportSize(viewportRef.current.getBoundingClientRect())
+        },
+        [viewportRef],
+    )
 
     // does useCallback actually get us anything here?
     // maybe we should move more of the tool-specific logic out of this, like it's just a dispatch
@@ -72,7 +74,14 @@ export const Viewport = (props: PropsWithChildren) => {
     return (
         <Carte title="viewport" wholeHeight stacking>
             <ResizeSensor targetRef={viewportRef} onResize={onResize}>
-                <div ref={viewportRef} className="layerboss gbk-viewport">
+                <div
+                    ref={viewportRef}
+                    className={classnames(
+                        'layerboss',
+                        'gbk-viewport',
+                        'gbk-tool-' + (toolId || 'none'),
+                    )}
+                >
                     <ViewportLayers viewportSize={viewportSize} />
                     {ants && <MarchingAnts {...ants} />}
                 </div>

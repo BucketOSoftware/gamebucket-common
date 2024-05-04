@@ -29,11 +29,7 @@ export default function FormField<T extends TSchema>(
     }
 
     // TODO: show readonly or literal values in another way (optionally?)
-    if (TypeGuard.IsReadonly(schema)) {
-        return null
-    }
-
-    if (TypeGuard.IsLiteral(schema)) {
+    if (TypeGuard.IsReadonly(schema) || TypeGuard.IsLiteral(schema)) {
         return null
 
         return (
@@ -98,6 +94,7 @@ export default function FormField<T extends TSchema>(
     switch (schema.type) {
         case 'object': {
         }
+
         case 'boolean':
             invariant(
                 typeof value === 'boolean' || typeof value === 'undefined',
@@ -111,10 +108,6 @@ export default function FormField<T extends TSchema>(
                 />
             )
 
-            return null
-            throw new Error(
-                `Can't handle number without whatever? ${path} ${value} ${schema}`,
-            )
         case 'array': {
             // TODO: exclude versions?
             if (TypeGuard.IsTuple(schema)) {
@@ -122,10 +115,7 @@ export default function FormField<T extends TSchema>(
                 // TODO: the actual types
                 // TODO: max, min
                 // const ary = schema as unknown as TArray
-                // invariant()
-                // invariant(Check(schema, value))
-                // invariant(value.length === 2)
-                return <></>
+                return null
             }
             break
         }

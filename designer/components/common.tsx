@@ -1,9 +1,5 @@
 import { Section, SectionCard } from '@blueprintjs/core'
-import { CSSProperties, PropsWithChildren } from 'react'
-
-// export function Card(props: PropsWithChildren) {
-// return <div className='bg-blue-200 rounded'>{props.children}</div>
-// }
+import { PropsWithChildren } from 'react'
 
 interface CarteProps {
     className?: string
@@ -11,8 +7,8 @@ interface CarteProps {
     lofted?: boolean
     wholeHeight?: boolean
     stacking?: boolean
-    // style?: CSSProperties
 }
+
 import classes from 'classnames'
 
 export function Carte(props: PropsWithChildren<CarteProps>) {

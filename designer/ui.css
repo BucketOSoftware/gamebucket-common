@@ -94,28 +94,24 @@
     touch-action: none;
 }
 
-#gbk-designer .gbk-tool-no-use .gbk-viewport {
+#gbk-designer .gbk-viewport.gbk-tool-no-use {
     cursor: not-allowed !important;
 }
 
-#gbk-designer .gbk-tool-none .gbk-viewport {
+#gbk-designer .gbk-viewport.gbk-tool-none {
     cursor: not-allowed;
 }
 
-#gbk-designer .gbk-tool-draw .gbk-viewport {
+#gbk-designer .gbk-viewport.gbk-tool-plot {
     cursor: crosshair;
 }
 
-#gbk-designer .gbk-tool-select .gbk-viewport {
+#gbk-designer .gbk-viewport.gbk-tool-select {
     cursor: crosshair;
 }
 
 #gbk-designer .gbk-tool-select.gbk-tool-dragging .gbk-viewport {
     cursor: nwse-resize;
-}
-
-#gbk-designer .gbk-tool-select.gbk-tool-hovering .gbk-viewport {
-    cursor: pointer;
 }
 
 #gbk-designer .gbk-tool-create .gbk-viewport {
@@ -141,6 +137,7 @@
     box-shadow: 1px 1px rgba(0, 0, 0, 50%);
     border: var(--palette-border-thickness) solid rgba(0, 0, 0, 0%);
 }
+
 /* 
 #gbk-designer .gbk-palette-sizing {
     width: var(--palette-button-width);

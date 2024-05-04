@@ -1,9 +1,9 @@
-import { noop } from 'ts-essentials'
-import { ButtonProps, MaybeElement } from '@blueprintjs/core'
+import { ButtonProps } from '@blueprintjs/core'
 import { createContext, useMemo } from 'react'
 import invariant from 'tiny-invariant'
+import { noop } from 'ts-essentials'
 
-import { Container, ResourceType, Spatial } from '../formats'
+import { ResourceType, Spatial } from '../formats'
 import { GesturePhase, GestureState } from './gestures'
 import { useLiaison } from './liaison'
 import {
@@ -13,22 +13,10 @@ import {
     selectElements,
     selectMarquee,
     useDispatch,
-    useSelectedLayer,
     useSelector,
 } from './store'
 
 type LiaisonData = ReturnType<typeof useLiaison>
-
-// export function useTool(): ToolFn<Spatial.Editable> {
-//     const dispatch = useDispatch()
-//     const liaisonData = useLiaison()
-//     const toolName = useSelector((state) => state.selected.tool)
-
-//     return useMemo(
-//         () => toolCallbacks[toolName](dispatch, liaisonData),
-//         [toolName, dispatch, liaisonData],
-//     )
-// }
 
 export function useTool(): ToolFn<Spatial.Editable> {
     const dispatch = useDispatch()
@@ -51,13 +39,7 @@ type ToolFn<L extends Spatial.Editable> = (
     layer: Readonly<L>,
 ) => any
 
-// const toolCallbacks: Record<
-//     ToolID,
-//     (
-//         dispatch: ReturnType<typeof useDispatch>,
-//         liaison: LiaisonData,
-//     ) => ToolFn<Spatial.Editable>
-// > = {
+/** Select elements via marquee */
 export const SelectTool: ToolDef<'select'> = {
     id: 'select',
     displayName: 'Select',
@@ -126,6 +108,7 @@ export const CreateTool: ToolDef<'create'> = {
     },
 }
 
+/** Apply currently selected palette items to elements */
 export const PlotTool: ToolDef<'plot'> = {
     id: 'plot',
     icon: 'draw',
@@ -133,7 +116,6 @@ export const PlotTool: ToolDef<'plot'> = {
 
     enabled(state) {
         return getSelectedLayer(state)?.type === ResourceType.SpatialDense2D
-        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type ===
     },
 
     viewportHandler(dispatch, liaison) {
@@ -169,10 +151,6 @@ export const PlotTool: ToolDef<'plot'> = {
         }
     },
 }
-// create: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
-
-// zoom: (dispatch, liaison) => (phase, gesture, viewport, layer) => {},
-// }
 
 ///// utils
 
@@ -196,13 +174,6 @@ export interface ToolDef<
     ) => ToolFn<Layer>
 
     readonly enabled?: (state: Readonly<RootState>) => boolean
-
-    // readonly viewportClass: (state: Readonly<RootState>) => string
 }
 
 export const Toolboxy = createContext<ToolDef<string, Spatial.Editable>[]>([])
-
-// function Buh () {
-//     return (<Toolboxy.Provider values={}></Toolboxy.Provider>)
-// // return <Toolbox.Provider ><div/></Toolbox.Provider>
-// }
