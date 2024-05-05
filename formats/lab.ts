@@ -7,6 +7,10 @@ export interface Scene extends Metadata<ResourceType.Scene> {
     // ...scenebucket...
 }
 
+/** @todo But is a state machine definition data or code? */
+interface StateMachine {
+}
+
 /** Change one or more values over time, to be applied to whatever at runtime.
  * Base on the GLTF animation format */
 interface TimelineAnimation extends Metadata<ResourceType.Timeline> {
