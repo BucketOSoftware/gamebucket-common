@@ -128,6 +128,7 @@ export function useDraggable<T extends HTMLElement>(
             state.event.stopPropagation()
 
             if (state.tap) {
+                setDisplacement([0,0])
                 callback(true)
             } else {
                 const [dx, dy] = state.movement
