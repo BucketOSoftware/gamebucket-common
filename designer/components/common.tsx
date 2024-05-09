@@ -1,5 +1,6 @@
 import { Section, SectionCard } from '@blueprintjs/core'
 import { PropsWithChildren } from 'react'
+import classnames from 'classnames'
 
 interface CarteProps {
     className?: string
@@ -9,17 +10,38 @@ interface CarteProps {
     stacking?: boolean
 }
 
-import classes from 'classnames'
-
 export function Carte(props: PropsWithChildren<CarteProps>) {
-    const klass = classes(props.className, {
-        'card-whole-height': props.wholeHeight,
-        'card-stacking-context': props.stacking,
-    })
+    return props.children
+}
 
+export function NavGroup({
+    children,
+    title,
+}: PropsWithChildren<{ title: string }>) {
     return (
-        <Section title={props.title} compact elevation={1} className={klass}>
-            <SectionCard>{props.children}</SectionCard>
-        </Section>
+        <nav className="nav-group">
+            <h5
+                className="nav-group-title"
+                style={{ textTransform: 'capitalize' }}
+            >
+                {title}
+            </h5>
+            {children}
+        </nav>
+    )
+}
+
+export function NavGroupItem({
+    active,
+    children,
+    onClick,
+}: PropsWithChildren<{ active?: boolean; onClick: () => void }>) {
+    return (
+        <a
+            onClick={onClick}
+            className={classnames('nav-group-item', { active: active })}
+        >
+            {children}
+        </a>
     )
 }

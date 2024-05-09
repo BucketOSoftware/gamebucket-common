@@ -3,10 +3,10 @@ import { Check } from '@sinclair/typebox/value'
 
 import { ResourceType } from '../../formats'
 import { useSelectedLayer, useSelector } from '../store'
-import { Carte } from './common'
+import { Carte, NavGroup } from './common'
 import FormControl from './form'
 
-export function PropertiesBox(props: unknown) {
+export function PropertiesBox() {
     const layer = useSelectedLayer()
     const selectedIds = useSelector((st) => st.selected.elements)
 
@@ -53,11 +53,16 @@ export function PropertiesBox(props: unknown) {
                 : 'Entity'
 
         return (
-            <Carte title={title}>
-                <form>
-                    <FormControl path="" schema={effectiveSchema} value={obj} />
-                </form>
-            </Carte>
+            // <NavGroup title={title}>
+            <section>
+                <hr />
+                <h4 style={{display: "flex", flexDirection: 'row' }}>
+                    <span style={{flexGrow: 1}}>{selectedIds[0]}</span>
+                    <button className='btn btn-negative'>Delete</button>
+                </h4>
+                <FormControl path="" schema={effectiveSchema} value={obj} />
+            </section>
+            // </NavGroup>
         )
     }
 }

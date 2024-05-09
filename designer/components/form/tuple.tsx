@@ -8,6 +8,8 @@ import {
     UpdateSelectionData,
 } from './updater'
 
+import './form.css'
+
 export default function TupleField<T extends TTuple>(
     props: AggregateControlProps<T>,
 ) {
@@ -15,8 +17,9 @@ export default function TupleField<T extends TTuple>(
     invariant(ValueGuard.IsArray(value), 'Expected an array, got: ${value}')
 
     return (
-        <FormGroup label={schema.title ?? path.at(-1)}>
-            <ControlGroup fill>
+        <div className="form-group">
+            <label>{schema.title ?? path.at(-1)}</label>
+            <div className="gbk-input-tuple">
                 {schema.items?.map((subschema, idx) => (
                     <UpdateSelectionData
                         element={TupleElement}
@@ -26,10 +29,14 @@ export default function TupleField<T extends TTuple>(
                         value={value[idx]}
                     />
                 ))}
-            </ControlGroup>
-        </FormGroup>
+            </div>
+        </div>
     )
 }
+
+// {/* <input type="email" class="form-control" placeholder="Email"> */}
+// <FormGroup label={schema.title ?? path.at(-1)}>
+//     <ControlGroup fill>
 
 function TupleElement({
     schema,
@@ -41,23 +48,15 @@ function TupleElement({
     const intent = valid ? 'none' : 'danger'
 
     return (
-        <InputGroup
-            small
-            fill
-            className="right-align"
-            intent={intent}
-            leftElement={
-                schema.title ? (
-                    <Tag minimal intent={intent}>
-                        {schema.title}
-                    </Tag>
-                ) : undefined
-            }
-            value={value as string}
-            onValueChange={onChange}
-            onBlur={(ev) => {
-                console.log('I blur:', ev)
-            }}
-        />
+        <div className="gbk-input-group">
+            <span className="gbk-input-inset">{schema.title}</span>
+            <input
+                className="form-control"
+                type="number"
+                // placeholder="0"
+                value={converted as number}
+                onChange={(e) => onChange(e.target.value)}
+            />
+        </div>
     )
 }

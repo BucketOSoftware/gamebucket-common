@@ -1,39 +1,43 @@
-import { Button, ButtonGroup, MaybeElement, Tooltip } from '@blueprintjs/core'
-import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
+// import { Button, ButtonGroup, MaybeElement, Tooltip } from '@blueprintjs/core'
+// import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
 import { PropsWithChildren } from 'react'
+import classnames from 'classnames'
 
 import { selectTool, useDispatch, useSelector } from '../store'
 import { useLiaison } from '../liaison'
 import { Carte } from './common'
 
-export  function Toolbar() {
+export function Toolbar() {
     const liaison = useLiaison()
 
-    const enabledTools = liaison.tools.filter((toolDef) => {
-        return useSelector(toolDef.enabled ?? (() => false))
-    })
-
-    if (!enabledTools.length) {
-        return null
-    } // or should we show some other null UI?
+    const state = useSelector((state) => state)
 
     return (
-        <Carte>
-            <ButtonGroup>
-                {enabledTools.map((tool) => (
-                    <ToolButton key={tool.id} id={tool.id} icon={tool.icon}>
+        <div className="toolbar-actions">
+            <div className="btn-group">
+                {/* <ButtonGroup> */}
+                {liaison.tools.map((tool) => (
+                    <ToolButton
+                        key={tool.id}
+                        label={tool.displayName}
+                        id={tool.id}
+                        icon={tool.icon}
+                        disabled={!tool.enabled!(state)}
+                    >
                         {tool.displayName}
                     </ToolButton>
                 ))}
-            </ButtonGroup>
-        </Carte>
+                {/* </ButtonGroup> */}
+            </div>
+        </div>
     )
 }
 
 function ToolButton(
     props: PropsWithChildren<{
         id: string
-        icon: BlueprintIcons_16Id | MaybeElement
+        label: string
+        icon: string
         disabled?: boolean
         children: string | JSX.Element
     }>,
@@ -41,24 +45,24 @@ function ToolButton(
     const dispatch = useDispatch()
     const tool = useSelector(({ selected }) => selected.tool)
 
-    if (props.disabled) return null
+    // if (props.disabled) return null
 
     return (
-        <Tooltip
-            openOnTargetFocus={true}
-            placement="bottom"
-            usePortal={false}
-            content={props.id}
-            className="flex-shrink" // For some reason the tooltip enlarges the button area in the stock CSS
+        <button
+            title={props.label}
+            type="button"
+            disabled={props.disabled}
+            onClick={() => {
+                dispatch(selectTool(props.id))
+            }}
+            className={classnames('btn', {
+                ['btn-default']: true,//!props.disabled,
+                ['btn-disabled']: props.disabled,
+                active: tool === props.id,
+            })}
         >
-            <Button
-                icon={props.icon}
-                large
-                intent={tool === props.id ? 'primary' : 'none'}
-                onClick={() => {
-                    dispatch(selectTool(props.id))
-                }}
-            />
-        </Tooltip>
+            <span className={'icon ' + props.icon} />
+            &nbsp;{props.label}
+        </button>
     )
 }

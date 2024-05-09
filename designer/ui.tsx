@@ -25,13 +25,15 @@ import {
 import { Liaison, LiaisonProvider } from './liaison'
 import { ElementID, store } from './store'
 
-import '@blueprintjs/core/lib/css/blueprint.css'
-import '@blueprintjs/icons/lib/css/blueprint-icons.css'
-import 'normalize.css'
+// import '@blueprintjs/core/lib/css/blueprint.css'
+// import '@blueprintjs/icons/lib/css/blueprint-icons.css'
+// import 'normalize.css'
+import 'photon/dist/css/photon.css'
 
 import './ui.css'
 
 import { ToolDef } from './tools'
+import { Toolbar } from './components'
 
 export function createApp<T extends string>(
     domElement: HTMLElement,
@@ -58,30 +60,42 @@ export function createApp<T extends string>(
 
 export function ColumnGroup({ children }: PropsWithChildren) {
     return (
-        <PanelGroup direction="horizontal" className="columns">
-            {children}
-        </PanelGroup>
+        <div className="window gbk-columns" style={{ borderRadius: '15px' }}>
+            <header className="toolbar toolbar-header">
+                {/* <h1 className="title">Header</h1> */}
+                <Toolbar />
+            </header>
+            <div className="window-content">
+                <div className="pane-group">{children}</div>
+            </div>
+        </div>
     )
 }
 
 export function ResizeHandle() {
-    return <PanelResizeHandle className="resize-handle" />
+    return null
+    // return <PanelResizeHandle className="resize-handle" />
 }
 
-export function Column({ children }: PropsWithChildren) {
-    return <Panel className="resizable-column">{children}</Panel>
+export function MainColumn({ children }: PropsWithChildren) {
+    return (
+        <div className="pane">
+            <section className="padded" style={{ height: '100%' }}>
+                {children}
+            </section>
+        </div>
+    )
 }
 
 export function Sidebar({ children }: PropsWithChildren) {
     return (
-        <Panel
-            className="resizable-column"
-            style={{ overflow: 'hidden auto' }}
-            defaultSize={30}
-            minSize={20}
-            maxSize={50}
-        >
-            <section className="column">{children}</section>
-        </Panel>
+        // <Panel
+        //     className="resizable-column"
+        //     style={{ overflow: 'hidden auto' }}
+        //     defaultSize={30}
+        //     minSize={20}
+        //     maxSize={50}
+        // >
+        <div className="pane pane-sm sidebar padded">{children}</div>
     )
 }

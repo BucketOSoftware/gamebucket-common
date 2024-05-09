@@ -10,13 +10,21 @@ import classnames from 'classnames'
 import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
 
-import { Palette, PaletteDiscrete, PaletteID, PaletteImage } from '../resource'
+import type {
+    Palette,
+    PaletteDiscrete,
+    PaletteID,
+    PaletteImage,
+} from '../types'
 import {
     selectPalette,
     useCurrentPalettes,
     useDispatch,
     useSelector,
 } from '../store'
+import { NavGroup, NavGroupItem } from './common'
+
+import './palette.css'
 
 /** Display possibilities for each attribute in the current layer */
 export function PaletteBox() {
@@ -30,20 +38,14 @@ export function PaletteBox() {
         console.warn('TODO: one-value schema?', palettes)
     }
 
-    return (
-        <Section title="Palette" compact elevation={1}>
-            {Object.entries(palettes).map(([attribute, palette]) => (
-                <SectionCard key={attribute}>
-                    <H6 className="bp5-text-muted">{attribute}</H6>
-                    <SinglePalette
-                        key={attribute}
-                        attribute={attribute}
-                        palette={palette}
-                    />
-                </SectionCard>
-            ))}
-        </Section>
-    )
+    return Object.entries(palettes).map(([attribute, palette]) => (
+        <NavGroup key={attribute} title={attribute}>
+            <SinglePalette
+                attribute={attribute}
+                palette={palette}
+            />
+        </NavGroup>
+    ))
 }
 
 function SinglePalette<V extends PaletteID>({
@@ -114,22 +116,22 @@ function PaletteButton<V extends PaletteID>({
 
     if (icon) {
         return (
-            <Tooltip
-                compact
-                disabled={!label}
-                content={label || ''}
-                placement="bottom"
-            >
-                <Button
+            // <Tooltip
+            //     compact
+            //     disabled={!label}
+            //     content={label || ''}
+            //     placement="bottom"
+            // >
+                <button
                     value={value}
                     onClick={onClick}
                     className={classnames('gbk-palette-button', {
                         ['gbk-palette-button-selected']: selected,
                     })}
-                    minimal={!selected}
-                    rightIcon={<PaletteIcon icon={icon} />}
-                ></Button>
-            </Tooltip>
+                    // minimal={!selected}
+                    // rightIcon={<PaletteIcon icon={icon} />}
+                ><PaletteIcon icon={icon}/></button>
+            // </Tooltip>
         )
     }
 
@@ -145,7 +147,7 @@ function PaletteButton<V extends PaletteID>({
                 minimal={!selected}
                 className={classnames(
                     'gbk-palette-button',
-                    'gbk-palette-sizing',
+                    // 'gbk-palette-sizing',
                     'gbk-palette-swatch', // TODO: style this
                     { ['gbk-palette-button-selected']: selected },
                 )}

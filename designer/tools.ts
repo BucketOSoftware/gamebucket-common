@@ -16,6 +16,22 @@ import {
     useSelector,
 } from './store'
 
+export interface ToolDef<
+    ID extends string,
+    Layer extends Spatial.Editable = Spatial.Editable,
+> {
+    readonly id: ID
+    readonly icon: string //ButtonProps['icon']
+    readonly displayName: string
+
+    readonly viewportHandler: (
+        dispatch: ReturnType<typeof useDispatch>,
+        liaison: LiaisonData,
+    ) => ToolFn<Layer>
+
+    readonly enabled?: (state: Readonly<RootState>) => boolean
+}
+
 type LiaisonData = ReturnType<typeof useLiaison>
 
 export function useTool(): ToolFn<Spatial.Editable> {
@@ -43,7 +59,8 @@ type ToolFn<L extends Spatial.Editable> = (
 export const SelectTool: ToolDef<'select'> = {
     id: 'select',
     displayName: 'Select',
-    icon: 'hand-up',
+    // icon: 'hand-up',
+    icon: 'icon-tools',
 
     enabled(state) {
         return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
@@ -95,6 +112,7 @@ export const SelectTool: ToolDef<'select'> = {
 
 export const CreateTool: ToolDef<'create'> = {
     id: 'create',
+    // icon: 'new-object',
     icon: 'new-object',
     displayName: 'Create',
 
@@ -111,7 +129,7 @@ export const CreateTool: ToolDef<'create'> = {
 /** Apply currently selected palette items to elements */
 export const PlotTool: ToolDef<'plot'> = {
     id: 'plot',
-    icon: 'draw',
+    icon: 'icon-pencil',
     displayName: 'Draw',
 
     enabled(state) {
@@ -160,20 +178,3 @@ const gestureVecToViewportRelative = (
     { left, top }: DOMRect,
 ) => ({ x: x - left, y: y - top })
 
-export interface ToolDef<
-    ID extends string,
-    Layer extends Spatial.Editable = Spatial.Editable,
-> {
-    readonly id: ID
-    readonly icon: ButtonProps['icon']
-    readonly displayName: string
-
-    readonly viewportHandler: (
-        dispatch: ReturnType<typeof useDispatch>,
-        liaison: LiaisonData,
-    ) => ToolFn<Layer>
-
-    readonly enabled?: (state: Readonly<RootState>) => boolean
-}
-
-export const Toolboxy = createContext<ToolDef<string, Spatial.Editable>[]>([])

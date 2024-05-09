@@ -1,0 +1,58 @@
+#gbk-designer {
+    --palette-button-width: 24px;
+    --palette-border-thickness: 4px;
+}
+
+#gbk-designer .palette-grid {
+    /* display: grid; */
+    /* gap: 1px; */
+    /* grid-template-columns: repeat(auto-fit, minmax(32px, 1fr)); */
+    /* grid-template-columns: repeat(auto-fit, minmax(32px, 1fr)); */
+    display: flex;
+
+    justify-content: left;
+    flex-wrap: wrap;
+    flex-direction: row;
+
+    gap: calc(var(--panel-gap) * 0.5);
+}
+
+#gbk-designer .gbk-palette-button {
+    border-radius: 4px;
+    line-height: 0;
+    /* padding: var(--palette-button-width); */
+    /* width: var(--palette-button-width); */
+    /* height: var(--palette-button-width); */
+
+    padding: 0;
+    box-shadow: 1px 1px rgba(0, 0, 0, 50%);
+    border: var(--palette-border-thickness) solid rgba(0, 0, 0, 0%);
+}
+#gbk-designer .gbk-palette-button.gbk-palette-swatch {
+    width: var(--palette-button-width); 
+    height: var(--palette-button-width);
+}
+
+/* 
+#gbk-designer .gbk-palette-sizing {
+    width: var(--palette-button-width);
+    height: var(--palette-button-width);
+} */
+
+#gbk-designer .gbk-palette-button.gbk-palette-button-selected {
+    box-shadow: 2px 2px black,
+        inset var(--palette-border-thickness) var(--palette-border-thickness) white,
+        inset calc(-1 * var(--palette-border-thickness)) var(--palette-border-thickness) white,
+        inset var(--palette-border-thickness) calc(-1 * var(--palette-border-thickness)) white,
+        inset calc(-1 * var(--palette-border-thickness)) calc(-1 * var(--palette-border-thickness)) white;
+
+    border: var(--palette-border-thickness) solid hsl(240, 100%, 60%);
+}
+
+#gbk-designer .palette-tags {
+    display: flex;
+    gap: 4px 3px;
+    flex-wrap: wrap;
+    flex-direction: row;
+    /* grid-template-columns: repeat(auto-fit, minmax(32px, 1fr)); */
+}

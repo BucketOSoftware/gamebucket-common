@@ -1,4 +1,4 @@
-import { Alignment, FormGroup, InputGroup, Switch } from '@blueprintjs/core'
+// import { Alignment, FormGroup, InputGroup, Switch } from '@blueprintjs/core'
 import {
     TypeGuard,
     ValueGuard,
@@ -99,14 +99,16 @@ export default function FormField<T extends TSchema>(
             invariant(
                 typeof value === 'boolean' || typeof value === 'undefined',
             )
+            /*
             return (
-                <Switch
+                <Toggle
                     label={schema.title}
-                    alignIndicator={Alignment.RIGHT}
                     checked={false}
                     onChange={(e) => console.warn('TODO', name, e)}
                 />
             )
+            */
+           return (<div>TODO</div>)
 
         case 'array': {
             // TODO: exclude versions?
@@ -120,15 +122,20 @@ export default function FormField<T extends TSchema>(
             break
         }
         case 'string': {
+            throw new Error("TODO")
             const data = props.value
             invariant(typeof data === 'string')
-            return (
-                <FormGroup inline label={schema.title}>
-                    <InputGroup value={data} disabled={props.readonly} />
-                </FormGroup>
-            )
+            // return (
+                // <FormGroup inline label={schema.title}>
+                    // <InputGroup value={data} disabled={props.readonly} />
+                // </FormGroup>
+            // )
         }
     }
 
     console.warn("Don't know how to make a form for: ", path, schema)
+}
+
+function Toggle() {
+    return <div>TODO</div>
 }
