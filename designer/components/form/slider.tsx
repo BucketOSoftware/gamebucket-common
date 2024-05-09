@@ -1,4 +1,4 @@
-import { FormGroup, Slider } from '@blueprintjs/core';
+// import { FormGroup, Slider } from '@blueprintjs/core';
 import {
     TInteger,
     TypeGuard, type TNumber
@@ -21,6 +21,7 @@ export default function SliderField(props: FormFieldProps<TNumber | TInteger, nu
     // const labelStepSize = multipleOf ? multipleOf * 4 : undefined
     const labelStepSize = undefined;
 
+    /*
     return (
         <FormGroup label={schema.title}>
             <Slider
@@ -33,4 +34,6 @@ export default function SliderField(props: FormFieldProps<TNumber | TInteger, nu
                 labelStepSize={labelStepSize} />
         </FormGroup>
     );
+    */
+   return <div>TODO</div>
 }

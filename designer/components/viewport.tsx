@@ -1,18 +1,14 @@
 import { ResizeSensor } from '@blueprintjs/core'
-import {
-    PropsWithChildren,
-    RefObject,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react'
 import classnames from 'classnames'
+import {
+    useCallback,
+    useRef,
+    useState
+} from 'react'
+import invariant from 'tiny-invariant'
 
 import { Container } from '../../formats'
 import * as rect from '../../rect'
-
 import {
     GesturePhase,
     GestureState,
@@ -30,9 +26,8 @@ import {
 } from '../store'
 import { useTool } from '../tools'
 import { Carte } from './common'
-import invariant from 'tiny-invariant'
 
-export const Viewport = (props: PropsWithChildren) => {
+export function Viewport() {
     const viewportRef = useRef<HTMLDivElement>(null)
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
     const dispatch = useDispatch()

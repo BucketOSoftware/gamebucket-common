@@ -7,6 +7,10 @@
     /* font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; */
 }
 
+#gbk-designer .title {
+    font-weight: 500;
+}
+
 #gbk-designer .pane.padded hr {
     margin: 10px -10px;
     /* border-bottom: 1px solid #ddd; */

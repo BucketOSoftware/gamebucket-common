@@ -1,11 +1,9 @@
-// import { Button, ButtonGroup, MaybeElement, Tooltip } from '@blueprintjs/core'
-// import { BlueprintIcons_16Id } from '@blueprintjs/icons/lib/esm/generated/16px/blueprint-icons-16'
 import { PropsWithChildren } from 'react'
 import classnames from 'classnames'
 
 import { selectTool, useDispatch, useSelector } from '../store'
 import { useLiaison } from '../liaison'
-import { Carte } from './common'
+import { ButtonGroup } from './common'
 
 export function Toolbar() {
     const liaison = useLiaison()
@@ -14,8 +12,7 @@ export function Toolbar() {
 
     return (
         <div className="toolbar-actions">
-            <div className="btn-group">
-                {/* <ButtonGroup> */}
+            <ButtonGroup>
                 {liaison.tools.map((tool) => (
                     <ToolButton
                         key={tool.id}
@@ -27,8 +24,7 @@ export function Toolbar() {
                         {tool.displayName}
                     </ToolButton>
                 ))}
-                {/* </ButtonGroup> */}
-            </div>
+            </ButtonGroup>
         </div>
     )
 }

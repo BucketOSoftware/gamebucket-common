@@ -1,4 +1,3 @@
-import { Section, SectionCard } from '@blueprintjs/core'
 import { PropsWithChildren } from 'react'
 import classnames from 'classnames'
 
@@ -44,4 +43,9 @@ export function NavGroupItem({
             {children}
         </a>
     )
+}
+
+
+export function ButtonGroup({children}:PropsWithChildren) {
+    return <div className="btn-group">{children}</div>
 }

@@ -10,7 +10,7 @@ import invariant from 'tiny-invariant'
 
 import { Container, Spatial } from '../formats'
 import * as rect from '../rect'
-import { PaletteID } from './resource'
+import { PaletteID } from './types'
 
 const PALETTES_MUTEX = true
 

@@ -1,4 +1,4 @@
-import { FormGroup, SegmentedControl } from '@blueprintjs/core';
+// import { FormGroup, SegmentedControl } from '@blueprintjs/core';
 import {
     TUnion,
     TypeGuard
@@ -10,7 +10,9 @@ export default function MultipleChoiceField<U extends TUnion>({
     value, schema, onChange,
 }: FormFieldProps<U, string>) {
     invariant(TypeGuard.IsUnionLiteral(schema));
+return <div>TODO</div>
 
+    /*
     return (
         <FormGroup label={schema.title}>
             <SegmentedControl
@@ -23,5 +25,7 @@ export default function MultipleChoiceField<U extends TUnion>({
                 }))}
                 onValueChange={onChange} />
         </FormGroup>
+        
     );
+    */
 }

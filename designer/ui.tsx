@@ -10,24 +10,10 @@ import {
 } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { Clone } from '@sinclair/typebox'
-import { DragConfig } from '@use-gesture/react'
-import invariant from 'tiny-invariant'
-
-import { type Rect } from '../rect'
-import {
-    DraggableCallback,
-    GestureState,
-    useDraggable,
-    useGesture,
-} from './gestures'
+// import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Liaison, LiaisonProvider } from './liaison'
 import { ElementID, store } from './store'
 
-// import '@blueprintjs/core/lib/css/blueprint.css'
-// import '@blueprintjs/icons/lib/css/blueprint-icons.css'
-// import 'normalize.css'
 import 'photon/dist/css/photon.css'
 
 import './ui.css'
@@ -60,9 +46,9 @@ export function createApp<T extends string>(
 
 export function ColumnGroup({ children }: PropsWithChildren) {
     return (
-        <div className="window gbk-columns" style={{ borderRadius: '15px' }}>
+        <div className="window gbk-columns" >
             <header className="toolbar toolbar-header">
-                {/* <h1 className="title">Header</h1> */}
+                <h1 className="title">Gamebucket Designer</h1>
                 <Toolbar />
             </header>
             <div className="window-content">
