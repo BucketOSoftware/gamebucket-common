@@ -4,8 +4,8 @@ import { Teardown } from './machine'
 const PAUSE = Symbol()
 type LoopStatus = typeof PAUSE | void
 
-const MAXIMUM_DELTA_MS = 1000 / 10
 const timestep_ms = 1000 / 60
+const MAXIMUM_DELTA_MS = timestep_ms * 6
 
 /**
  *
@@ -31,8 +31,9 @@ export function fixedLoop(
 
     let loopStatus: LoopStatus
 
-    let rafId: number | undefined = requestAnimationFrame(l)
-    function l(t: number) {
+    let rafId: number | undefined = requestAnimationFrame(loop)
+    function loop(t: number) {
+        // TODO: can we use the param? If not, why do we accept one?
         t = performance.now()
 
         // t is wall-clock time
@@ -78,7 +79,7 @@ export function fixedLoop(
             gameTime_t,
         )
 
-        rafId = requestAnimationFrame(l)
+        rafId = requestAnimationFrame(loop)
     }
 
     return () => {

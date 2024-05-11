@@ -2,6 +2,7 @@ import { Static, TSchema } from '@sinclair/typebox'
 import { produce } from 'immer'
 import {
     PropsWithChildren,
+    FunctionComponent,
     createContext,
     useContext,
     useEffect,
@@ -20,6 +21,7 @@ export interface DepictProps {
     resourceId: Container.ItemID
     resource: EditableSubresource
     canvasSize: rect.Size
+    pointer: GVec2
 }
 
 interface LiaisonData {
@@ -35,6 +37,7 @@ interface LiaisonData {
         coordinates: Readonly<[to: GVec2, from: GVec2]>,
     ) => Array<number> | undefined
 
+    /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     select?: (
         layer: Spatial.Editable,
         viewport: DOMRect,
@@ -54,13 +57,6 @@ interface LiaisonData {
     /** User has "dragged" the edit window by this amount */
     onPan?: (pixelMovement: GVec2) => void
 
-    /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
-    onMarquee?: <ID>(
-        canvas: HTMLCanvasElement,
-        layer: EditableSubresource,
-        normalizedRect: rect.Rect,
-    ) => ID[] | rect.Rect
-
     /** given input from the designer (position, area if applicable, and any selected palette items as attributes), return a new entity (spawn point) that will be added to the active dataset*/
     onCreate?: <E extends TSchema>(
         canvas: HTMLCanvasElement,
@@ -70,14 +66,14 @@ interface LiaisonData {
     ) => Static<E>
 
     /** the given element has been edited */
-    onEdit?: (
-        canvas: HTMLCanvasElement,
-        layer: EditableSubresource,
-        elementId: string | number | undefined, // if undefined, refresh all
-    ) => void
+    // onEdit?: (
+    //     canvas: HTMLCanvasElement,
+    //     layer: EditableSubresource,
+    //     elementId: string | number | undefined, // if undefined, refresh all
+    // ) => void
 
     /** map a layer to a react component */
-    Depict?: React.FunctionComponent<DepictProps>
+    Depict?: FunctionComponent<DepictProps>
 }
 
 const defaultClientData = {
@@ -113,11 +109,9 @@ export class Liaison {
     }
 
     open(resource: EditableResource) {
-        // console.log('Wanna open:', resource)
         this.snapshot = produce(this.snapshot, (draft) => {
             draft.openResources = [resource]
         })
-        // console.warn('SNAPSHOT', this.snapshot)
         this.notifySubscribers()
     }
 

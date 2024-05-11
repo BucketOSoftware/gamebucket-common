@@ -1,10 +1,6 @@
 import { ResizeSensor } from '@blueprintjs/core'
 import classnames from 'classnames'
-import {
-    useCallback,
-    useRef,
-    useState
-} from 'react'
+import { useCallback, useRef, useState } from 'react'
 import invariant from 'tiny-invariant'
 
 import { Container } from '../../formats'
@@ -26,11 +22,15 @@ import {
 } from '../store'
 import { useTool } from '../tools'
 import { Carte } from './common'
+import { GVec2 } from '../../geometry'
+import { MarchingAnts } from '../ui'
 
 export function Viewport() {
+    const dispatch = useDispatch()
+
     const viewportRef = useRef<HTMLDivElement>(null)
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
-    const dispatch = useDispatch()
+    const [pointer, setPointer] = useState<GVec2>({ x: 0, y: 0 })
     const editedLayer = useSelectedLayer()
     const toolHandler = useTool()
     const phase = useRef<GesturePhase>()
@@ -56,6 +56,9 @@ export function Viewport() {
 
             if (newPhase === IGNORE_GESTURE || !editedLayer) return
 
+            const [x, y] = gesture.xy
+            setPointer({ x, y })
+
             let memo = toolHandler(newPhase, gesture, viewportSize, editedLayer)
             phase.current = gesturePhasePersists(newPhase)
 
@@ -77,7 +80,10 @@ export function Viewport() {
                         'gbk-tool-' + (toolId || 'none'),
                     )}
                 >
-                    <ViewportLayers viewportSize={viewportSize} />
+                    <ViewportLayers
+                        viewportSize={viewportSize}
+                        pointer={pointer}
+                    />
                     {ants && <MarchingAnts {...ants} />}
                 </div>
             </ResizeSensor>
@@ -85,7 +91,13 @@ export function Viewport() {
     )
 }
 
-function ViewportLayers({ viewportSize }: { viewportSize: DOMRect }) {
+function ViewportLayers({
+    viewportSize,
+    pointer,
+}: {
+    pointer: GVec2
+    viewportSize: DOMRect
+}) {
     const { Depict } = useLiaison()
     const loaded = useSelector((state) => state.loaded[0])
 
@@ -109,25 +121,7 @@ function ViewportLayers({ viewportSize }: { viewportSize: DOMRect }) {
                 loaded.items[id as Container.ItemID] as EditableSubresource
             }
             canvasSize={viewportSize}
+            pointer={pointer}
         />
     ))
-}
-
-function MarchingAnts(props: rect.Rect) {
-    return (
-        <svg
-            style={{
-                left: props.x,
-                top: props.y,
-                width: props.width,
-                height: props.height,
-            }}
-            className="marching-ants"
-            viewBox="0 0 40 40"
-            // prevents the scaling from applying to the rect
-            preserveAspectRatio="none"
-        >
-            <rect width="40" height="40" />
-        </svg>
-    )
 }

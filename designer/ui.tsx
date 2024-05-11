@@ -20,6 +20,7 @@ import './ui.css'
 
 import { ToolDef } from './tools'
 import { Toolbar } from './components'
+import * as rect from '../rect'
 
 export function createApp<T extends string>(
     domElement: HTMLElement,
@@ -46,7 +47,7 @@ export function createApp<T extends string>(
 
 export function ColumnGroup({ children }: PropsWithChildren) {
     return (
-        <div className="window gbk-columns" >
+        <div className="window gbk-columns">
             <header className="toolbar toolbar-header">
                 <h1 className="title">Gamebucket Designer</h1>
                 <Toolbar />
@@ -83,5 +84,24 @@ export function Sidebar({ children }: PropsWithChildren) {
         //     maxSize={50}
         // >
         <div className="pane pane-sm sidebar padded">{children}</div>
+    )
+}
+
+export function MarchingAnts(props: rect.Rect) {
+    return (
+        <svg
+            style={{
+                left: props.x,
+                top: props.y,
+                width: props.width,
+                height: props.height,
+            }}
+            className="marching-ants"
+            viewBox="0 0 40 40"
+            // prevents the scaling from applying to the rect
+            preserveAspectRatio="none"
+        >
+            <rect width="40" height="40" />
+        </svg>
     )
 }

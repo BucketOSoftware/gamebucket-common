@@ -52,7 +52,7 @@ function ToolButton(
                 dispatch(selectTool(props.id))
             }}
             className={classnames('btn', {
-                ['btn-default']: true,//!props.disabled,
+                ['btn-default']: true, //!props.disabled,
                 ['btn-disabled']: props.disabled,
                 active: tool === props.id,
             })}
