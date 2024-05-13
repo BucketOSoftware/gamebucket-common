@@ -128,7 +128,7 @@ const LiaisonContext = createContext<LiaisonData>(defaultClientData)
 export class Liaison {
     private snapshot: LiaisonData
 
-    constructor(tools: ToolDef<string>[]) {
+    constructor(tools: ToolDef<string>[], public readonly unmount: () => void) {
         this.snapshot = { ...defaultClientData, tools }
     }
 

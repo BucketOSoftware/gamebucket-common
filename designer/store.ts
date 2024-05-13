@@ -143,10 +143,11 @@ export const designerSlice = createSlice({
             const { schema, data } = draft.loaded[0].items[layerId]
             const element = data[elementId as keyof typeof data]
 
+            /*
             invariant(
                 element && typeof element === 'object',
                 "Element doesn't exist",
-            )
+            )*/
 
             ValuePointer.Set(element, pointer, value)
             if (!Check(schema, element)) {

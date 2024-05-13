@@ -138,7 +138,11 @@ export const CreateTool: ToolDef<'create'> = {
     },
 }
 
-/** Apply currently selected palette items to elements */
+/**
+ *  Apply currently selected palette items to elements 
+ * 
+ * @todo Fix lag when first starting the drag -- we don't care about the drag/tap distinction
+ */
 export const PlotTool: ToolDef<'plot'> = {
     id: 'plot',
     icon: 'icon-pencil',
@@ -163,6 +167,7 @@ export const PlotTool: ToolDef<'plot'> = {
             roundVec2(pos)
 
             switch (phase) {
+                case GesturePhase.Tap:
                 case GesturePhase.DragStart:
                 case GesturePhase.DragContinue: {
                     const previous = (gesture.memo as GVec2) ?? pos

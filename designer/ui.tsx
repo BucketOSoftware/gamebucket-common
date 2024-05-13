@@ -27,7 +27,7 @@ export function createApp<T extends string>(
     App: ReactNode,
     tools: ToolDef<T>[],
 ) {
-    const liaison = new Liaison(tools)
+    const liaison = new Liaison(tools, () => root.unmount())
     const root = createRoot(domElement)
     root.render(
         <StrictMode>
@@ -37,12 +37,7 @@ export function createApp<T extends string>(
         </StrictMode>,
     )
 
-    return [
-        liaison,
-        () => {
-            root.unmount()
-        },
-    ] as const
+    return liaison
 }
 
 export function ColumnGroup({ children }: PropsWithChildren) {
