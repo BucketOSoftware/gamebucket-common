@@ -42,7 +42,7 @@ const uVG_dragOptions: DragConfig = {
 
 export function useViewportGestures(
     ref: RefObject<HTMLElement>,
-    handleGesture: <G extends 'move' | 'drag'>(
+    handleGesture: <G extends 'move' | 'drag' | 'hover'>(
         gesture: GestureState<G>,
         type: G,
     ) => any,
@@ -51,7 +51,7 @@ export function useViewportGestures(
         () => ({
             onHover: (gesture: GestureState<'hover'>) => {
                 if (gesture.hovering === false) {
-                    handleGesture(gesture as GestureState<'move'>, 'move')
+                    handleGesture(gesture, 'hover')
                 }
             },
             onMove: (gesture: GestureState<'move'>) =>
@@ -103,6 +103,7 @@ export function phaseFromGesture<G extends GestureKey>(
     }
     throw new Error('Unhandleable gesture: ' + type)
 }
+
 /**
  *
  * @return The gesture phase to keep for next time, or undefined

@@ -3,8 +3,7 @@ import classnames from 'classnames'
 import { useCallback, useRef, useState } from 'react'
 import invariant from 'tiny-invariant'
 
-import { Container } from '../../formats'
-import * as rect from '../../rect'
+import { GVec2 } from '../../geometry'
 import {
     GesturePhase,
     GestureState,
@@ -14,16 +13,10 @@ import {
     useViewportGestures,
 } from '../gestures'
 import { useLiaison } from '../liaison'
-import {
-    EditableSubresource,
-    useDispatch,
-    useSelectedLayer,
-    useSelector,
-} from '../store'
+import { useDispatch, useSelectedLayer, useSelector } from '../store'
 import { useTool } from '../tools'
-import { Carte } from './common'
-import { GVec2 } from '../../geometry'
 import { MarchingAnts } from '../ui'
+import { Carte } from './common'
 
 export function Viewport() {
     const dispatch = useDispatch()
@@ -31,7 +24,9 @@ export function Viewport() {
     const viewportRef = useRef<HTMLDivElement>(null)
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
 
-    const [pointer, setPointer] = useState<GVec2>({ x: 0, y: 0 })
+    // Last pointer position in viewport coords
+    const [cursor, setCursor] = useState<GVec2>({ x: Infinity, y: Infinity })
+
     const toolHandler = useTool()
     const phase = useRef<GesturePhase>()
 
@@ -51,10 +46,22 @@ export function Viewport() {
     // does useCallback actually get us anything here?
     // maybe we should move more of the tool-specific logic out of this, like it's just a dispatch
     const handleGesture = useCallback(
-        <G extends 'move' | 'drag'>(gesture: GestureState<G>, type: G) => {
+        <G extends 'move' | 'drag' | 'hover'>(
+            gesture: GestureState<G>,
+            type: G,
+        ) => {
             // we want the cursor position regardless
-            const [x, y] = gesture.xy
-            setPointer({ x, y })
+            // console.warn(gesture.hovering, 'HOV')
+
+            if (type === 'hover') {
+                setCursor({ x: Infinity, y: Infinity })
+                return
+            }
+
+            setCursor({
+                x: gesture.xy[0] - viewportSize.left,
+                y: gesture.xy[1] - viewportSize.top,
+            })
 
             // Track whether a gesture is ongoing, and ignore ones that aren't relevant
             const newPhase = phaseFromGesture(type, gesture, phase.current)
@@ -81,8 +88,7 @@ export function Viewport() {
                 >
                     <ViewportLayers
                         viewportSize={viewportSize}
-                        pointerX={pointer.x - viewportSize.left}
-                        pointerY={pointer.y - viewportSize.top}
+                        cursor={cursor}
                     />
                     {ants && <MarchingAnts {...ants} />}
                 </div>
@@ -93,15 +99,13 @@ export function Viewport() {
 
 function ViewportLayers({
     viewportSize,
-    pointerX,
-    pointerY,
+    cursor,
 }: {
-    pointerX: number
-    pointerY: number
+    cursor: GVec2
     viewportSize: DOMRect
 }) {
     const { Depict } = useLiaison()
-    const loaded = useSelector((state) => state.loaded[0])
+    const mainResource = useSelector((state) => state.loaded[0])
 
     if (!Depict) {
         return (
@@ -111,19 +115,17 @@ function ViewportLayers({
         )
     }
 
-    if (!loaded) {
+    if (!mainResource) {
         return <div className="gbk-warning">[!] No assets loaded.</div>
     }
 
-    return loaded.itemOrder.map((id) => (
+    return mainResource.itemOrder.map((id) => (
         <Depict
             key={id}
-            resourceId={id as Container.ItemID}
-            resource={
-                loaded.items[id as Container.ItemID] as EditableSubresource
-            }
+            resourceId={id}
+            resource={mainResource.items[id]}
             canvasSize={viewportSize}
-            pointer={{ x: pointerX, y: pointerY }}
+            pointer={cursor}
         />
     ))
 }

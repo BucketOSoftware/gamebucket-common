@@ -14,7 +14,7 @@ import {
     useDispatch,
     useSelector,
 } from './store'
-import { roundVec2 } from '../geometry'
+import { GVec2, roundVec2 } from '../geometry'
 
 export interface ToolDef<
     ID extends string,
@@ -158,32 +158,23 @@ export const PlotTool: ToolDef<'plot'> = {
 
             const pos = gestureVecToViewportRelative(gesture.values, viewport)
             if (!pos) {
-                // dispatch(pointerHover())
                 return
             }
             roundVec2(pos)
 
-            // dispatch(
-            //     pointerHover(
-            //         phase === GesturePhase.DragCommit ? undefined : pos,
-            //     ),
-            // )
-
             switch (phase) {
                 case GesturePhase.DragStart:
                 case GesturePhase.DragContinue: {
-                    const previous = gesture.memo ?? pos
+                    const previous = (gesture.memo as GVec2) ?? pos
 
-                    const ids = liaison.selectLine(
-                        layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
-                        viewport,
-                        [pos, previous],
-                    )
+                    const ids =
+                        liaison.selectLine(
+                            layer as Spatial.Dense<2>, // no idea why this was failing despite the invariant above
+                            viewport,
+                            [pos, previous],
+                        ) ?? []
 
-                    if (ids) {
-                        dispatch(applyPalette(ids))
-                    }
-
+                    dispatch(applyPalette(ids))
                     return pos
                 }
             }
