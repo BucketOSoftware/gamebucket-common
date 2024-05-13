@@ -11,6 +11,7 @@ import invariant from 'tiny-invariant'
 import { Container, Spatial } from '../formats'
 import * as rect from '../rect'
 import { PaletteID } from './types'
+import { GVec2 } from '../geometry'
 
 const PALETTES_MUTEX = true
 
@@ -21,9 +22,21 @@ export type ElementID<S extends string | number = string | number> = S
 export const designerSlice = createSlice({
     name: 'designer',
 
+    // TODO: remove the need for a default tool, so the toolset can be customizable?
     initialState: { selected: { tool: 'select', attribs: {} }, loaded: [] } as {
         selected: {
-            /** currently active tool. @todo Type? */
+            /**
+             * Last point the pointer was at and not doing anything, in
+             * viewport coordinates, or undefined if the pointer is outside the
+             * viewport or mid-gesture.
+             */
+            hover?: boolean
+
+            /**
+             * currently active tool.
+             * @todo Type checking?
+             * @todo Store this per layer type (i.e. per set of usable tools?) so we don't switch layers and end up on an invalid tool
+             */
             tool: string
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
@@ -51,7 +64,6 @@ export const designerSlice = createSlice({
             }: PayloadAction<[string | undefined, any]>,
         ) => {
             invariant(attribute, 'TODO: single-attribute layers')
-            console.warn('SETTING:', attribute, value)
             if (PALETTES_MUTEX) {
                 draft.selected.attribs = { [attribute]: value }
             } else {

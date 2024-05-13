@@ -5,11 +5,16 @@ import {
     createUseGesture,
     dragAction,
     moveAction,
+    hoverAction,
 } from '@use-gesture/react'
 import { RefObject, useCallback, useMemo, useState } from 'react'
 import invariant from 'tiny-invariant'
 
-export const useGesture = createUseGesture([moveAction, dragAction])
+export const useGesture = createUseGesture([
+    moveAction,
+    dragAction,
+    hoverAction,
+])
 
 export const DRAG_ENTITY_THRESHOLD_MS = 200
 // export const DRAG_ENTITY_THRESHOLD_DISTANCE = 1
@@ -25,6 +30,7 @@ export enum GesturePhase {
     DragContinue = 'DRAG_CONTINUE',
     DragCommit = 'DRAG_COMMIT',
     Tap = 'TAP',
+    MouseOut = 'MOUSE_OUT',
 }
 
 const uVG_eventOptions = { passive: false } as const
@@ -43,6 +49,11 @@ export function useViewportGestures(
 ) {
     const handlers = useMemo(
         () => ({
+            onHover: (gesture: GestureState<'hover'>) => {
+                if (gesture.hovering === false) {
+                    handleGesture(gesture as GestureState<'move'>, 'move')
+                }
+            },
             onMove: (gesture: GestureState<'move'>) =>
                 handleGesture(gesture, 'move'),
             onDrag: (gesture: GestureState<'drag'>) =>
@@ -128,7 +139,7 @@ export function useDraggable<T extends HTMLElement>(
             state.event.stopPropagation()
 
             if (state.tap) {
-                setDisplacement([0,0])
+                setDisplacement([0, 0])
                 callback(true)
             } else {
                 const [dx, dy] = state.movement

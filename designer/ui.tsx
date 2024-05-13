@@ -105,3 +105,19 @@ export function MarchingAnts(props: rect.Rect) {
         </svg>
     )
 }
+
+export function Highlight(props: rect.Rect) {
+    const extend = 3
+    const extend2 = 6
+    return (
+        <div
+            className="gbk-hover-target"
+            style={{
+                left: props.x - extend,
+                top: props.y - extend,
+                width: props.width + extend2,
+                height: props.height + extend2,
+            }}
+        />
+    )
+}

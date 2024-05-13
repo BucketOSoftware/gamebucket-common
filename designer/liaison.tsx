@@ -8,13 +8,20 @@ import {
     useEffect,
     useSyncExternalStore,
 } from 'react'
-import { useDispatch } from 'react-redux'
+import { DeepReadonly } from 'ts-essentials'
 
 import { Container, Spatial } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
-import { EditableResource, EditableSubresource, ElementID, open } from './store'
+import {
+    EditableResource,
+    EditableSubresource,
+    ElementID,
+    open,
+    AppDispatch,
+    useDispatch,
+} from './store'
 import { ToolDef } from './tools'
 
 export interface DepictProps {
@@ -22,6 +29,43 @@ export interface DepictProps {
     resource: EditableSubresource
     canvasSize: rect.Size
     pointer: GVec2
+}
+
+/** Information to be made available to callbacks (but read-only) */
+interface DesignerContext {
+    /**
+     * Location and size of the viewport in viewport coordinates
+     * @todo Ugh. Using "viewport" 2 different ways
+     *
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect
+     */
+    viewport: DOMRect
+
+    /** gesture we're responding to/being asked about. coordinates are all relative to  */
+    gesture: {
+        action: 'hover' | 'drag'
+
+        /** Current pointer position
+         */
+        to: GVec2
+
+        /**
+         * where the pointer was at the beginning of this gesture update.
+         * `to - from` is the movement this frame
+         */
+        from: GVec2
+
+        /** vector of from -> to
+         * @todo
+         */
+        movement?: GVec2
+
+        /** If true, the gesture is at the "commit" stage */
+        complete?: boolean
+    }
+
+    /** modify state if you want! */
+    dispatch: AppDispatch
 }
 
 interface LiaisonData {
@@ -39,11 +83,9 @@ interface LiaisonData {
 
     /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     select?: (
+        ctx: DeepReadonly<DesignerContext>,
         layer: Spatial.Editable,
-        viewport: DOMRect,
-        coordinates: Readonly<[to: GVec2, from: GVec2]>,
-        marquee: (r: rect.Rect) => void,
-    ) => ElementID[]
+    ) => void
 
     /** The user has moved an entity relative to the viewport
      * @returns The entity's new `position` or `undefined` if it shouldn't move

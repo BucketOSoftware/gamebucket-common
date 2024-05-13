@@ -30,11 +30,12 @@ export function Viewport() {
 
     const viewportRef = useRef<HTMLDivElement>(null)
     const [viewportSize, setViewportSize] = useState<DOMRect>(new DOMRect())
+
     const [pointer, setPointer] = useState<GVec2>({ x: 0, y: 0 })
-    const editedLayer = useSelectedLayer()
     const toolHandler = useTool()
     const phase = useRef<GesturePhase>()
 
+    const editedLayer = useSelectedLayer()
     const ants = useSelector((state) => state.selected.marquee)
     const toolId = useSelector((state) => state.selected.tool)
 
@@ -51,18 +52,16 @@ export function Viewport() {
     // maybe we should move more of the tool-specific logic out of this, like it's just a dispatch
     const handleGesture = useCallback(
         <G extends 'move' | 'drag'>(gesture: GestureState<G>, type: G) => {
-            // Track whether a gesture is ongoing, and ignore ones that aren't relevant
-            const newPhase = phaseFromGesture(type, gesture, phase.current)
-
-            if (newPhase === IGNORE_GESTURE || !editedLayer) return
-
+            // we want the cursor position regardless
             const [x, y] = gesture.xy
             setPointer({ x, y })
 
-            let memo = toolHandler(newPhase, gesture, viewportSize, editedLayer)
+            // Track whether a gesture is ongoing, and ignore ones that aren't relevant
+            const newPhase = phaseFromGesture(type, gesture, phase.current)
+            if (newPhase === IGNORE_GESTURE || !editedLayer) return
             phase.current = gesturePhasePersists(newPhase)
 
-            return memo
+            return toolHandler(newPhase, gesture, viewportSize, editedLayer)
         },
         [dispatch, phase, toolHandler, editedLayer, viewportSize],
     )
@@ -82,7 +81,8 @@ export function Viewport() {
                 >
                     <ViewportLayers
                         viewportSize={viewportSize}
-                        pointer={pointer}
+                        pointerX={pointer.x - viewportSize.left}
+                        pointerY={pointer.y - viewportSize.top}
                     />
                     {ants && <MarchingAnts {...ants} />}
                 </div>
@@ -93,9 +93,11 @@ export function Viewport() {
 
 function ViewportLayers({
     viewportSize,
-    pointer,
+    pointerX,
+    pointerY,
 }: {
-    pointer: GVec2
+    pointerX: number
+    pointerY: number
     viewportSize: DOMRect
 }) {
     const { Depict } = useLiaison()
@@ -121,7 +123,7 @@ function ViewportLayers({
                 loaded.items[id as Container.ItemID] as EditableSubresource
             }
             canvasSize={viewportSize}
-            pointer={pointer}
+            pointer={{ x: pointerX, y: pointerY }}
         />
     ))
 }

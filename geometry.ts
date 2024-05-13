@@ -25,7 +25,7 @@ export type GVec3 = { x: number; y: number; z: number }
 /** A generic quaternion */
 export type GQuat = { w: number; x: number; y: number; z: number }
 
-export type GVec<D extends 2|3> = D extends 2 ? GVec2 : GVec3
+export type GVec<D extends 2 | 3> = D extends 2 ? GVec2 : GVec3
 export const GVec2 = (x: number, y: number) => ({ x, y })
 export const GVec3 = (x: number, y: number, z: number) => ({ x, y, z })
 
@@ -56,11 +56,11 @@ export function floorVec2(vec2: GVec2): GVec2 {
     return vec2
 }
 
-export function roundVec2(vec2: GVec2, increments = 1): GVec2 {
-    vec2.x = roundBy(vec2.x, increments)
-    vec2.y = roundBy(vec2.y, increments)
+export function roundVec2(v: GVec2, increments = 1, out = v): GVec2 {
+    out.x = roundBy(v.x, increments)
+    out.y = roundBy(v.y, increments)
 
-    return vec2
+    return out
 }
 
 /** Squashes `vec3` onto the XZ (ground) plane, discarding y, and sets `vec2`

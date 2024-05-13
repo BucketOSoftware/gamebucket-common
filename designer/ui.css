@@ -99,6 +99,7 @@
     touch-action: none;
     background-color: aliceblue;
     cursor: help;
+    overflow: hidden;
 }
 
 #gbk-designer .btn.btn-disabled {
@@ -110,6 +111,19 @@
     touch-action: none;
 }
 
+
+#gbk-designer .gbk-viewport .gbk-hover-target {
+    /* display: inline-block; */
+    display: none;
+    touch-action: none;
+    pointer-events: none;
+
+    position: absolute;
+    background-color: rgba(0, 0, 255, 33%);
+}
+
+
+
 #gbk-designer .gbk-viewport.gbk-tool-no-use {
     cursor: not-allowed !important;
 }
@@ -118,9 +132,14 @@
     cursor: not-allowed;
 }
 
-#gbk-designer .gbk-viewport.gbk-tool-plot {
-    cursor: crosshair;
+#gbk-designer .gbk-viewport.gbk-tool-plot .gbk-viewport-layer {
+    cursor: none;
 }
+
+#gbk-designer .gbk-viewport.gbk-tool-plot .gbk-hover-target {
+    display: block;
+}
+
 
 #gbk-designer .gbk-viewport.gbk-tool-select {
     cursor: crosshair;

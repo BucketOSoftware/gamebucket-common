@@ -14,6 +14,7 @@ import {
     useDispatch,
     useSelector,
 } from './store'
+import { roundVec2 } from '../geometry'
 
 export interface ToolDef<
     ID extends string,
@@ -70,38 +71,50 @@ export const SelectTool: ToolDef<'select'> = {
         return (phase, gesture, viewport, layer) => {
             invariant(liaison.select)
 
-            const marqueeArea = [
-                gestureVecToViewportRelative(gesture.values, viewport),
-                gestureVecToViewportRelative(
-                    gesture.memo ?? gesture.values,
-                    viewport,
-                ),
-            ] as const
+            const to = gestureVecToViewportRelative(gesture.values, viewport)
+            const from = gestureVecToViewportRelative(
+                gesture.memo ?? gesture.values,
+                viewport,
+            )
+            if (!(to && from)) {
+                return
+            }
 
             switch (phase) {
+                case GesturePhase.Hover:
+                    // DOM can probably handle this
+                    return
                 case GesturePhase.DragStart:
                     return gesture.values
                 case GesturePhase.DragContinue:
                     invariant(gesture.memo)
 
-                    liaison.select(layer, viewport, marqueeArea, (r) =>
-                        dispatch(selectMarquee(r)),
+                    liaison.select(
+                        {
+                            viewport,
+                            dispatch,
+                            gesture: { action: 'drag', to, from },
+                        },
+                        layer,
                     )
 
                     return gesture.memo
                 case GesturePhase.DragCommit:
-                    dispatch(
-                        selectElements([
-                            undefined,
-                            liaison.select(layer, viewport, marqueeArea, noop),
-                        ]),
+                    liaison.select(
+                        {
+                            viewport,
+                            dispatch,
+                            gesture: {
+                                action: 'drag',
+                                to,
+                                from,
+                                complete: true,
+                            },
+                        },
+                        layer,
                     )
-                    dispatch(selectMarquee())
                     return
                 default:
-                // TODO?
-                // case GesturePhase.Tap:
-                // case GesturePhase.Hover:
             }
 
             return
@@ -143,14 +156,22 @@ export const PlotTool: ToolDef<'plot'> = {
                 'Draw only works on tilemaps (dense 2D layers)',
             )
 
+            const pos = gestureVecToViewportRelative(gesture.values, viewport)
+            if (!pos) {
+                // dispatch(pointerHover())
+                return
+            }
+            roundVec2(pos)
+
+            // dispatch(
+            //     pointerHover(
+            //         phase === GesturePhase.DragCommit ? undefined : pos,
+            //     ),
+            // )
+
             switch (phase) {
                 case GesturePhase.DragStart:
                 case GesturePhase.DragContinue: {
-                    const pos = gestureVecToViewportRelative(
-                        gesture.values,
-                        viewport,
-                    )
-
                     const previous = gesture.memo ?? pos
 
                     const ids = liaison.selectLine(
@@ -160,8 +181,9 @@ export const PlotTool: ToolDef<'plot'> = {
                     )
 
                     if (ids) {
-                        dispatch(applyPalette(ids!))
+                        dispatch(applyPalette(ids))
                     }
+
                     return pos
                 }
             }
@@ -172,8 +194,15 @@ export const PlotTool: ToolDef<'plot'> = {
 ///// utils
 
 // TODO?: factor in window.scroll*?
-const gestureVecToViewportRelative = (
+function gestureVecToViewportRelative(
     [x, y]: [number, number],
-    { left, top }: DOMRect,
-) => ({ x: x - left, y: y - top })
+    { left, top, right, bottom }: DOMRect,
+    clip: boolean = true,
+) {
+    // TODO: are right and bottom inclusive or exclusive
+    if (clip && (x < left || x > right || y < top || y > bottom)) {
+        return
+    }
 
+    return { x: x - left, y: y - top }
+}
