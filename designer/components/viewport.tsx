@@ -16,7 +16,6 @@ import { useLiaison } from '../liaison'
 import { useDispatch, useSelectedLayer, useSelector } from '../store'
 import { useTool } from '../tools'
 import { MarchingAnts } from '../ui'
-import { Carte } from './common'
 
 export function Viewport() {
     const dispatch = useDispatch()
@@ -76,24 +75,20 @@ export function Viewport() {
     useViewportGestures(viewportRef, handleGesture)
 
     return (
-        <Carte title="viewport" wholeHeight stacking>
-            <ResizeSensor targetRef={viewportRef} onResize={onResize}>
-                <div
-                    ref={viewportRef}
-                    className={classnames(
-                        'layerboss',
-                        'gbk-viewport',
-                        'gbk-tool-' + (toolId || 'none'),
-                    )}
-                >
-                    <ViewportLayers
-                        viewportSize={viewportSize}
-                        cursor={cursor}
-                    />
-                    {ants && <MarchingAnts {...ants} />}
-                </div>
-            </ResizeSensor>
-        </Carte>
+        // <Carte title="viewport" wholeHeight stacking>
+        <ResizeSensor targetRef={viewportRef} onResize={onResize}>
+            <div
+                ref={viewportRef}
+                className={classnames(
+                    'layerboss',
+                    'gbk-viewport',
+                    'gbk-tool-' + (toolId || 'none'),
+                )}
+            >
+                <ViewportLayers viewportSize={viewportSize} cursor={cursor} />
+                {ants && <MarchingAnts {...ants} />}
+            </div>
+        </ResizeSensor>
     )
 }
 

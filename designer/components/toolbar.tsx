@@ -11,21 +11,19 @@ export function Toolbar() {
     const state = useSelector((state) => state)
 
     return (
-        <div className="toolbar-actions">
-            <ButtonGroup>
-                {liaison.tools.map((tool) => (
-                    <ToolButton
-                        key={tool.id}
-                        label={tool.displayName}
-                        id={tool.id}
-                        icon={tool.icon}
-                        disabled={!tool.enabled!(state)}
-                    >
-                        {tool.displayName}
-                    </ToolButton>
-                ))}
-            </ButtonGroup>
-        </div>
+        <ButtonGroup>
+            {liaison.tools.map((tool) => (
+                <ToolButton
+                    key={tool.id}
+                    label={tool.displayName}
+                    id={tool.id}
+                    icon={tool.icon}
+                    disabled={!tool.enabled!(state)}
+                >
+                    {tool.displayName}
+                </ToolButton>
+            ))}
+        </ButtonGroup>
     )
 }
 
