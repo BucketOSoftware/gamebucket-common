@@ -1,8 +1,12 @@
 import { Static, TSchema } from '@sinclair/typebox'
+import { NonEmptyObject, NonNever, Primitive } from 'ts-essentials'
 
 export enum ResourceType {
+    /**
+     * Can hold multiple other resource, and optionally have properties
+     * (metadata); otherwise generic
+     */
     Container = 'gamebucket/container',
-    // Spatial2D = 'resource/spatial2d',
 
     SpatialSparse2D = 'resource/spatial2d/sparse',
     SpatialDense2D = 'resource/spatial2d/dense',
@@ -20,7 +24,8 @@ export enum ResourceType {
     Equation = 'resource/equation',
 }
 
-export type Serializable =
+/** @todo replace this with a library type */
+type Serializable =
     | string
     | number
     | boolean
@@ -28,29 +33,34 @@ export type Serializable =
     | Serializable[]
     | { [key: string]: Serializable }
 
-// export type CompoundResourceType = ResourceType.Spatial2D
-
-export interface Metadata<R extends ResourceType> {
+/**
+ * A resource that was loaded from disk, or could be saved to disk. `&` this with
+ * any other resource to get an editable "file" */
+export interface File<R extends ResourceType> extends GenericResource<R> {
     /** where the resource was loaded from, or new/unsaved if undefined */
     src?: string
     /** If present, a user-facing name for the resource */
     displayName?: string
+}
 
+export interface GenericResource<R extends ResourceType = ResourceType> {
     type: R
+
+    properties?: unknown
 }
 
-/** Any resource! */
-export namespace GenericResource {
-    export interface Serialized<R extends ResourceType> {
-        type: R
+export type WithProperties<P> = IfPresent<'properties', P>
 
-        /** If present, a user-facing name for the resource */
-        displayName?: string
-    }
+/**
+ * A type that maps `K` to `P` if `P` is a primitive or a non-empty object, or
+ * an empty object type otherwise
+ */
+type IfPresent<K extends string, P = never> = NonNever<
+    Record<K, AllowPrimitiveOrFullObject<P>>
+>
 
-    export interface Editable<R extends ResourceType = ResourceType>
-        extends Serialized<R> {
-        /** where the resource was loaded from, or new/unsaved if undefined */
-        src?: string
-    }
-}
+type AllowPrimitiveOrFullObject<P> = P extends Primitive
+    ? P
+    : AllowNonEmptyObject<P>
+
+type AllowNonEmptyObject<P> = P extends {} ? NonEmptyObject<P> : never

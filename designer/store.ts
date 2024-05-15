@@ -1,29 +1,25 @@
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
-import { TSchema } from '@sinclair/typebox'
 import { Errors } from '@sinclair/typebox/errors'
 import { Check, ValuePointer } from '@sinclair/typebox/value'
+import uniqueId from 'lodash-es/uniqueId'
+import { Opaque, WithOpaque } from 'ts-essentials'
 import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
 import invariant from 'tiny-invariant'
 
-import { Container, Spatial } from '../formats'
 import * as rect from '../rect'
-import { PaletteID } from './types'
+import { EditableTopLevel, ElementID, LayerID, PaletteID, TopLevelResourceID } from './types'
 import { GVec2 } from '../geometry'
 
 const PALETTES_MUTEX = true
-
-export type EditableSubresource = Spatial.Editable<2, TSchema, any>
-export type EditableResource = Container.Editable<EditableSubresource[]>
-export type ElementID<S extends string | number = string | number> = S
 
 export const designerSlice = createSlice({
     name: 'designer',
 
     // TODO: remove the need for a default tool, so the toolset can be customizable?
-    initialState: { selected: { tool: 'select', attribs: {} }, loaded: [] } as {
+    initialState: { selected: { tool: 'select', attribs: {} }, loaded: {} } as {
         selected: {
             /**
              * Last point the pointer was at and not doing anything, in
@@ -41,7 +37,7 @@ export const designerSlice = createSlice({
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
-            layer?: Container.ItemID
+            layer?: LayerID
 
             /** Area selected OR elements selected
              * @todo unfortunately element IDs are unique to the LAYER, but not globally...
@@ -52,8 +48,7 @@ export const designerSlice = createSlice({
             marquee?: rect.Rect
         }
 
-        // TODO: do we need to store this? Should we just get it from the Liaison and copy the thing we're editing into ui.layer?
-        loaded: EditableResource[]
+        loaded: Record<TopLevelResourceID, EditableTopLevel>
     },
 
     reducers: {
@@ -77,7 +72,7 @@ export const designerSlice = createSlice({
 
         selectLayer: (
             draft,
-            { payload }: PayloadAction<Container.ItemID | undefined>,
+            { payload }: PayloadAction<LayerID | undefined>,
         ) => {
             draft.selected.layer = payload
         },
@@ -94,7 +89,7 @@ export const designerSlice = createSlice({
             {
                 payload: [layer, elements],
             }: PayloadAction<
-                [layer: Container.ItemID | undefined, elements: ElementID[]]
+                [layer: LayerID | undefined, elements: ElementID[]]
             >,
         ) => {
             if (layer) {
@@ -106,13 +101,14 @@ export const designerSlice = createSlice({
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
         applyPalette: (draft, { payload: ids }: PayloadAction<ElementID[]>) => {
-            invariant(
-                Container.isItemID(draft.selected.layer!, draft.loaded[0]),
-            )
-            const layer = draft.loaded[0].items[draft.selected.layer!]
-
-            const array = Array.isArray(layer.data) && layer.data
-            const record = !Array.isArray(layer.data) && layer.data
+            const layer = draft.loaded[0].items[draft.selected.layer as LayerID]
+            // TODO: this is how we do it
+            if ('chunks' in layer) {
+                layer.chunks[0][-32][0] = 3
+            } else {
+                const array = Array.isArray(layer.items) && layer.items
+                const record = !Array.isArray(layer.items) && layer.items
+            }
             // TODO: coerce values to match layer schema?
             for (let id of ids) {
                 const e =
@@ -130,7 +126,7 @@ export const designerSlice = createSlice({
             {
                 payload,
             }: PayloadAction<{
-                layer: Container.ItemID
+                layer: LayerID
                 id: ElementID
                 /** JSON pointer.
                  * @see https://www.rfc-editor.org/rfc/rfc6901 */
@@ -140,8 +136,8 @@ export const designerSlice = createSlice({
         ) => {
             const { id: elementId, layer: layerId, pointer, value } = payload
 
-            const { schema, data } = draft.loaded[0].items[layerId]
-            const element = data[elementId as keyof typeof data]
+            const { schema, items, chunks } = draft.loaded[0].items[layerId]
+            const element = items[elementId as keyof typeof items]
 
             /*
             invariant(
@@ -179,18 +175,20 @@ export const designerSlice = createSlice({
             invariant(layer, 'Layer not found')
 
             const elementId = draft.selected.elements[0]
-            const element = layer.data[elementId as keyof typeof layer.data]
+            const element = layer.items[elementId as keyof typeof layer.items]
             invariant(element, 'Element not found')
-
+            // ValuePointer.Get(
             ValuePointer.Set(element, pointer, value)
         },
 
         open: (
             draft,
-            { payload: resource }: PayloadAction<EditableResource>,
+            { payload: resource }: PayloadAction<EditableTopLevel>,
         ) => {
             // TODO: accept serialized form, convert to editable form.
-            draft.loaded = [resource]
+            // draft.loaded = [resource]
+            draft.loaded = { [TopLevelResourceID()]: resource }
+            // TODO: start using JSON pointers or something to drill down from state.loaded to a layer, element, etc. so we know we have an unambiguous path
             draft.selected.layer = resource.itemOrder[0]
         },
     },
@@ -235,10 +233,23 @@ export const {
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
 export const getSelectedLayer = (state: Readonly<RootState>) =>
-    state.selected.layer && state.loaded[0]?.items[state.selected.layer]
+    state.selected.layer
+        ? state.loaded[0]?.items[state.selected.layer]
+        : undefined
 
 export const useSelectedLayer = () =>
     useSelector((state) => getSelectedLayer(state))
 
 export const useCurrentPalettes = () =>
     useSelector((state) => getSelectedLayer(state)?.palettes)
+
+
+
+
+function getChunkAt(state: RootState, pos: GVec2, chunkSize: number) {
+    const x = Math.floor(pos.x / chunkSize) * chunkSize
+    const x = Math.floor(pos.x / chunkSize) * chunkSize
+}
+
+function coordInChunk(chunkOffset: GVec2, pos: GVec2) {
+    return pos.x - chunkOffset.x

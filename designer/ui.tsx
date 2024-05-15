@@ -12,7 +12,7 @@ import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 // import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Liaison, LiaisonProvider } from './liaison'
-import { ElementID, store } from './store'
+import {  store } from './store'
 
 import 'photon/dist/css/photon.css'
 

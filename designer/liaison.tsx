@@ -10,23 +10,17 @@ import {
 } from 'react'
 import { DeepReadonly } from 'ts-essentials'
 
-import { Container, Spatial } from '../formats'
+import { Spatial, Vector } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
-import {
-    EditableResource,
-    EditableSubresource,
-    ElementID,
-    open,
-    AppDispatch,
-    useDispatch,
-} from './store'
+import { open, AppDispatch, useDispatch } from './store'
 import { ToolDef } from './tools'
+import { Editable, EditableTopLevel, LayerID } from './types'
 
 export interface DepictProps {
-    resourceId: Container.ItemID
-    resource: EditableSubresource
+    resourceId: LayerID
+    resource: Editable
     canvasSize: rect.Size
     pointer: GVec2
 }
@@ -69,7 +63,7 @@ interface DesignerContext {
 }
 
 interface LiaisonData {
-    openResources: EditableResource[]
+    openResources: EditableTopLevel[]
     tools: ToolDef<string>[]
 
     /** Given two points in the viewport, and a presumably dense layer, return a list of elements
@@ -84,17 +78,17 @@ interface LiaisonData {
     /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     select?: (
         ctx: DeepReadonly<DesignerContext>,
-        layer: Spatial.Editable,
+        layer: Spatial.Spatial,
     ) => void
 
     /** The user has moved an entity relative to the viewport
-     * @returns The entity's new `position` or `undefined` if it shouldn't move
+     * @returns The entity's new `position`, or `undefined` if it shouldn't move
      */
     translateElement?: (
         element: Spatial.SparseElement,
         viewportMovement: GVec2,
         selectedLayer?: Spatial.Sparse,
-    ) => Spatial.Position | void
+    ) => Vector | void
 
     /** User has "dragged" the edit window by this amount */
     onPan?: (pixelMovement: GVec2) => void
@@ -102,7 +96,7 @@ interface LiaisonData {
     /** given input from the designer (position, area if applicable, and any selected palette items as attributes), return a new entity (spawn point) that will be added to the active dataset*/
     onCreate?: <E extends TSchema>(
         canvas: HTMLCanvasElement,
-        layer: EditableSubresource,
+        layer: Spatial.Spatial,
         normalizedPosition: GVec2,
         properties: { area?: rect.Size; [k: string]: unknown },
     ) => Static<E>
@@ -128,7 +122,10 @@ const LiaisonContext = createContext<LiaisonData>(defaultClientData)
 export class Liaison {
     private snapshot: LiaisonData
 
-    constructor(tools: ToolDef<string>[], public readonly unmount: () => void) {
+    constructor(
+        tools: ToolDef<string>[],
+        public readonly unmount: () => void,
+    ) {
         this.snapshot = { ...defaultClientData, tools }
     }
 
@@ -150,7 +147,7 @@ export class Liaison {
         return this.snapshot
     }
 
-    open(resource: EditableResource) {
+    open(resource: EditableTopLevel) {
         this.snapshot = produce(this.snapshot, (draft) => {
             draft.openResources = [resource]
         })
