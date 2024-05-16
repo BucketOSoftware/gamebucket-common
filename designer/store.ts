@@ -1,17 +1,24 @@
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
 import { Errors } from '@sinclair/typebox/errors'
 import { Check, ValuePointer } from '@sinclair/typebox/value'
-import uniqueId from 'lodash-es/uniqueId'
-import { Opaque, WithOpaque } from 'ts-essentials'
 import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
 import invariant from 'tiny-invariant'
+import { Dictionary } from 'ts-essentials'
 
-import * as rect from '../rect'
-import { EditableTopLevel, ElementID, LayerID, PaletteID, TopLevelResourceID } from './types'
 import { GVec2 } from '../geometry'
+import * as rect from '../rect'
+import {
+    ElementID,
+    LoadableResource,
+    PaletteID,
+    ResourceID,
+    prepareContainer,
+} from './types'
+import { ResourceType } from '../formats'
+import { TSchema } from '@sinclair/typebox'
 
 const PALETTES_MUTEX = true
 
@@ -19,7 +26,11 @@ export const designerSlice = createSlice({
     name: 'designer',
 
     // TODO: remove the need for a default tool, so the toolset can be customizable?
-    initialState: { selected: { tool: 'select', attribs: {} }, loaded: {} } as {
+    initialState: {
+        selected: { tool: 'select', attribs: {} },
+        resources: {},
+        roots: [],
+    } as {
         selected: {
             /**
              * Last point the pointer was at and not doing anything, in
@@ -37,7 +48,7 @@ export const designerSlice = createSlice({
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
-            layer?: LayerID
+            layer?: ResourceID
 
             /** Area selected OR elements selected
              * @todo unfortunately element IDs are unique to the LAYER, but not globally...
@@ -48,7 +59,12 @@ export const designerSlice = createSlice({
             marquee?: rect.Rect
         }
 
-        loaded: Record<TopLevelResourceID, EditableTopLevel>
+        /** All loaded resources, which can reference children by ID */
+        resources: Record<ResourceID, LoadableResource<TSchema, any>>
+        /** Which resource the editor is */
+        root?: ResourceID
+        /** Future expansion: multiple distinct roots can be loaded but not edited at the same time */
+        roots: ResourceID[]
     },
 
     reducers: {
@@ -72,7 +88,7 @@ export const designerSlice = createSlice({
 
         selectLayer: (
             draft,
-            { payload }: PayloadAction<LayerID | undefined>,
+            { payload }: PayloadAction<ResourceID | undefined>,
         ) => {
             draft.selected.layer = payload
         },
@@ -89,7 +105,7 @@ export const designerSlice = createSlice({
             {
                 payload: [layer, elements],
             }: PayloadAction<
-                [layer: LayerID | undefined, elements: ElementID[]]
+                [layer: ResourceID | undefined, elements: ElementID[]]
             >,
         ) => {
             if (layer) {
@@ -101,7 +117,9 @@ export const designerSlice = createSlice({
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
         applyPalette: (draft, { payload: ids }: PayloadAction<ElementID[]>) => {
-            const layer = draft.loaded[0].items[draft.selected.layer as LayerID]
+            /*
+            const layer =
+                draft.loaded[0].items[draft.selected.layer as ResourceID]
             // TODO: this is how we do it
             if ('chunks' in layer) {
                 layer.chunks[0][-32][0] = 3
@@ -119,6 +137,7 @@ export const designerSlice = createSlice({
 
                 Object.assign(e, draft.selected.attribs)
             }
+            */
         },
 
         editElement: (
@@ -126,7 +145,7 @@ export const designerSlice = createSlice({
             {
                 payload,
             }: PayloadAction<{
-                layer: LayerID
+                layer: ResourceID
                 id: ElementID
                 /** JSON pointer.
                  * @see https://www.rfc-editor.org/rfc/rfc6901 */
@@ -134,16 +153,12 @@ export const designerSlice = createSlice({
                 value: unknown
             }>,
         ) => {
-            const { id: elementId, layer: layerId, pointer, value } = payload
-
-            const { schema, items, chunks } = draft.loaded[0].items[layerId]
-            const element = items[elementId as keyof typeof items]
-
+            console.warn('TODO')
             /*
-            invariant(
-                element && typeof element === 'object',
-                "Element doesn't exist",
-            )*/
+            const { id: elementId, layer: ResourceID, pointer, value } = payload
+
+            const { schema, items, chunks } = draft.loaded[0].items[ResourceID]
+            const element = items[elementId as keyof typeof items]
 
             ValuePointer.Set(element, pointer, value)
             if (!Check(schema, element)) {
@@ -154,7 +169,9 @@ export const designerSlice = createSlice({
                     ),
                 )
             }
+            */
         },
+
         editSelectedElements: (
             draft,
             {
@@ -165,6 +182,7 @@ export const designerSlice = createSlice({
                 limit?: number
             }>,
         ) => {
+            /*
             // TODO: check type as well?
             invariant(
                 Array.isArray(draft.selected.elements),
@@ -179,18 +197,39 @@ export const designerSlice = createSlice({
             invariant(element, 'Element not found')
             // ValuePointer.Get(
             ValuePointer.Set(element, pointer, value)
+            */
         },
 
         open: (
             draft,
-            { payload: resource }: PayloadAction<EditableTopLevel>,
+            { payload: resource }: PayloadAction<any>, //LoadableResource<TSchema, unknown>
         ) => {
-            // TODO: accept serialized form, convert to editable form.
-            // draft.loaded = [resource]
-            draft.loaded = { [TopLevelResourceID()]: resource }
-            // TODO: start using JSON pointers or something to drill down from state.loaded to a layer, element, etc. so we know we have an unambiguous path
-            draft.selected.layer = resource.itemOrder[0]
+            const [resources, root] = prepareContainer(resource)
+            draft.resources = resources
+            draft.root = root
+            draft.roots = [root]
+
+            // let root: ResourceID | undefined
+            // const queue = [resource]
+            // const ids: Dictionary<LoadableResource> = {}
+            // while (queue.length) {
+            //     const res = queue.pop()!
+            //     const id = ResourceID(res)
+            //     ids[id] = load(res)
+            //     if ('items' in res) {
+            //         invariant(Array.isArray(res.items))
+            //         queue.push(...res.items)
+            //     }
+            //     // if
         },
+
+        // draft.resources =
+        // draft.roots =
+        // TODO: accept serialized form, convert to editable form.
+        // draft.loaded = [resource]
+        // draft.loaded = { [TopLevelResourceID()]: resource }
+        // TODO: start using JSON pointers or something to drill down from state.loaded to a layer, element, etc. so we know we have an unambiguous path
+        // draft.selected.layer = resource.itemOrder[0]
     },
 })
 
@@ -232,24 +271,21 @@ export const {
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
-export const getSelectedLayer = (state: Readonly<RootState>) =>
-    state.selected.layer
-        ? state.loaded[0]?.items[state.selected.layer]
-        : undefined
+export const getSelectedLayer = (state: Readonly<RootState>) => undefined // TODO
+// state.selected.layer
+// ? state.loaded[0]?.items[state.selected.layer]
+// : undefined
 
+// function mapID(state:RootState, id) {
+// return  state.resources[id]
+export const useLayerList = () =>
+    useSelector((state) => {
+        if (!state.root) {
+            return []
+        }
+    })
+// state.root ? state.root
 export const useSelectedLayer = () =>
     useSelector((state) => getSelectedLayer(state))
 
-export const useCurrentPalettes = () =>
-    useSelector((state) => getSelectedLayer(state)?.palettes)
-
-
-
-
-function getChunkAt(state: RootState, pos: GVec2, chunkSize: number) {
-    const x = Math.floor(pos.x / chunkSize) * chunkSize
-    const x = Math.floor(pos.x / chunkSize) * chunkSize
-}
-
-function coordInChunk(chunkOffset: GVec2, pos: GVec2) {
-    return pos.x - chunkOffset.x
+export const useCurrentPalettes = () => undefined // useSelector((state) => getSelectedLayer(state)?.palettes)

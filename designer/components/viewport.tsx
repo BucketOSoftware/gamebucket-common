@@ -15,7 +15,9 @@ import {
 import { useLiaison } from '../liaison'
 import { useDispatch, useSelectedLayer, useSelector } from '../store'
 import { useTool } from '../tools'
-import { MarchingAnts } from '../ui'
+import { MarchingAnts } from './common'
+import { ScalarResource, TODO } from '../types'
+// import { MarchingAnts } from '../ui'
 
 export function Viewport() {
     const dispatch = useDispatch()
@@ -100,7 +102,16 @@ function ViewportLayers({
     viewportSize: DOMRect
 }) {
     const { Depict } = useLiaison()
-    const mainResource = useSelector((state) => state.loaded[0])
+    const resources = useSelector((state) => {
+        const thaRoot = state.root && state.resources[state.root]
+        if (!thaRoot) {
+            return []
+        }
+
+        invariant('items' in thaRoot)
+        // TODO: nested containers
+        return thaRoot.items.map((id) => [id, state.resources[id]] as const)
+    })
 
     if (!Depict) {
         return (
@@ -110,15 +121,15 @@ function ViewportLayers({
         )
     }
 
-    if (!mainResource) {
-        return <div className="gbk-warning">[!] No assets loaded.</div>
-    }
+    // if (!mainResource) {
+    //     return <div className="gbk-warning">[!] No assets loaded.</div>
+    // }
 
-    return mainResource.itemOrder.map((id) => (
+    return resources.map(([id, res]) => (
         <Depict
-            key={id}
+            key={id as string}
             resourceId={id}
-            resource={mainResource.items[id]}
+            resource={res as ScalarResource<TODO>}
             canvasSize={viewportSize}
             pointer={cursor}
         />

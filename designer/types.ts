@@ -2,16 +2,20 @@ import {
     NumberOptions,
     SchemaOptions,
     Static,
-    TObject,
     TSchema,
     Type,
 } from '@sinclair/typebox'
-import { Opaque, WithOpaque } from 'ts-essentials'
-
-import * as Spatial from '../formats/spatial'
-import { Rect } from '../rect'
-import { File, ResourceType, WithProperties } from '../formats'
+import fill from 'lodash-es/fill'
 import uniqueId from 'lodash-es/uniqueId'
+import invariant from 'tiny-invariant'
+import { Opaque } from 'ts-essentials'
+
+import { File, GenericResource, ResourceType, WithProperties } from '../formats'
+import * as Spatial from '../formats/spatial'
+import * as grid from '../grid'
+import * as rect from '../rect'
+
+export type TODO = any
 
 // -----
 //  JSON schema "presets"
@@ -38,48 +42,55 @@ export function TVec2(
 // Resources
 // -----
 
-export type TopLevelResourceID = Opaque<string, 'TOP_LEVEL_RESOURCE_ID'>
-export function TopLevelResourceID(prefix?: string) {
-    return uniqueId(prefix ? prefix + '_' : undefined) as TopLevelResourceID
+/**
+ * A unique ID for a resource we're editing. Unique across the editor but does
+ * not persist past a save/load
+ */
+export type ResourceID = Opaque<string, 'DESIGNER_RESOURCE_ID'>
+/**
+ *
+ * @param prefix An optional prefix for help when debugging or what have you
+ * @returns
+ */
+export function ResourceID(_resource: GenericResource, prefix: string = 'res') {
+    return uniqueId(prefix + '/') as ResourceID
 }
-export type LayerID<ID extends string = string> = ID
+
 export type ElementID<ID extends string | number = string | number> = ID
 
 /** Resource types the designer can work with */
-export type Editable<S extends TSchema = TSchema> = Dense2D<S> | Sparse2D<S>
-export type EditableTopLevel = Container
 
-/**  */
-export type Container<P = void> = ContainerItems &
-    File<ResourceType.Container> &
+/** The kind of container we get as an argument */
+export type ScalarResource<S extends TSchema> = Sparse2D<S> | Dense2D<S>
+export type LoadableResource<S extends TSchema, P = void> = (
+    | ({
+          items: ResourceID[]
+      } & File<ResourceType.Container>)
+    | ScalarResource<S>
+) &
     WithProperties<P>
 
-interface ContainerItems {
-    items: Record<LayerID, Editable>
-    itemOrder: LayerID[]
-}
 
-type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> &
-    HasPalette<S> &
-    WithOpaque<'EDITOR_PREPARED'>
+export type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> & HasPalette<S>
 
 /** in-memory representation for SpatialDense2D */
-type Dense2D<S extends TSchema> = Omit<Spatial.Dense<2, S>, 'items'> &
+export type Dense2D<S extends TSchema> = Omit<Spatial.Dense<2, S>, 'data'> &
     ChunkedDense2D<S> &
-    HasPalette<S> &
-    WithOpaque<'EDITOR_PREPARED'>
+    HasPalette<S>
 
 /** Dense layer data, but stored in chunks */
 interface ChunkedDense2D<S extends TSchema> {
     /** width and height of each chunk */
-    chunkSize: 16 | 32 | 64 | 128 | 256
+    chunkSize: ChunkSize
     /** chunks[offsetx][offsety] contains an array of `chunkSize ** 2` elements  */
     chunks: {
         [x: number]: {
-            [y: number]: Static<S>[]
+            [y: number]: (Static<S> | null)[]
         }
     }
 }
+
+type ChunkSize = 16 | 32 | 64 | 128 | 256
 
 interface HasPalette<S extends TSchema = TSchema> {
     /** For each field in the schema, the palette provides information for the editor to create an interface. If a given property doesn't have a palette, it's assumed that the schema data will be enough to present form elements to edit the value (for an entity list this would be the typical case, but maybe we want to use it for metadata, e.g. this one property is a color and should have a color picker
@@ -87,13 +98,120 @@ interface HasPalette<S extends TSchema = TSchema> {
     palettes: Palettes<S>
 }
 
+function chunkData<S extends TSchema>(
+    data: Static<S>[],
+    bounds: rect.Rect,
+    size: ChunkSize,
+): ChunkedDense2D<S> {
+    invariant(data.length === rect.area(bounds))
+
+    // this is probably inefficient -- we could fill out a whole chunk at a
+    // time, but we'd have to do some preprocessing and I'm not sure it matters.
+    // plus this would also work for non-dense coordinates with light modification
+    return {
+        chunks: data.reduce<ChunkedDense2D<S>['chunks']>(
+            (chunks, element, idx) => {
+                let { x, y } = grid.toCoord(idx, bounds.width)
+                const chunkOffset = {
+                    x: Math.floor((x + bounds.x) / size) * size,
+                    y: Math.floor((y + bounds.y) / size) * size,
+                }
+
+                const localIdx = grid.toIdx(
+                    x - chunkOffset.x,
+                    y - chunkOffset.y,
+                    bounds.width,
+                )
+
+                chunks[chunkOffset.x] ??= {}
+                chunks[chunkOffset.x][chunkOffset.y] ??= fill(
+                    new Array<Static<S>>(size ** 2),
+                    null,
+                )
+
+                chunks[chunkOffset.x][chunkOffset.y][localIdx] = element
+
+                return chunks
+            },
+            {},
+        ),
+        chunkSize: size,
+    }
+}
+
+/**
+ * @todo Can we embed the palette info in the Typebox schema? Custom properties or whatever? Also multiple layers should be able to share palettes as appropriate so we can save the selection per-palette-set
+ *
+ * @param resource
+ * @param palettes
+ * @param chunkSize
+ * @returns
+ */
+export function prepareDense<S extends TSchema>(
+    resource: Spatial.Dense<2, S>,
+    palettes: Palettes<S>,
+    chunkSize: ChunkSize = 32,
+): Dense2D<S> {
+    return {
+        ...resource,
+        ...chunkData(resource.data, resource.bounds, chunkSize),
+        palettes: { ...palettes },
+    }
+}
+
+export function prepareSparse<S extends TSchema>(
+    resource: Spatial.Sparse<2, S>,
+): Sparse2D<S> {
+    // TODO: what do we use for palettes here?
+    return { ...resource, palettes: {} }
+}
+
+export function prepareContainer<S extends TSchema, P = void>(
+    container: {
+        items: LoadableResource<S, P>[]
+    } & File<ResourceType.Container> &
+        WithProperties<P>,
+) /*: [resources: Record<ResourceID, LoadableResource<S>>, root: ResourceID] */ {
+    const resources: Record<ResourceID, LoadableResource<S>> = {}
+
+    return [resources, flatten(container, resources)]
+}
+
+function flatten(
+    thing: any, //{ items: any[] } & File<ResourceType.Container>,
+    resources: Record<ResourceID, any>,
+): ResourceID {
+    // if this is a container,
+    if ('items' in thing) {
+        invariant(Array.isArray(thing.items))
+
+        const flattenedThing = {
+            ...thing,
+            items: thing.items.map((item: any) => flatten(item, resources)),
+        }
+
+        const id = ResourceID(flattenedThing)
+        invariant(!(id in resources))
+
+        resources[id] = flattenedThing
+        return id
+    }
+
+    const id = ResourceID(thing)
+    invariant(!(id in resources))
+
+    resources[id] = thing
+    return id
+}
+
 // -----
 //  Palettes
 // -----
 
-export type Palettes<S extends TSchema> = S extends TObject
-    ? { [P in keyof S['properties']]?: Palette }
-    : Record<string, Palette> | Palette | undefined
+export type Palettes<S extends TSchema> = {
+    [P in keyof S['properties']]?: Palette
+}
+// : never //Record<string, Palette> | Palette | undefined
 
 export type PaletteID = string
 
@@ -103,7 +221,7 @@ export type Palette<K extends PaletteID = PaletteID> =
     | ColorPicker
 
 /** User can select from the given items */
-export type PaletteDiscrete<K extends PaletteID = PaletteID> = PaletteEntry<K>[]
+export type PaletteDiscrete<V extends PaletteID = PaletteID> = PaletteEntry<V>[]
 
 /** Select an arbitrary color. Use a PaletteDiscrete with swatches to select
  * from a specific set of colors */
@@ -116,13 +234,13 @@ interface ColorPicker {
 }
 
 // an image URL, or an image URL plus the portion of the image that should be displayed
-export type PaletteImage = string | [string, Rect]
+export type PaletteImage = string | [string, rect.Rect]
 
 /** If icon/img/label are all omitted, the entry is considered "nil", i.e. no tile in this location or whatever */
-interface PaletteEntry<K extends PaletteID> {
+interface PaletteEntry<V extends PaletteID> {
     /** when this entry is drawn/placed/whatever, the data-adding logic will get
      * the position (and maybe area, if `this.area` is true), and this value */
-    value: K
+    value: V
     /** src for an icon used to represent the thing */
     icon?: PaletteImage
     /** src for an image of the thing, intended to be displayed as large as

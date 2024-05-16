@@ -6,17 +6,11 @@ import type {
 } from 'three'
 import { Static, TObject, TSchema } from '@sinclair/typebox'
 
-import { Palette } from '../designer'
 import * as rect from '../rect'
 
-import { ResourceType } from './common'
-// import { Container } from './resources'
+import { ResourceType as RT } from './common'
 
 const K_POSITION = 'position'
-
-export type Types2D = ResourceType.SpatialDense2D | ResourceType.SpatialSparse2D
-export type Types3D = ResourceType.SpatialDense3D | ResourceType.SpatialSparse3D
-export type Types = Types2D | Types3D
 
 export type Dimensions = 2 | 3
 
@@ -39,11 +33,23 @@ export interface SparseElement<D extends Dimensions = Dimensions> {
  * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
  */
 interface Base<S extends TSchema> {
-    type: Types
+    // type: Types
 
     displayName?: string
 
+    /** @todo This is a `Rect` rather than a `Size` because a dataset doesn't have to start at `[0,0]` */
     bounds?: rect.Rect
+
+    /** @todo If `bounds` is defined:
+     *  - `fixed` means that the bounds should stay as they are unless manually
+     *    changed. (Does that mean coordinates are meant to be always >=0?)
+     *    Elements outside bounds may be saved with the dataset but may be
+     *    discarded as part of the asset pipeline
+     *  - `expand` means that the bounds should be whatever AABB contains all
+     *    the coordinates, which may be negative. If `bounds` is defined by the
+     *    user it's purely advisory, e.g. as a guide
+     */
+    boundaryType?: 'fixed' | 'expand'
 
     /** Each element in the dataset must follow this schema */
     schema: S
@@ -58,6 +64,14 @@ interface Base<S extends TSchema> {
     worldTransform?: Matrix3Tuple | Matrix4Tuple
 }
 
+/** @todo: This is a way to link a bunch of maps together */
+interface World {
+    displayName?: string
+    // worldTransform:
+
+    areas: Record<string, Spatial[]>
+}
+
 /**
  * A spatial dataset with explicitly specified positions on each element, i.e.
  * an entity list
@@ -66,13 +80,11 @@ export interface Sparse<
     D extends Dimensions = Dimensions,
     S extends TSchema = TSchema,
 > extends Base<S> {
-    type: D extends 2
-        ? ResourceType.SpatialSparse2D
-        : ResourceType.SpatialSparse3D
+    type: D extends 2 ? RT.SpatialSparse2D : RT.SpatialSparse3D
 
     /** Map of element IDs to elements.
      * ID is arbitrary and unique only to this dataset */
-    items: Record<string, Static<S>>
+    data: Record<string, Static<S>>
 }
 
 /**
@@ -83,26 +95,21 @@ export interface Dense<
     D extends Dimensions = Dimensions,
     S extends TSchema = TSchema,
 > extends Base<S> {
-    type: D extends 2
-        ? ResourceType.SpatialDense2D
-        : ResourceType.SpatialDense3D
+    type: D extends 2 ? RT.SpatialDense2D : RT.SpatialDense3D
     displayName?: string
 
     bounds: rect.Rect
 
-    items: Static<S>[]
+    data: Static<S>[]
 }
 
+/** any of the types of spatial datasets */
 export type Spatial<
     D extends Dimensions = Dimensions,
     S extends TSchema = TSchema,
 > = Dense<D, S> | Sparse<D, S>
 
-// export type Serialized<
-//     D extends Dimensions = Dimensions,
-//     S extends TSchema = TSchema,
-//     P extends {} | void = void,
-// > = (Sparse<D, S> | Dense<D, S>) & HasProperties<P>
+export type ResourceType<D extends Dimensions = Dimensions> = Spatial<D>['type']
 
 /** @todo ensure that `data.length === rect.area(size)`, worldTransform is a valid matrix if present, there are enough tiles to fill out the space if it's a dense coord, etc. */
 export function validate<D extends 2 | 3>(

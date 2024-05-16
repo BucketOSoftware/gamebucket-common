@@ -16,11 +16,11 @@ import * as rect from '../rect'
 
 import { open, AppDispatch, useDispatch } from './store'
 import { ToolDef } from './tools'
-import { Editable, EditableTopLevel, LayerID } from './types'
+import { ResourceID, ScalarResource } from './types'
 
 export interface DepictProps {
-    resourceId: LayerID
-    resource: Editable
+    resourceId: ResourceID
+    resource: ScalarResource<TSchema>
     canvasSize: rect.Size
     pointer: GVec2
 }
@@ -63,7 +63,8 @@ interface DesignerContext {
 }
 
 interface LiaisonData {
-    openResources: EditableTopLevel[]
+    openResources: Parameters<typeof open>[0] | null
+
     tools: ToolDef<string>[]
 
     /** Given two points in the viewport, and a presumably dense layer, return a list of elements
@@ -113,7 +114,7 @@ interface LiaisonData {
 }
 
 const defaultClientData = {
-    openResources: [],
+    openResources: null,
     tools: [],
 } satisfies LiaisonData
 
@@ -147,9 +148,9 @@ export class Liaison {
         return this.snapshot
     }
 
-    open(resource: EditableTopLevel) {
+    open(resource: LiaisonData['openResources']) {
         this.snapshot = produce(this.snapshot, (draft) => {
-            draft.openResources = [resource]
+            draft.openResources = resource
         })
         this.notifySubscribers()
     }
@@ -175,7 +176,9 @@ export function LiaisonProvider({
 
     // notify of new data from the user. TODO: will updating callbacks trigger the right stuff, or do we have to do those individually?
     useEffect(() => {
-        dispatch(open(clientData.openResources[0]))
+        if (clientData.openResources) {
+            dispatch(open(clientData.openResources))
+        }
     }, [clientData.openResources])
 
     return (
