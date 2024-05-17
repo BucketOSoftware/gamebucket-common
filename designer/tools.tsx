@@ -1,54 +1,43 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import invariant from 'tiny-invariant'
 import { noop } from 'ts-essentials'
 
 import { ResourceType, Spatial } from '../formats'
+import { GVec2, roundVec2 } from '../geometry'
+import { Button } from './components/common'
 import { GesturePhase, GestureState } from './gestures'
 import { useLiaison } from './liaison'
-import {
-    RootState,
-    applyPalette,
-    getSelectedLayer,
-    selectElements,
-    selectMarquee,
-    useDispatch,
-    useSelector,
-} from './store'
-import { GVec2, roundVec2 } from '../geometry'
+import { applyPalette, selectTool, useDispatch, useSelector } from './store'
 
 export interface ToolDef<
     ID extends string,
-    Layer extends Spatial.Editable = Spatial.Editable,
+    Layer extends Spatial.Spatial = Spatial.Spatial,
 > {
     readonly id: ID
-    readonly icon: string //ButtonProps['icon']
-    readonly displayName: string
 
     readonly viewportHandler: (
         dispatch: ReturnType<typeof useDispatch>,
-        liaison: LiaisonData,
+        liaison: ReturnType<typeof useLiaison>,
     ) => ToolFn<Layer>
 
-    readonly enabled?: (state: Readonly<RootState>) => boolean
+    readonly ToolbarButton: React.FunctionComponent
 }
 
-type LiaisonData = ReturnType<typeof useLiaison>
-
-export function useTool(): ToolFn<Spatial.Editable> {
+export function useTool(): ToolFn<Spatial.Spatial> {
     const dispatch = useDispatch()
     const liaisonData = useLiaison()
-    const selectedTool = useSelector((state) => state.selected.tool)
+    const selectedTool = useSelectedTool()
 
     return useMemo(
         () =>
             liaisonData.tools
-                .find((toolDef) => toolDef.id == selectedTool)!
-                .viewportHandler(dispatch, liaisonData),
+                .find((toolDef) => toolDef.id == selectedTool)
+                ?.viewportHandler(dispatch, liaisonData) ?? noop,
         [selectedTool, dispatch, liaisonData],
     )
 }
 
-type ToolFn<L extends Spatial.Editable> = (
+type ToolFn<L extends Spatial.Spatial> = (
     phase: GesturePhase,
     gesture: GestureState,
     viewport: DOMRect,
@@ -58,13 +47,30 @@ type ToolFn<L extends Spatial.Editable> = (
 /** Select elements via marquee */
 export const SelectTool: ToolDef<'select'> = {
     id: 'select',
-    displayName: 'Select',
-    // icon: 'hand-up',
-    icon: 'icon-tools',
 
-    enabled(state) {
-        return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
-        // return state.loaded[0].items[state.selected.layer as Container.ItemID].type ===
+    ToolbarButton() {
+        const id = 'select'
+        const dispatch = useDispatch()
+        const currentTool = useSelectedTool()
+        const possible = useSelector(
+            (state) =>
+                state.resources[state.selected.layer!]?.type ===
+                ResourceType.SpatialSparse2D,
+        )
+
+        const onClick = useCallback(() => {
+            dispatch(selectTool(id))
+        }, [])
+
+        return (
+            <Button
+                icon="icon-tools"
+                label="Select"
+                disabled={!possible}
+                active={possible && currentTool === id}
+                onClick={onClick}
+            />
+        )
     },
 
     viewportHandler(dispatch, liaison) {
@@ -124,13 +130,9 @@ export const SelectTool: ToolDef<'select'> = {
 
 export const CreateTool: ToolDef<'create'> = {
     id: 'create',
-    // icon: 'new-object',
-    icon: 'new-object',
-    displayName: 'Create',
 
-    enabled(state) {
-        return false
-        // return getSelectedLayer(state)?.type === ResourceType.SpatialSparse2D
+    ToolbarButton(props: {}) {
+        return null
     },
 
     viewportHandler(dispatch, liaison) {
@@ -139,17 +141,36 @@ export const CreateTool: ToolDef<'create'> = {
 }
 
 /**
- *  Apply currently selected palette items to elements 
- * 
+ *  Apply currently selected palette items to elements
+ *
  * @todo Fix lag when first starting the drag -- we don't care about the drag/tap distinction
  */
 export const PlotTool: ToolDef<'plot'> = {
     id: 'plot',
-    icon: 'icon-pencil',
-    displayName: 'Draw',
 
-    enabled(state) {
-        return getSelectedLayer(state)?.type === ResourceType.SpatialDense2D
+    ToolbarButton() {
+        const id = 'plot'
+        const dispatch = useDispatch()
+        const currentTool = useSelectedTool()
+        const possible = useSelector(
+            (state) =>
+                state.resources[state.selected.layer!]?.type ===
+                ResourceType.SpatialDense2D,
+        )
+
+        const onClick = useCallback(() => {
+            dispatch(selectTool(id))
+        }, [])
+
+        return (
+            <Button
+                icon="icon-pencil"
+                label="Draw"
+                disabled={!possible}
+                active={possible && currentTool === id}
+                onClick={onClick}
+            />
+        )
     },
 
     viewportHandler(dispatch, liaison) {
@@ -185,6 +206,17 @@ export const PlotTool: ToolDef<'plot'> = {
             }
         }
     },
+}
+
+/////
+// Hooks
+/////
+
+function useSelectedTool() {
+    return useSelector(
+        (state) =>
+            state.selected.tool[state.resources[state.selected.layer!]?.type!],
+    )
 }
 
 ///// utils

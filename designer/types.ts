@@ -70,7 +70,6 @@ export type LoadableResource<S extends TSchema, P = void> = (
 ) &
     WithProperties<P>
 
-
 export type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> & HasPalette<S>
 
 /** in-memory representation for SpatialDense2D */
@@ -85,12 +84,13 @@ interface ChunkedDense2D<S extends TSchema> {
     /** chunks[offsetx][offsety] contains an array of `chunkSize ** 2` elements  */
     chunks: {
         [x: number]: {
-            [y: number]: (Static<S> | null)[]
+            [y: number]: ChunkData<S>
         }
     }
 }
 
-type ChunkSize = 16 | 32 | 64 | 128 | 256
+export type ChunkData<S extends TSchema> = (Static<S> | null)[]
+export type ChunkSize = 16 | 32 | 64 | 128 | 256
 
 interface HasPalette<S extends TSchema = TSchema> {
     /** For each field in the schema, the palette provides information for the editor to create an interface. If a given property doesn't have a palette, it's assumed that the schema data will be enough to present form elements to edit the value (for an entity list this would be the typical case, but maybe we want to use it for metadata, e.g. this one property is a color and should have a color picker
@@ -111,16 +111,17 @@ function chunkData<S extends TSchema>(
     return {
         chunks: data.reduce<ChunkedDense2D<S>['chunks']>(
             (chunks, element, idx) => {
-                let { x, y } = grid.toCoord(idx, bounds.width)
+                // Get the map coordinates of the current element
+                const { x, y } = grid.toCoord(idx, bounds.width)
                 const chunkOffset = {
                     x: Math.floor((x + bounds.x) / size) * size,
                     y: Math.floor((y + bounds.y) / size) * size,
                 }
-
+                // console.log(data,bounds, size)
                 const localIdx = grid.toIdx(
                     x - chunkOffset.x,
                     y - chunkOffset.y,
-                    bounds.width,
+                    size,
                 )
 
                 chunks[chunkOffset.x] ??= {}
@@ -171,8 +172,8 @@ export function prepareContainer<S extends TSchema, P = void>(
         items: LoadableResource<S, P>[]
     } & File<ResourceType.Container> &
         WithProperties<P>,
-) /*: [resources: Record<ResourceID, LoadableResource<S>>, root: ResourceID] */ {
-    const resources: Record<ResourceID, LoadableResource<S>> = {}
+): [resources: Record<ResourceID, LoadableResource<S, any>>, root: ResourceID] {
+    const resources: Record<ResourceID, LoadableResource<S, any>> = {}
 
     return [resources, flatten(container, resources)]
 }

@@ -27,7 +27,13 @@ export const designerSlice = createSlice({
 
     // TODO: remove the need for a default tool, so the toolset can be customizable?
     initialState: {
-        selected: { tool: 'select', attribs: {} },
+        selected: {
+            tool: {
+                [ResourceType.SpatialDense2D]: 'plot',
+                [ResourceType.SpatialSparse2D]: 'select',
+            },
+            attribs: {},
+        },
         resources: {},
         roots: [],
     } as {
@@ -42,9 +48,9 @@ export const designerSlice = createSlice({
             /**
              * currently active tool.
              * @todo Type checking?
-             * @todo Store this per layer type (i.e. per set of usable tools?) so we don't switch layers and end up on an invalid tool
              */
-            tool: string
+            tool: Partial<Record<ResourceType, string>>
+
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
             /** ID of the layer under edit */
@@ -83,7 +89,9 @@ export const designerSlice = createSlice({
         },
 
         selectTool: (draft, { payload }: PayloadAction<string>) => {
-            draft.selected.tool = payload
+            invariant(draft.selected.layer, 'No layer selected')
+            const restype = draft.resources[draft.selected.layer].type
+            draft.selected.tool[restype] = payload
         },
 
         selectLayer: (
@@ -209,27 +217,8 @@ export const designerSlice = createSlice({
             draft.root = root
             draft.roots = [root]
 
-            // let root: ResourceID | undefined
-            // const queue = [resource]
-            // const ids: Dictionary<LoadableResource> = {}
-            // while (queue.length) {
-            //     const res = queue.pop()!
-            //     const id = ResourceID(res)
-            //     ids[id] = load(res)
-            //     if ('items' in res) {
-            //         invariant(Array.isArray(res.items))
-            //         queue.push(...res.items)
-            //     }
-            //     // if
+            console.log('DONE', resources)
         },
-
-        // draft.resources =
-        // draft.roots =
-        // TODO: accept serialized form, convert to editable form.
-        // draft.loaded = [resource]
-        // draft.loaded = { [TopLevelResourceID()]: resource }
-        // TODO: start using JSON pointers or something to drill down from state.loaded to a layer, element, etc. so we know we have an unambiguous path
-        // draft.selected.layer = resource.itemOrder[0]
     },
 })
 
@@ -271,20 +260,9 @@ export const {
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
-export const getSelectedLayer = (state: Readonly<RootState>) => undefined // TODO
-// state.selected.layer
-// ? state.loaded[0]?.items[state.selected.layer]
-// : undefined
+export const getSelectedLayer = (state: Readonly<RootState>) =>
+    state.selected.layer && state.resources[state.selected.layer]
 
-// function mapID(state:RootState, id) {
-// return  state.resources[id]
-export const useLayerList = () =>
-    useSelector((state) => {
-        if (!state.root) {
-            return []
-        }
-    })
-// state.root ? state.root
 export const useSelectedLayer = () =>
     useSelector((state) => getSelectedLayer(state))
 

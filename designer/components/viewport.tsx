@@ -121,9 +121,9 @@ function ViewportLayers({
         )
     }
 
-    // if (!mainResource) {
-    //     return <div className="gbk-warning">[!] No assets loaded.</div>
-    // }
+    if (!resources.length) {
+        return <div className="gbk-warning">[!] No assets loaded.</div>
+    }
 
     return resources.map(([id, res]) => (
         <Depict

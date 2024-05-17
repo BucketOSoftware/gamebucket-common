@@ -109,3 +109,35 @@ export function Highlight(props: rect.Rect) {
         />
     )
 }
+
+type ButtonProps = React.DetailedHTMLProps<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    HTMLButtonElement
+>
+
+export function Button(props: {
+    label?: string
+    icon?: string
+    disabled?: boolean
+    active?: boolean
+    onClick: ButtonProps['onClick']
+}) {
+    const { label, icon, disabled, active, onClick } = props
+
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            title={label}
+            type="button"
+            className={classnames('btn', 'btn-default', {
+                active,
+                ['btn-disabled']: props.disabled,
+            })}
+        >
+            <span className={'icon ' + icon} />
+            &nbsp;
+            {label}
+        </button>
+    )
+}
