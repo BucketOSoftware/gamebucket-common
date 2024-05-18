@@ -23,6 +23,13 @@ export interface ToolDef<
     readonly ToolbarButton: React.FunctionComponent
 }
 
+type ToolFn<L extends Spatial.Spatial> = (
+    phase: GesturePhase,
+    gesture: GestureState,
+    viewport: DOMRect,
+    layer: Readonly<L>,
+) => any
+
 export function useTool(): ToolFn<Spatial.Spatial> {
     const dispatch = useDispatch()
     const liaisonData = useLiaison()
@@ -36,13 +43,6 @@ export function useTool(): ToolFn<Spatial.Spatial> {
         [selectedTool, dispatch, liaisonData],
     )
 }
-
-type ToolFn<L extends Spatial.Spatial> = (
-    phase: GesturePhase,
-    gesture: GestureState,
-    viewport: DOMRect,
-    layer: Readonly<L>,
-) => any
 
 /** Select elements via marquee */
 export const SelectTool: ToolDef<'select'> = {
@@ -121,9 +121,8 @@ export const SelectTool: ToolDef<'select'> = {
                     )
                     return
                 default:
+                    return
             }
-
-            return
         }
     },
 }

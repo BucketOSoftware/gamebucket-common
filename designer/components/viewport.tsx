@@ -17,6 +17,7 @@ import { useDispatch, useSelectedLayer, useSelector } from '../store'
 import { useTool } from '../tools'
 import { MarchingAnts } from './common'
 import { ScalarResource, TODO } from '../types'
+import { ResourceType, Spatial } from '../../formats'
 // import { MarchingAnts } from '../ui'
 
 export function Viewport() {
@@ -69,7 +70,12 @@ export function Viewport() {
             if (newPhase === IGNORE_GESTURE || !editedLayer) return
             phase.current = gesturePhasePersists(newPhase)
 
-            return toolHandler(newPhase, gesture, viewportSize, editedLayer)
+            return toolHandler(
+                newPhase,
+                gesture,
+                viewportSize,
+                editedLayer as Spatial.Spatial,
+            )
         },
         [dispatch, phase, toolHandler, editedLayer, viewportSize],
     )
@@ -105,7 +111,7 @@ function ViewportLayers({
     const resources = useSelector((state) => {
         const thaRoot = state.root && state.resources[state.root]
         if (!thaRoot) {
-            return []
+            return thaRoot
         }
 
         invariant('items' in thaRoot)
@@ -121,7 +127,7 @@ function ViewportLayers({
         )
     }
 
-    if (!resources.length) {
+    if (!resources || !resources.length) {
         return <div className="gbk-warning">[!] No assets loaded.</div>
     }
 

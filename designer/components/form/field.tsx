@@ -46,7 +46,7 @@ export default function FormField<T extends TSchema>(
                 return (
                     <FormField
                         key={name}
-                        path={path + '/' + name}
+                        path={path + '.' + name}
                         schema={subschema}
                         value={data[name]}
                     />

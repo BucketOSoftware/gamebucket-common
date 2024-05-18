@@ -9,7 +9,7 @@ import { editSelectedElements, useDispatch } from '../../store'
  * @param [S] Schema for acceptable values for the control
  */
 export interface AggregateControlProps<S extends TSchema> {
-    path: string // JSON pointer
+    path: string
     schema: S
     value: /*Static<T> */ unknown
 }
@@ -32,8 +32,8 @@ export function UpdateSelectionData<S extends TSchema, I = string>(
 ) {
     const { path, schema, value: realValue } = props
 
-    const [formValue, setFormValue] = useState<I | null>(null)
     const dispatch = useDispatch()
+    const [formValue, setFormValue] = useState<I | null>(null)
 
     useEffect(() => {
         setFormValue(realValue as I)
@@ -46,7 +46,7 @@ export function UpdateSelectionData<S extends TSchema, I = string>(
             if (Check(schema, converted)) {
                 dispatch(
                     editSelectedElements({
-                        pointer: path,
+                        path: path,
                         value: converted,
                         limit: 1,
                     }),

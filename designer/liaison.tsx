@@ -67,14 +67,14 @@ interface LiaisonData {
 
     tools: ToolDef<string>[]
 
-    /** Given two points in the viewport, and a presumably dense layer, return a list of elements
+    /** Given two points in the viewport, and a presumably dense layer, return a list of element positions
      * @param [coordinates] Points in viewport space
      */
     selectLine?: (
         layer: Spatial.Dense<2>,
         viewport: DOMRect,
         coordinates: Readonly<[to: GVec2, from: GVec2]>,
-    ) => Array<number> | undefined
+    ) => Array<GVec2> | undefined
 
     /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     select?: (

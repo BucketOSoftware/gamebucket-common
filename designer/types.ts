@@ -14,6 +14,7 @@ import { File, GenericResource, ResourceType, WithProperties } from '../formats'
 import * as Spatial from '../formats/spatial'
 import * as grid from '../grid'
 import * as rect from '../rect'
+import { GVec2 } from '../geometry'
 
 export type TODO = any
 
@@ -61,7 +62,7 @@ export type ElementID<ID extends string | number = string | number> = ID
 /** Resource types the designer can work with */
 
 /** The kind of container we get as an argument */
-export type ScalarResource<S extends TSchema> = Sparse2D<S> | Dense2D<S>
+export type ScalarResource<S extends TSchema> = Sparse2D<S> | Dense<2, S>
 export type LoadableResource<S extends TSchema, P = void> = (
     | ({
           items: ResourceID[]
@@ -70,15 +71,15 @@ export type LoadableResource<S extends TSchema, P = void> = (
 ) &
     WithProperties<P>
 
-export type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> & HasPalette<S>
+// export type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> & HasPalette<S>
+export interface Sparse2D<S extends TSchema>
+    extends Spatial.Sparse<2, S>,
+        HasPalette<S> {}
 
 /** in-memory representation for SpatialDense2D */
-export type Dense2D<S extends TSchema> = Omit<Spatial.Dense<2, S>, 'data'> &
-    ChunkedDense2D<S> &
-    HasPalette<S>
-
-/** Dense layer data, but stored in chunks */
-interface ChunkedDense2D<S extends TSchema> {
+export interface Dense<D extends Spatial.Dimensions, S extends TSchema>
+    extends Omit<Spatial.Dense<D, S>, 'data'>,
+        HasPalette<S> {
     /** width and height of each chunk */
     chunkSize: ChunkSize
     /** chunks[offsetx][offsety] contains an array of `chunkSize ** 2` elements  */
@@ -98,6 +99,21 @@ interface HasPalette<S extends TSchema = TSchema> {
     palettes: Palettes<S>
 }
 
+export function positionInChunk(
+    { x, y }: GVec2,
+    bounds: rect.Rect,
+    size: ChunkSize,
+): [offsetx: number, offsety: number, localIdx: number] {
+    const offsetx = Math.floor((x + bounds.x) / size) * size
+    const offsety = Math.floor((y + bounds.y) / size) * size
+
+    return [offsetx, offsety, grid.toIdx(x - offsetx, y - offsety, size)]
+}
+
+type ChunkedDense2D<S extends TSchema> = Pick<
+    Dense<2, S>,
+    'chunkSize' | 'chunks'
+>
 function chunkData<S extends TSchema>(
     data: Static<S>[],
     bounds: rect.Rect,
@@ -112,25 +128,19 @@ function chunkData<S extends TSchema>(
         chunks: data.reduce<ChunkedDense2D<S>['chunks']>(
             (chunks, element, idx) => {
                 // Get the map coordinates of the current element
-                const { x, y } = grid.toCoord(idx, bounds.width)
-                const chunkOffset = {
-                    x: Math.floor((x + bounds.x) / size) * size,
-                    y: Math.floor((y + bounds.y) / size) * size,
-                }
-                // console.log(data,bounds, size)
-                const localIdx = grid.toIdx(
-                    x - chunkOffset.x,
-                    y - chunkOffset.y,
+                const [offsetx, offsety, localIdx] = positionInChunk(
+                    grid.toCoord(idx, bounds.width),
+                    bounds,
                     size,
                 )
 
-                chunks[chunkOffset.x] ??= {}
-                chunks[chunkOffset.x][chunkOffset.y] ??= fill(
+                chunks[offsetx] ??= {}
+                chunks[offsetx][offsety] ??= fill(
                     new Array<Static<S>>(size ** 2),
                     null,
                 )
 
-                chunks[chunkOffset.x][chunkOffset.y][localIdx] = element
+                chunks[offsetx][offsety][localIdx] = element
 
                 return chunks
             },
@@ -152,7 +162,8 @@ export function prepareDense<S extends TSchema>(
     resource: Spatial.Dense<2, S>,
     palettes: Palettes<S>,
     chunkSize: ChunkSize = 32,
-): Dense2D<S> {
+): Dense<2, S> {
+    // TODO: remove 'data
     return {
         ...resource,
         ...chunkData(resource.data, resource.bounds, chunkSize),
@@ -210,7 +221,8 @@ function flatten(
 // -----
 
 export type Palettes<S extends TSchema> = {
-    [P in keyof S['properties']]?: Palette
+    // [P in keyof S['properties']]: Palette
+    [k: string]: Palette
 }
 // : never //Record<string, Palette> | Palette | undefined
 

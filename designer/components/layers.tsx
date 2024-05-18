@@ -14,7 +14,7 @@ const iconForLayer = {
 function useLayerList() {
     return useSelector((state) => {
         if (!state.root) {
-            return []
+            return
         }
 
         const res = state.resources[state.root]
@@ -44,7 +44,7 @@ export function Layers() {
     const dispatch = useDispatch()
 
     // the container and the layers are both resources -- currently, containers are just nodes on a graph and layers are the leaves
-    const layerList = useLayerList()
+    const layerList = useLayerList() ?? []
     const selectedLayer = useSelector((state) => state.selected.layer)
 
     useEffect(() => {

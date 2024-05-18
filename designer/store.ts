@@ -1,24 +1,26 @@
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
+import { TSchema } from '@sinclair/typebox'
 import { Errors } from '@sinclair/typebox/errors'
 import { Check, ValuePointer } from '@sinclair/typebox/value'
+import get from 'lodash-es/get'
 import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
 } from 'react-redux'
 import invariant from 'tiny-invariant'
-import { Dictionary } from 'ts-essentials'
 
-import { GVec2 } from '../geometry'
+import { ResourceType } from '../formats'
+import { GVec, GVec2 } from '../geometry'
 import * as rect from '../rect'
 import {
     ElementID,
     LoadableResource,
     PaletteID,
     ResourceID,
+    positionInChunk,
     prepareContainer,
 } from './types'
-import { ResourceType } from '../formats'
-import { TSchema } from '@sinclair/typebox'
+import { set } from 'lodash-es'
 
 const PALETTES_MUTEX = true
 
@@ -53,6 +55,7 @@ export const designerSlice = createSlice({
 
             /** items selected from the palette */
             attribs: Record<string, PaletteID>
+
             /** ID of the layer under edit */
             layer?: ResourceID
 
@@ -124,28 +127,53 @@ export const designerSlice = createSlice({
         },
 
         /** apply currently selected palette attributes to the given elements in the selected layer */
-        applyPalette: (draft, { payload: ids }: PayloadAction<ElementID[]>) => {
-            /*
-            const layer =
-                draft.loaded[0].items[draft.selected.layer as ResourceID]
+        applyPalette: (
+            draft,
+            { payload: elements }: PayloadAction<GVec<2>[] | ElementID[]>,
+        ) => {
+            const layer = getSelectedLayer(draft)
+            invariant(layer, 'No layer selected')
+
             // TODO: this is how we do it
+            invariant('chunks' in layer)
             if ('chunks' in layer) {
-                layer.chunks[0][-32][0] = 3
+                for (let pos of elements) {
+                    invariant(typeof pos === 'object')
+
+                    // layer.chunks[0][-32][0] = 3
+                    const [ox, oy, i] = positionInChunk(
+                        pos as GVec2,
+                        layer.bounds,
+                        layer.chunkSize,
+                    )
+                    const e = layer.chunks[ox][oy][i]
+                    // layer.chunks[0][-32][0] = 3
+                    invariant(
+                        e && typeof e === 'object',
+                        `Element at ${pos} not found`,
+                    )
+
+                    Object.assign(e, draft.selected.attribs)
+                }
             } else {
+                invariant('TODO')
+                /*
                 const array = Array.isArray(layer.items) && layer.items
                 const record = !Array.isArray(layer.items) && layer.items
-            }
-            // TODO: coerce values to match layer schema?
-            for (let id of ids) {
-                const e =
-                    typeof id === 'number'
-                        ? array && array[id]
-                        : record && record[id]
-                invariant(e && typeof e === 'object', `Element ${id} not found`)
+                // TODO: coerce values to match layer schema?
+                for (let id of elements) {
+                    const e =
+                        typeof id === 'number'
+                            ? array && array[id]
+                            : record && record[id]
+                    invariant(
+                        e && typeof e === 'object',
+                        `Element ${id} not found`,
+                    )
 
-                Object.assign(e, draft.selected.attribs)
+                    Object.assign(e, draft.selected.attribs)
+                    */
             }
-            */
         },
 
         editElement: (
@@ -161,14 +189,15 @@ export const designerSlice = createSlice({
                 value: unknown
             }>,
         ) => {
-            console.warn('TODO')
-            /*
-            const { id: elementId, layer: ResourceID, pointer, value } = payload
+            const { id: elementId, layer: layerID, pointer, value } = payload
 
-            const { schema, items, chunks } = draft.loaded[0].items[ResourceID]
-            const element = items[elementId as keyof typeof items]
+            const layer = draft.resources[layerID]
+            invariant('schema' in layer)
+            invariant('data' in layer)
+            const { schema, data } = layer
+            const element = get(layer.data, elementId as keyof typeof data)
 
-            ValuePointer.Set(element, pointer, value)
+            // ValuePointer.Set(element, pointer, value)
             if (!Check(schema, element)) {
                 console.error(
                     'Invalid update to an element:',
@@ -177,35 +206,48 @@ export const designerSlice = createSlice({
                     ),
                 )
             }
-            */
         },
 
         editSelectedElements: (
             draft,
             {
-                payload: { pointer, value },
+                payload: { path, value, limit },
             }: PayloadAction<{
-                pointer: string
+                path: string
                 value: unknown
                 limit?: number
             }>,
         ) => {
-            /*
             // TODO: check type as well?
             invariant(
                 Array.isArray(draft.selected.elements),
                 "Can't edit a rect or undefined",
             )
 
+            if (limit !== undefined) {
+                invariant(
+                    draft.selected.elements.length <= limit,
+                    'Too many selected',
+                )
+            }
+
             const layer = getSelectedLayer(draft)
             invariant(layer, 'Layer not found')
 
-            const elementId = draft.selected.elements[0]
-            const element = layer.items[elementId as keyof typeof layer.items]
-            invariant(element, 'Element not found')
-            // ValuePointer.Get(
-            ValuePointer.Set(element, pointer, value)
-            */
+            const element = get(layer, draft.selected.elements[0])
+            set(element, path, value)
+
+            if (!Check(layer.schema, element)) {
+                console.error(
+                    'Invalid update to an element:',
+                    Array.from(Errors(layer.schema, element)),
+                )
+            }
+            // const elementId = draft.selected.elements[0]
+
+            // const element = layer.items[elementId as keyof typeof layer.items]
+            // invariant(element, 'Element not found')
+            // ValuePointer.Set(element, pointer, value)
         },
 
         open: (
@@ -260,10 +302,22 @@ export const {
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
-export const getSelectedLayer = (state: Readonly<RootState>) =>
-    state.selected.layer && state.resources[state.selected.layer]
+export function getSelectedLayer(state: Readonly<RootState>) {
+    const layer = state.selected.layer && state.resources[state.selected.layer]
+    if (layer && layer.type !== ResourceType.Container) {
+        return layer
+    }
+}
 
+/** Returns  */
 export const useSelectedLayer = () =>
     useSelector((state) => getSelectedLayer(state))
 
-export const useCurrentPalettes = () => undefined // useSelector((state) => getSelectedLayer(state)?.palettes)
+export const useCurrentPalettes = () =>
+    useSelector((state) => {
+        const layer = getSelectedLayer(state)
+        if (layer && 'palettes' in layer) {
+            // console.log('uh oh', layer)
+            return layer.palettes
+        }
+    })
