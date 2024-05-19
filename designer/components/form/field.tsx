@@ -18,7 +18,7 @@ export default function FormField<T extends TSchema>(
         readonly?: boolean
     },
 ) {
-    const { schema, value, path } = props
+    const { schema, id, value, path } = props
 
     if (!Check(schema, value)) {
         console.error(
@@ -45,8 +45,9 @@ export default function FormField<T extends TSchema>(
             ([name, subschema]: [string, TSchema]) => {
                 return (
                     <FormField
+                        id={id}
                         key={name}
-                        path={path + '.' + name}
+                        path={path.concat(name)}
                         schema={subschema}
                         value={data[name]}
                     />
@@ -59,6 +60,7 @@ export default function FormField<T extends TSchema>(
         // Assume it's an enum?
         return (
             <UpdateSelectionData
+                id={id}
                 element={MultipleChoice<typeof schema>}
                 path={path}
                 value={value}
@@ -71,6 +73,7 @@ export default function FormField<T extends TSchema>(
         if ('minimum' in schema && 'maximum' in schema) {
             return (
                 <UpdateSelectionData
+                    id={id}
                     element={Slider}
                     path={path}
                     value={value}
@@ -88,7 +91,7 @@ export default function FormField<T extends TSchema>(
         invariant(ValueGuard.IsArray(value))
         invariant(schema.items, 'No items in schema?')
 
-        return <Tuple schema={schema} path={path} value={value} />
+        return <Tuple id={id} schema={schema} path={path} value={value} />
     }
 
     switch (schema.type) {
@@ -108,7 +111,7 @@ export default function FormField<T extends TSchema>(
                 />
             )
             */
-           return (<div>TODO</div>)
+            return <div>TODO</div>
 
         case 'array': {
             // TODO: exclude versions?
@@ -122,13 +125,13 @@ export default function FormField<T extends TSchema>(
             break
         }
         case 'string': {
-            throw new Error("TODO")
+            throw new Error('TODO')
             const data = props.value
             invariant(typeof data === 'string')
             // return (
-                // <FormGroup inline label={schema.title}>
-                    // <InputGroup value={data} disabled={props.readonly} />
-                // </FormGroup>
+            // <FormGroup inline label={schema.title}>
+            // <InputGroup value={data} disabled={props.readonly} />
+            // </FormGroup>
             // )
         }
     }

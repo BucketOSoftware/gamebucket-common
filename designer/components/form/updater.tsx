@@ -3,13 +3,15 @@ import { Check, Convert } from '@sinclair/typebox/value'
 import { debounce } from 'lodash-es'
 import { useCallback, useEffect, useState } from 'react'
 
-import { editSelectedElements, useDispatch } from '../../store'
+import { editElemente, useDispatch } from '../../store'
+import { ElementKey } from '../../types'
 
 /**
  * @param [S] Schema for acceptable values for the control
  */
 export interface AggregateControlProps<S extends TSchema> {
-    path: string
+    id: ElementKey
+    path: string[]
     schema: S
     value: /*Static<T> */ unknown
 }
@@ -27,10 +29,11 @@ export interface FormFieldProps<S extends TSchema, I>
  * inputs but still allows invalid inputs  */
 export function UpdateSelectionData<S extends TSchema, I = string>(
     props: AggregateControlProps<S> & {
+        /** this is the JSX element, not a layer element. oof */
         element: (props: FormFieldProps<S, I>) => JSX.Element
     },
 ) {
-    const { path, schema, value: realValue } = props
+    const { path, schema, value: realValue, id } = props
 
     const dispatch = useDispatch()
     const [formValue, setFormValue] = useState<I | null>(null)
@@ -45,10 +48,10 @@ export function UpdateSelectionData<S extends TSchema, I = string>(
             const converted = Convert(schema, newValue)
             if (Check(schema, converted)) {
                 dispatch(
-                    editSelectedElements({
+                    editElemente({
+                        key: id,
                         path: path,
                         value: converted,
-                        limit: 1,
                     }),
                 )
             }
@@ -73,6 +76,7 @@ export function UpdateSelectionData<S extends TSchema, I = string>(
 
     return (
         <props.element
+            id={id}
             value={formValue}
             path={path}
             schema={schema}

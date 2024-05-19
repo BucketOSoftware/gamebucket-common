@@ -94,17 +94,17 @@ export function MarchingAnts(props: rect.Rect) {
     )
 }
 
-export function Highlight(props: rect.Rect) {
-    const extend = 3
-    const extend2 = 6
+export function Highlight(props: rect.Rect & { padding?: number }) {
+    const padding = props.padding ?? 3
+
     return (
         <div
             className="gbk-hover-target"
             style={{
-                left: props.x - extend,
-                top: props.y - extend,
-                width: props.width + extend2,
-                height: props.height + extend2,
+                left: props.x - padding,
+                top: props.y - padding,
+                width: props.width + padding * 2,
+                height: props.height + padding * 2,
             }}
         />
     )

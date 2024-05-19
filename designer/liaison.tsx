@@ -10,17 +10,17 @@ import {
 } from 'react'
 import { DeepReadonly } from 'ts-essentials'
 
-import { Spatial, Vector } from '../formats'
+import { Spatial  } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
 import { open, AppDispatch, useDispatch } from './store'
 import { ToolDef } from './tools'
-import { ResourceID, ScalarResource } from './types'
+import { ResourceID, ScalarResource, SupportedDimension } from './types'
 
 export interface DepictProps {
     resourceId: ResourceID
-    resource: ScalarResource<TSchema>
+    resource: ScalarResource<SupportedDimension, TSchema>
     canvasSize: rect.Size
     pointer: GVec2
 }
@@ -74,7 +74,7 @@ interface LiaisonData {
         layer: Spatial.Dense<2>,
         viewport: DOMRect,
         coordinates: Readonly<[to: GVec2, from: GVec2]>,
-    ) => Array<GVec2> | undefined
+    ) => Array<Spatial.Vector> | undefined
 
     /** Returns either a list of entities (dense layer) or layer-coordinates of what's within the marquee. If the rect has width/height of 0 or undefined, select based on the point */
     select?: (
@@ -89,7 +89,7 @@ interface LiaisonData {
         element: Spatial.SparseElement,
         viewportMovement: GVec2,
         selectedLayer?: Spatial.Sparse,
-    ) => Vector | void
+    ) => Spatial.Vector | void
 
     /** User has "dragged" the edit window by this amount */
     onPan?: (pixelMovement: GVec2) => void

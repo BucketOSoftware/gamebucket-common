@@ -1,9 +1,9 @@
 import { TypedArray } from "three"
 import { GVec2 } from "../geometry"
-import { Metadata, ResourceType } from "./common"
+import {  GenericResource, ResourceType } from "./common"
 
 // TODO?: are the types MIME-ish? */
-export interface Scene extends Metadata<ResourceType.Scene> {
+export interface Scene extends GenericResource<ResourceType.Scene> {
     // ...scenebucket...
 }
 
@@ -13,11 +13,11 @@ interface StateMachine {
 
 /** Change one or more values over time, to be applied to whatever at runtime.
  * Base on the GLTF animation format */
-interface TimelineAnimation extends Metadata<ResourceType.Timeline> {
+interface TimelineAnimation extends GenericResource<ResourceType.Timeline> {
     // type:
 }
 
-interface Equation extends Metadata<ResourceType.Equation> {
+interface Equation extends GenericResource<ResourceType.Equation> {
     ast: EquationNode
 }
 
@@ -27,7 +27,7 @@ interface EquationNode {
 }
 
 /** TODO: make sure this covers different use cases */
-interface TexturePackerSpriteSheet extends Metadata<ResourceType.SpriteSheet> {
+interface TexturePackerSpriteSheet extends GenericResource<ResourceType.SpriteSheet> {
     frames: {
         /** poorly named -- just the identifier for the frame */
         filename: string
@@ -90,7 +90,7 @@ type TexturePackerImageFormat = 'RGBA8888'
 //  Audio
 // -------
 
-interface Song extends Metadata<ResourceType.Song> {
+interface Song extends GenericResource<ResourceType.Song> {
     /** Uncompressed audio data */
     samples: TypedArray
     /** Samples per second */

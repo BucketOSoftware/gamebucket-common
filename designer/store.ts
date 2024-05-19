@@ -1,8 +1,9 @@
 import { PayloadAction, configureStore, createSlice } from '@reduxjs/toolkit'
 import { TSchema } from '@sinclair/typebox'
 import { Errors } from '@sinclair/typebox/errors'
-import { Check, ValuePointer } from '@sinclair/typebox/value'
+import { Check } from '@sinclair/typebox/value'
 import get from 'lodash-es/get'
+import set from 'lodash-es/set'
 import {
     useDispatch as reduxUseDispatch,
     useSelector as reduxUseSelector,
@@ -13,14 +14,17 @@ import { ResourceType } from '../formats'
 import { GVec, GVec2 } from '../geometry'
 import * as rect from '../rect'
 import {
-    ElementID,
-    LoadableResource,
+    ElementKey,
+    FlattenedResource,
     PaletteID,
     ResourceID,
+    ScalarResource,
+    SupportedDimension,
+    elementAt,
+    notContainer,
     positionInChunk,
     prepareContainer,
 } from './types'
-import { set } from 'lodash-es'
 
 const PALETTES_MUTEX = true
 
@@ -59,20 +63,26 @@ export const designerSlice = createSlice({
             /** ID of the layer under edit */
             layer?: ResourceID
 
-            /** Area selected OR elements selected
+            /**
+             * Elements that are to be modified by the user
              * @todo unfortunately element IDs are unique to the LAYER, but not globally...
              */
-            elements?: rect.Rect | ElementID[]
+            elements?: ElementKey[]
 
             /** If defined, viewport coordinates of the area currently being selected */
             marquee?: rect.Rect
         }
 
         /** All loaded resources, which can reference children by ID */
-        resources: Record<ResourceID, LoadableResource<TSchema, any>>
+        resources: Record<
+            ResourceID,
+            FlattenedResource<SupportedDimension, TSchema, any>
+        >
         /** Which resource the editor is */
         root?: ResourceID
-        /** Future expansion: multiple distinct roots can be loaded but not edited at the same time */
+        /**
+         * @todo Future expansion: multiple distinct roots can be loaded but not edited at the same time
+         */
         roots: ResourceID[]
     },
 
@@ -116,11 +126,11 @@ export const designerSlice = createSlice({
             {
                 payload: [layer, elements],
             }: PayloadAction<
-                [layer: ResourceID | undefined, elements: ElementID[]]
+                [layer: ResourceID | undefined, elements: ElementKey[]]
             >,
         ) => {
+            // TODO: require the layer ID
             if (layer) {
-                // TODO: this is very iffy
                 draft.selected.layer = layer
             }
             draft.selected.elements = elements
@@ -129,30 +139,18 @@ export const designerSlice = createSlice({
         /** apply currently selected palette attributes to the given elements in the selected layer */
         applyPalette: (
             draft,
-            { payload: elements }: PayloadAction<GVec<2>[] | ElementID[]>,
+            { payload: keys }: PayloadAction<ElementKey[]>,
         ) => {
             const layer = getSelectedLayer(draft)
             invariant(layer, 'No layer selected')
 
-            // TODO: this is how we do it
             invariant('chunks' in layer)
             if ('chunks' in layer) {
-                for (let pos of elements) {
-                    invariant(typeof pos === 'object')
-
-                    // layer.chunks[0][-32][0] = 3
-                    const [ox, oy, i] = positionInChunk(
-                        pos as GVec2,
-                        layer.bounds,
-                        layer.chunkSize,
-                    )
-                    const e = layer.chunks[ox][oy][i]
-                    // layer.chunks[0][-32][0] = 3
-                    invariant(
-                        e && typeof e === 'object',
-                        `Element at ${pos} not found`,
-                    )
-
+                for (let key of keys) {
+                    // getele
+                    // const [ox, oy, i] = globalToChunked(key)
+                    invariant(Array.isArray(key), key.toString())
+                    const e = elementAt(layer, key)
                     Object.assign(e, draft.selected.attribs)
                 }
             } else {
@@ -176,65 +174,40 @@ export const designerSlice = createSlice({
             }
         },
 
-        editElement: (
+        editElemente: (
             draft,
             {
-                payload,
+                payload: { key, path, value, layer: layerID },
             }: PayloadAction<{
-                layer: ResourceID
-                id: ElementID
-                /** JSON pointer.
-                 * @see https://www.rfc-editor.org/rfc/rfc6901 */
-                pointer: string
+                path: string[]
                 value: unknown
-            }>,
-        ) => {
-            const { id: elementId, layer: layerID, pointer, value } = payload
-
-            const layer = draft.resources[layerID]
-            invariant('schema' in layer)
-            invariant('data' in layer)
-            const { schema, data } = layer
-            const element = get(layer.data, elementId as keyof typeof data)
-
-            // ValuePointer.Set(element, pointer, value)
-            if (!Check(schema, element)) {
-                console.error(
-                    'Invalid update to an element:',
-                    Array.from(
-                        Errors(schema, data[elementId as keyof typeof data]),
-                    ),
-                )
-            }
-        },
-
-        editSelectedElements: (
-            draft,
-            {
-                payload: { path, value, limit },
-            }: PayloadAction<{
-                path: string
-                value: unknown
-                limit?: number
+                key: ElementKey
+                layer?: ResourceID
+                // limit?: number
             }>,
         ) => {
             // TODO: check type as well?
-            invariant(
-                Array.isArray(draft.selected.elements),
-                "Can't edit a rect or undefined",
-            )
+            // invariant(
+            //     Array.isArray(draft.selected.elements),
+            //     "Can't edit a rect or undefined",
+            // )
 
-            if (limit !== undefined) {
-                invariant(
-                    draft.selected.elements.length <= limit,
-                    'Too many selected',
-                )
-            }
+            // if (limit !== undefined) {
+            //     invariant(
+            //         draft.selected.elements.length <= limit,
+            //         'Too many selected',
+            //     )
+            // }
 
-            const layer = getSelectedLayer(draft)
-            invariant(layer, 'Layer not found')
+            const layer = layerID
+                ? draft.resources[layerID]
+                : getSelectedLayer(draft)
+            invariant(layer && 'schema' in layer, 'Invalid layer')
 
-            const element = get(layer, draft.selected.elements[0])
+            const element = elementAt(layer, key)
+            invariant(typeof element === 'object')
+
+            console.debug('Setting:', element, path, value)
             set(element, path, value)
 
             if (!Check(layer.schema, element)) {
@@ -243,11 +216,6 @@ export const designerSlice = createSlice({
                     Array.from(Errors(layer.schema, element)),
                 )
             }
-            // const elementId = draft.selected.elements[0]
-
-            // const element = layer.items[elementId as keyof typeof layer.items]
-            // invariant(element, 'Element not found')
-            // ValuePointer.Set(element, pointer, value)
         },
 
         open: (
@@ -287,8 +255,7 @@ export const useDispatch = reduxUseDispatch.withTypes<AppDispatch>() // Export a
 export const {
     open,
     applyPalette,
-    editElement,
-    editSelectedElements,
+    editElemente,
     selectElements,
     selectLayer,
     selectTool,
@@ -302,7 +269,9 @@ export const {
 
 export const useSelector = reduxUseSelector.withTypes<RootState>()
 
-export function getSelectedLayer(state: Readonly<RootState>) {
+export function getSelectedLayer(
+    state: Readonly<RootState>,
+): ScalarResource<2, TSchema> | undefined {
     const layer = state.selected.layer && state.resources[state.selected.layer]
     if (layer && layer.type !== ResourceType.Container) {
         return layer

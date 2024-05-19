@@ -3,6 +3,7 @@ import { Check } from '@sinclair/typebox/value'
 
 import { ResourceType } from '../../formats'
 import { useSelectedLayer, useSelector } from '../store'
+import { elementAt } from '../types'
 import FormControl from './form'
 
 export function PropertiesBox() {
@@ -25,7 +26,7 @@ export function PropertiesBox() {
     if (selectedIds.length > 1) {
         return <div>[!] {selectedIds.length} entities selected</div>
     } else {
-        const selection = selectedIds.map((id) => layer.data[id])
+        const selection = selectedIds.map((id) => elementAt(layer, id))
         let effectiveSchema = schema
 
         const [obj] = selection
@@ -48,16 +49,19 @@ export function PropertiesBox() {
                 : 'Entity'
 
         return (
-            // <NavGroup title={title}>
             <section>
                 <hr />
                 <h4 style={{ display: 'flex', flexDirection: 'row' }}>
                     <span style={{ flexGrow: 1 }}>{selectedIds[0]}</span>
                     <button className="btn btn-negative">Delete</button>
                 </h4>
-                <FormControl path="" schema={effectiveSchema} value={obj} />
+                <FormControl
+                    id={selectedIds[0]}
+                    path={[]}
+                    schema={effectiveSchema}
+                    value={obj}
+                />
             </section>
-            // </NavGroup>
         )
     }
 }

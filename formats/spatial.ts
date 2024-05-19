@@ -14,6 +14,7 @@ const K_POSITION = 'position'
 
 export type Dimensions = 2 | 3
 
+/** Tuple of 2 or 3 dimensions */
 export type Vector<D extends Dimensions = Dimensions> = D extends 2
     ? Vector2Tuple
     : Vector3Tuple
@@ -33,8 +34,6 @@ export interface SparseElement<D extends Dimensions = Dimensions> {
  * @todo Size of the overall map is considered to be the size of: the largest layer? the first layer with a size?
  */
 interface Base<S extends TSchema> {
-    // type: Types
-
     displayName?: string
 
     /** @todo This is a `Rect` rather than a `Size` because a dataset doesn't have to start at `[0,0]` */
@@ -86,6 +85,7 @@ export interface Sparse<
      * ID is arbitrary and unique only to this dataset */
     data: Record<string, Static<S>>
 }
+
 
 /**
  * A spatial dataset with densely-packed elements which are positioned

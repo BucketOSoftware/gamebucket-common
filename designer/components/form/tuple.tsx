@@ -1,7 +1,7 @@
-import { ControlGroup, FormGroup, InputGroup, Tag } from '@blueprintjs/core'
 import { TTuple, ValueGuard, type TNumber } from '@sinclair/typebox'
 import { Check, Convert } from '@sinclair/typebox/value'
 import invariant from 'tiny-invariant'
+
 import {
     AggregateControlProps,
     FormFieldProps,
@@ -13,19 +13,20 @@ import './form.css'
 export default function TupleField<T extends TTuple>(
     props: AggregateControlProps<T>,
 ) {
-    const { schema, value, path } = props
+    const { id, schema, value, path } = props
     invariant(ValueGuard.IsArray(value), 'Expected an array, got: ${value}')
 
     return (
         <div className="form-group">
             <label>{schema.title ?? path.at(-1)}</label>
             <div className="gbk-input-tuple">
-                {schema.items?.map((subschema, idx) => (
+                {schema.items!.map((subschema, idx) => (
                     <UpdateSelectionData
                         element={TupleElement}
+                        id={id}
                         key={idx}
                         schema={subschema as TNumber}
-                        path={path + '/' + idx}
+                        path={path.concat('' + idx)}
                         value={value[idx]}
                     />
                 ))}
@@ -33,10 +34,6 @@ export default function TupleField<T extends TTuple>(
         </div>
     )
 }
-
-// {/* <input type="email" class="form-control" placeholder="Email"> */}
-// <FormGroup label={schema.title ?? path.at(-1)}>
-//     <ControlGroup fill>
 
 function TupleElement({
     schema,

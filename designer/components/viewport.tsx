@@ -1,8 +1,10 @@
 import { ResizeSensor } from '@blueprintjs/core'
+import { TSchema } from '@sinclair/typebox'
 import classnames from 'classnames'
 import { useCallback, useRef, useState } from 'react'
 import invariant from 'tiny-invariant'
 
+import { Spatial } from '../../formats'
 import { GVec2 } from '../../geometry'
 import {
     GesturePhase,
@@ -15,10 +17,8 @@ import {
 import { useLiaison } from '../liaison'
 import { useDispatch, useSelectedLayer, useSelector } from '../store'
 import { useTool } from '../tools'
+import { ResourceID, ScalarResource } from '../types'
 import { MarchingAnts } from './common'
-import { ScalarResource, TODO } from '../types'
-import { ResourceType, Spatial } from '../../formats'
-// import { MarchingAnts } from '../ui'
 
 export function Viewport() {
     const dispatch = useDispatch()
@@ -116,7 +116,13 @@ function ViewportLayers({
 
         invariant('items' in thaRoot)
         // TODO: nested containers
-        return thaRoot.items.map((id) => [id, state.resources[id]] as const)
+        return thaRoot.items.map(
+            (id) =>
+                [id, state.resources[id]] as unknown as [
+                    ResourceID,
+                    ScalarResource<2, TSchema>,
+                ],
+        )
     })
 
     if (!Depict) {
@@ -135,7 +141,7 @@ function ViewportLayers({
         <Depict
             key={id as string}
             resourceId={id}
-            resource={res as ScalarResource<TODO>}
+            resource={res as unknown as ScalarResource<2, TSchema>}
             canvasSize={viewportSize}
             pointer={cursor}
         />

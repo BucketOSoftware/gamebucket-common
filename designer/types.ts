@@ -10,11 +10,16 @@ import uniqueId from 'lodash-es/uniqueId'
 import invariant from 'tiny-invariant'
 import { Opaque } from 'ts-essentials'
 
-import { File, GenericResource, ResourceType, WithProperties } from '../formats'
-import * as Spatial from '../formats/spatial'
+import {
+    File,
+    GenericResource,
+    ResourceType,
+    Spatial,
+    WithProperties,
+} from '../formats'
+import { GVec2 } from '../geometry'
 import * as grid from '../grid'
 import * as rect from '../rect'
-import { GVec2 } from '../geometry'
 
 export type TODO = any
 
@@ -43,6 +48,8 @@ export function TVec2(
 // Resources
 // -----
 
+export type SupportedDimension = 2
+
 /**
  * A unique ID for a resource we're editing. Unique across the editor but does
  * not persist past a save/load
@@ -57,27 +64,81 @@ export function ResourceID(_resource: GenericResource, prefix: string = 'res') {
     return uniqueId(prefix + '/') as ResourceID
 }
 
-export type ElementID<ID extends string | number = string | number> = ID
+/**
+ * The way the client identifies an element within a resource, i.e. a 2D coord
+ * on a tile map or a specific entity
+ */
+export type ElementKey<
+    L extends FlattenedResource<any> = FlattenedResource<any>,
+    D extends Spatial.Dimensions = Spatial.Dimensions,
+> =
+    L extends FlattenedDense<D, TSchema>
+        ? Spatial.Vector<D>
+        : L extends FlattenedSparse<D, TSchema>
+          ? string
+          : L extends FlattenedContainer
+            ? number
+            : never
 
-/** Resource types the designer can work with */
+export function elementAt<
+    O extends {},
+    S extends TSchema = TSchema,
+    D extends SupportedDimension = SupportedDimension,
+>(layer: FlattenedResource<D, S>, id: ElementKey<FlattenedResource<D, S>>): O {
+    console.warn('get', id)
+    if (Array.isArray(id)) {
+        invariant('chunks' in layer)
+        const [x, y] = id
 
-/** The kind of container we get as an argument */
-export type ScalarResource<S extends TSchema> = Sparse2D<S> | Dense<2, S>
-export type LoadableResource<S extends TSchema, P = void> = (
-    | ({
-          items: ResourceID[]
-      } & File<ResourceType.Container>)
-    | ScalarResource<S>
-) &
-    WithProperties<P>
+        const [ox, oy, localIdx] = positionInChunk(
+            { x, y },
+            layer.bounds,
+            layer.chunkSize,
+        )
 
-// export type Sparse2D<S extends TSchema> = Spatial.Sparse<2, S> & HasPalette<S>
-export interface Sparse2D<S extends TSchema>
-    extends Spatial.Sparse<2, S>,
+        const e = layer.chunks[ox][oy][localIdx]
+        invariant(e, 'Element not found')
+        invariant(typeof e === 'object', 'Element is not an object')
+        return e as O
+    }
+
+    // @ts-expect-error: could use a more permissive system, guys
+    const e = (layer.data || layer.items)[id]
+    invariant(e, 'Element not found')
+    invariant(typeof e === 'object', 'Element is not an object')
+    return e
+}
+
+/** The kind of resource we can load and work with */
+export type FlattenedResource<
+    D extends Spatial.Dimensions = Spatial.Dimensions,
+    S extends TSchema = TSchema,
+    P = unknown,
+> = (FlattenedContainer | ScalarResource<D, S>) & WithProperties<P>
+
+export function notContainer<R extends FlattenedResource>(r?: R) {
+    invariant(r, 'Not a layer')
+    invariant(r.type !== ResourceType.Container, 'Expected a non-container')
+
+    return r
+}
+
+interface FlattenedContainer extends File<ResourceType.Container> {
+    items: ResourceID[]
+}
+
+export type ScalarResource<D extends Spatial.Dimensions, S extends TSchema> =
+    | FlattenedSparse<D, S>
+    | FlattenedDense<D, S>
+
+export interface FlattenedSparse<
+    D extends Spatial.Dimensions,
+    S extends TSchema,
+> extends Spatial.Sparse<D, S>,
         HasPalette<S> {}
 
 /** in-memory representation for SpatialDense2D */
-export interface Dense<D extends Spatial.Dimensions, S extends TSchema>
+export interface FlattenedDense<D extends Spatial.Dimensions, S extends TSchema>
     extends Omit<Spatial.Dense<D, S>, 'data'>,
         HasPalette<S> {
     /** width and height of each chunk */
@@ -99,11 +160,14 @@ interface HasPalette<S extends TSchema = TSchema> {
     palettes: Palettes<S>
 }
 
-export function positionInChunk(
-    { x, y }: GVec2,
+export function positionInChunk<
+    D extends SupportedDimension = SupportedDimension,
+>(
+    [x, y]: Spatial.Vector<D>,
     bounds: rect.Rect,
     size: ChunkSize,
 ): [offsetx: number, offsety: number, localIdx: number] {
+    invariant(rect.containsPoint(bounds, { x, y }), 'Point out of bounds')
     const offsetx = Math.floor((x + bounds.x) / size) * size
     const offsety = Math.floor((y + bounds.y) / size) * size
 
@@ -111,9 +175,10 @@ export function positionInChunk(
 }
 
 type ChunkedDense2D<S extends TSchema> = Pick<
-    Dense<2, S>,
+    FlattenedDense<2, S>,
     'chunkSize' | 'chunks'
 >
+
 function chunkData<S extends TSchema>(
     data: Static<S>[],
     bounds: rect.Rect,
@@ -159,11 +224,10 @@ function chunkData<S extends TSchema>(
  * @returns
  */
 export function prepareDense<S extends TSchema>(
-    resource: Spatial.Dense<2, S>,
+    resource: Spatial.Dense<SupportedDimension, S>,
     palettes: Palettes<S>,
     chunkSize: ChunkSize = 32,
-): Dense<2, S> {
-    // TODO: remove 'data
+): FlattenedDense<2, S> {
     return {
         ...resource,
         ...chunkData(resource.data, resource.bounds, chunkSize),
@@ -172,19 +236,28 @@ export function prepareDense<S extends TSchema>(
 }
 
 export function prepareSparse<S extends TSchema>(
-    resource: Spatial.Sparse<2, S>,
-): Sparse2D<S> {
+    resource: Spatial.Sparse<SupportedDimension, S>,
+): FlattenedSparse<SupportedDimension, S> {
     // TODO: what do we use for palettes here?
     return { ...resource, palettes: {} }
 }
 
 export function prepareContainer<S extends TSchema, P = void>(
     container: {
-        items: LoadableResource<S, P>[]
+        items: FlattenedResource<SupportedDimension, S, P>[]
     } & File<ResourceType.Container> &
         WithProperties<P>,
-): [resources: Record<ResourceID, LoadableResource<S, any>>, root: ResourceID] {
-    const resources: Record<ResourceID, LoadableResource<S, any>> = {}
+): [
+    resources: Record<
+        ResourceID,
+        FlattenedResource<SupportedDimension, S, any>
+    >,
+    root: ResourceID,
+] {
+    const resources: Record<
+        ResourceID,
+        FlattenedResource<SupportedDimension, S, any>
+    > = {}
 
     return [resources, flatten(container, resources)]
 }
