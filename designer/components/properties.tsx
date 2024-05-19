@@ -22,7 +22,7 @@ export function PropertiesBox() {
     ) {
         return null
     }
-
+    
     if (selectedIds.length > 1) {
         return <div>[!] {selectedIds.length} entities selected</div>
     } else {

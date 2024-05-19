@@ -119,7 +119,7 @@
     pointer-events: none;
 
     position: absolute;
-    background-color: rgba(0, 0, 255, 33%);
+    background-color: hsla(219, 100%, 50%, 0.33);
 }
 
 
