@@ -136,13 +136,15 @@ export type ScalarResource<D extends Spatial.Dimensions, S extends TSchema> =
 
 export interface FlattenedSparse<
     D extends Spatial.Dimensions,
-    S extends TSchema,
+    S extends TSchema = TSchema,
 > extends Spatial.Sparse<D, S>,
         HasPalette<S> {}
 
 /** in-memory representation for SpatialDense2D */
-export interface FlattenedDense<D extends Spatial.Dimensions, S extends TSchema>
-    extends Omit<Spatial.Dense<D, S>, 'data'>,
+export interface FlattenedDense<
+    D extends Spatial.Dimensions,
+    S extends TSchema = TSchema,
+> extends Omit<Spatial.Dense<D, S>, 'data'>,
         HasPalette<S> {
     /** width and height of each chunk */
     chunkSize: ChunkSize

@@ -183,7 +183,6 @@ export const designerSlice = createSlice({
                 value: unknown
                 key: ElementKey
                 layer?: ResourceID
-                // limit?: number
             }>,
         ) => {
             // TODO: check type as well?

@@ -10,7 +10,7 @@ import {
 } from 'react'
 import { DeepReadonly } from 'ts-essentials'
 
-import { Spatial  } from '../formats'
+import { Spatial } from '../formats'
 import { GVec2, GVec3 } from '../geometry'
 import * as rect from '../rect'
 
@@ -82,14 +82,18 @@ interface LiaisonData {
         layer: Spatial.Spatial,
     ) => void
 
-    /** The user has moved an entity relative to the viewport
+    /**
+     * The user has moved an entity in the viewport
+     * @param [element] The entity record to modify
+     * @param [viewportMovement] The relative movement in the viewport, in pixels
+     *
      * @returns The entity's new `position`, or `undefined` if it shouldn't move
      */
     translateElement?: (
-        element: Spatial.SparseElement,
-        viewportMovement: GVec2,
+        element: Spatial.SparseElement<SupportedDimension>,
+        viewportMovement: Spatial.Vector<SupportedDimension>,
         selectedLayer?: Spatial.Sparse,
-    ) => Spatial.Vector | void
+    ) => Spatial.Vector<SupportedDimension> | void
 
     /** User has "dragged" the edit window by this amount */
     onPan?: (pixelMovement: GVec2) => void
@@ -101,13 +105,6 @@ interface LiaisonData {
         normalizedPosition: GVec2,
         properties: { area?: rect.Size; [k: string]: unknown },
     ) => Static<E>
-
-    /** the given element has been edited */
-    // onEdit?: (
-    //     canvas: HTMLCanvasElement,
-    //     layer: EditableSubresource,
-    //     elementId: string | number | undefined, // if undefined, refresh all
-    // ) => void
 
     /** map a layer to a react component */
     Depict?: FunctionComponent<DepictProps>
