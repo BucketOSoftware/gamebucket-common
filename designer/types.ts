@@ -20,6 +20,7 @@ import {
 import { GVec2 } from '../geometry'
 import * as grid from '../grid'
 import * as rect from '../rect'
+import { Dimensions } from '../formats/spatial'
 
 export type TODO = any
 
@@ -69,12 +70,14 @@ export function ResourceID(_resource: GenericResource, prefix: string = 'res') {
  * on a tile map or a specific entity
  */
 export type ElementKey<
-    L extends FlattenedResource<any> = FlattenedResource<any>,
-    D extends Spatial.Dimensions = Spatial.Dimensions,
+    L extends FlattenedResource<Dimensions, any> = FlattenedResource<
+        Dimensions,
+        any
+    >,
 > =
-    L extends FlattenedDense<D, TSchema>
+    L extends FlattenedDense<infer D, TSchema>
         ? Spatial.Vector<D>
-        : L extends FlattenedSparse<D, TSchema>
+        : L extends FlattenedSparse<infer D, TSchema>
           ? string
           : L extends FlattenedContainer
             ? number
@@ -83,15 +86,15 @@ export type ElementKey<
 export function elementAt<
     O extends {},
     S extends TSchema = TSchema,
-    D extends SupportedDimension = SupportedDimension,
+    D extends 2 = 2, //SupportedDimension = SupportedDimension,
 >(layer: FlattenedResource<D, S>, id: ElementKey<FlattenedResource<D, S>>): O {
-    console.warn('get', id)
+    // console.warn('get', id)
     if (Array.isArray(id)) {
         invariant('chunks' in layer)
-        const [x, y] = id
+        // const [x, y] = id
 
         const [ox, oy, localIdx] = positionInChunk(
-            { x, y },
+            id,
             layer.bounds,
             layer.chunkSize,
         )
@@ -192,9 +195,10 @@ function chunkData<S extends TSchema>(
     return {
         chunks: data.reduce<ChunkedDense2D<S>['chunks']>(
             (chunks, element, idx) => {
+                const { x, y } = grid.toCoord(idx, bounds.width)
                 // Get the map coordinates of the current element
                 const [offsetx, offsety, localIdx] = positionInChunk(
-                    grid.toCoord(idx, bounds.width),
+                    [x, y],
                     bounds,
                     size,
                 )
