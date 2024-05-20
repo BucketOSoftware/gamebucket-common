@@ -144,6 +144,10 @@ export function useDraggable<T extends HTMLElement>(
                 callback(true)
             } else {
                 const [dx, dy] = state.movement
+                if (state.first) {
+                    callback(true)
+                }
+
                 if (state.last) {
                     callback([dx, dy])
                     setDisplacement([0, 0])

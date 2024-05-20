@@ -118,7 +118,7 @@ function ViewportLayers({
         // TODO: nested containers
         return thaRoot.items.map(
             (id) =>
-                [id, state.resources[id]] as unknown as [
+                [id, state.resources[id]] as [
                     ResourceID,
                     ScalarResource<2, TSchema>,
                 ],
