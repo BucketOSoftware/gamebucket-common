@@ -10,6 +10,8 @@ import {
     SRGBColorSpace,
     WebGLRenderer,
 } from 'three'
+import type * as THREE from 'three'
+
 import invariant from 'tiny-invariant'
 
 import { GVec2 } from './geometry'

@@ -293,7 +293,7 @@ export default class Input<Intent extends string> {
     }
 
     /** @returns how long the intent has been held down, in miliseconds, or 0 if it isn't */
-    getHeld(intent: Intent, now: number, player = 0): number {
+    getHeld(intent: Intent, now: number = performance.now(), player = 0): number {
         // throw new Error('uh oh!')
         // const pressedAt = this.keyDown[key]
         // probably not so likely that the timestamp would be 0, but...

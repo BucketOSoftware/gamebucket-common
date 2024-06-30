@@ -75,12 +75,12 @@ export function fixedLoop(
         }
 
         // TODO: explain why this happens here
-        const afterUpdates_t = performance.now()
+        const afterUpdates_ms = performance.now()
 
         const frameProgress = updateAccumulator_ms / timestep_ms
 
-        const renderDelta_ms = afterUpdates_t - lastRender_ms
-        lastRender_ms = afterUpdates_t
+        const renderDelta_ms = afterUpdates_ms - lastRender_ms
+        lastRender_ms = afterUpdates_ms
 
         lastRender_ms = performance.now()
         loopStatus = render(
