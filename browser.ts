@@ -100,3 +100,38 @@ export function fixedLoop(
 }
 
 fixedLoop.PAUSE = PAUSE
+
+export function quickDebugDisplay() {
+    const div = document.createElement('pre')
+    div.style.position = 'absolute'
+    div.style.top = '5px'
+    div.style.left = '5px'
+    div.style.padding = '5px'
+    div.style.margin = '0'
+    div.style.textWrap = 'wrap'
+    div.style.overflow = 'scroll'
+
+    div.style.backgroundColor = 'hsla(200, 50%, 75%, 20%)'
+
+    div.style.border = '1px dashed black'
+    div.style.color = 'hsla(200, 33%, 90%, 100%)'
+    div.style.textShadow = '2px 2px black'
+    div.style.fontFamily =
+        "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace"
+
+    let shrunk = false
+
+    function updateSize() {
+        div.style.maxHeight = shrunk ? '0.5rem' : '10rem'
+        div.style.maxWidth = shrunk ? '0.5rem' : '66%'
+    }
+    updateSize()
+
+    div.addEventListener('dblclick', (ev) => {
+        shrunk = !shrunk
+        updateSize()
+    })
+
+    document.body.appendChild(div)
+    return div
+}
