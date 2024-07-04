@@ -18,7 +18,7 @@ const MAXIMUM_DELTA_MS = timestep_ms * 6
 export type RenderFn = (
     renderDelta_ms: number,
     isPaused: boolean,
-    frameProgress: number,
+    accumulatedUpdateTime_ms: number,
     gameTime_t: number,
 ) => LoopStatus
 
@@ -77,7 +77,7 @@ export function fixedLoop(
         // TODO: explain why this happens here
         const afterUpdates_ms = performance.now()
 
-        const frameProgress = updateAccumulator_ms / timestep_ms
+        const frameProgress = updateAccumulator_ms
 
         const renderDelta_ms = afterUpdates_ms - lastRender_ms
         lastRender_ms = afterUpdates_ms
