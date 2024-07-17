@@ -4,9 +4,6 @@ import { Teardown } from './machine'
 const PAUSE = Symbol()
 type LoopStatus = typeof PAUSE | void
 
-const timestep_ms = 1000 / 60
-const MAXIMUM_DELTA_MS = timestep_ms * 6
-
 /** Render loop callback.
  * @param renderDelta_ms Time in miliseconds since last render
  * @param isPaused True if this function returned PAUSE last time
@@ -16,10 +13,14 @@ const MAXIMUM_DELTA_MS = timestep_ms * 6
  * @returns `fixedLoop.PAUSE` if the update loop should continue running until the next call to the render function
  */
 export type RenderFn = (
-    renderDelta_ms: number,
-    isPaused: boolean,
-    accumulatedUpdateTime_ms: number,
-    gameTime_t: number,
+    /** True if the update loop is paused (i.e. the render function returned fixedLoop.PAUSE */
+    updatePaused: boolean,
+    /** Time in seconds since the last time the render function was called */
+    renderDelta_s: number,
+    /** Leftover time in the fixed loop accumulator, in terms of partial updates (i.e., in the range [0..1) )*/
+    extrapolation: number,
+    /** total amount of simulated time */
+    gameTime_s: number,
 ) => LoopStatus
 
 /**
@@ -29,10 +30,13 @@ export type RenderFn = (
  * @returns
  */
 export function fixedLoop(
+    updatesPerSecond: number,
     fixedUpdate: (dt: number) => void,
     render: RenderFn,
-    // options: { timestep?: number; speed?: number}
 ): Teardown {
+    const timestep_ms = 1000 / updatesPerSecond
+    const maximumDelta = timestep_ms * 6
+
     let lastLoop = performance.now()
     let lastRender_ms = lastLoop
     let updateAccumulator_ms = 0
@@ -58,14 +62,14 @@ export function fixedLoop(
         // dt is game time
         // if the last render paused the loop, we don't contribute the time
         let dt = isPaused ? 0 : (t - lastLoop) * speedFactor
-        if (dt > MAXIMUM_DELTA_MS) {
+
+        if (dt > maximumDelta) {
             // Slow down the game
             // TODO: does this work? Test with slow updates
             dt = timestep_ms
         }
         updateAccumulator_ms += dt
         gameTime_ms += dt
-
         lastLoop = t
 
         while (updateAccumulator_ms >= timestep_ms) {
@@ -74,20 +78,15 @@ export function fixedLoop(
             fixedUpdate(timestep_ms)
         }
 
-        // TODO: explain why this happens here
-        const afterUpdates_ms = performance.now()
+        const now = performance.now()
+        const renderDelta_ms = now - lastRender_ms
+        lastRender_ms = now
 
-        const frameProgress = updateAccumulator_ms
-
-        const renderDelta_ms = afterUpdates_ms - lastRender_ms
-        lastRender_ms = afterUpdates_ms
-
-        lastRender_ms = performance.now()
         loopStatus = render(
-            renderDelta_ms,
             loopStatus === PAUSE,
-            frameProgress,
-            gameTime_ms,
+            renderDelta_ms / 1000,
+            updateAccumulator_ms / timestep_ms,
+            gameTime_ms / 1000,
         )
 
         rafId = requestAnimationFrame(loop)

@@ -145,6 +145,14 @@ export function formatSize3D({ x, y, z }: Readonly<GVec3>, places = 3) {
     )
 }
 
+export function formatVec2({ x, y }: Readonly<GVec2>, places = 3) {
+    return (
+        '(' +
+        [roundToPlaces(x, places), roundToPlaces(y, places)].join(', ') +
+        ')'
+    )
+}
+
 export function formatVec3({ x, y, z }: Readonly<GVec3>, places = 3) {
     return '(' + [x, y, z].map((n) => roundToPlaces(n, places)).join(', ') + ')'
 }
