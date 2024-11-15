@@ -134,3 +134,18 @@ export function quickDebugDisplay() {
     document.body.appendChild(div)
     return div
 }
+
+// Runs a function when the DOM is ready
+export function main(fn: () => void) {
+    if (document.readyState === 'loading') {
+        const start = () => {
+            document.removeEventListener('DOMContentLoaded', start)
+            fn()
+        }
+
+        document.addEventListener('DOMContentLoaded', start)
+    } else {
+        // `DOMContentLoaded` has already fired
+        fn()
+    }
+}
