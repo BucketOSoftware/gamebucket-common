@@ -5,10 +5,10 @@ const PAUSE = Symbol()
 type LoopStatus = typeof PAUSE | void
 
 /** Render loop callback.
- * @param renderDelta_ms Time in miliseconds since last render
- * @param isPaused True if this function returned PAUSE last time
- * @param frameProgress How much of the next frame has been processed (0 to 1 exclusive), for render interpolation
- * @param gameTime_t Sum of time this loop has processed in the update callback
+ * @param updatePaused True if the update loop is paused (this function returned PAUSE last time)
+ * @param renderDelta_s Time in seconds since the last time the render function was called
+ * @param extrapolation How much of the next frame has been processed (0 to 1 exclusive), for render interpolation
+ * @param gameTime_s Sum of time updated in the update callback
  *
  * @returns `fixedLoop.PAUSE` if the update loop should continue running until the next call to the render function
  */
