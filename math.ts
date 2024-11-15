@@ -1,6 +1,7 @@
 import invariant from 'tiny-invariant'
 import { clamp, lerp, inverseLerp } from 'three/src/math/MathUtils.js'
 export { clamp, lerp, inverseLerp } from 'three/src/math/MathUtils.js'
+export * as ease from 'd3-ease'
 
 /** Returns a number between min and max, inclusive */
 export function randomBetween(min: number, max: number) {
