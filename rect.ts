@@ -3,16 +3,16 @@ import { GVec2, ZMatrix3, ZVec2 } from './geometry'
 import invariant from 'tiny-invariant'
 
 export interface Size {
-    width: number
-    height: number
+    w: number
+    h: number
 }
 
 /** An axis-aligned rectangle. `x` and `y` represent the minium coordinate in the rectangle, and `width` and `height` are the size/shape */
 export type Rect = {
     x: number
     y: number
-    width: number
-    height: number
+    w: number
+    h: number
 }
 
 export type OptionalArea = {
@@ -25,12 +25,12 @@ export type OptionalArea = {
 export function build(
     x: number,
     y: number,
-    width: number,
-    height: number,
+    w: number,
+    h: number,
 ): Rect {
-    invariant(width >= 0, 'Width must be 0 or greater')
-    invariant(height >= 0, 'Height must be 0 or greater')
-    return { x, y, width, height }
+    invariant(w >= 0, 'Width must be 0 or greater')
+    invariant(h >= 0, 'Height must be 0 or greater')
+    return { x, y, w, h }
 }
 
 const getx = (v: GVec2) => v.x
@@ -50,12 +50,12 @@ export function fromCorners(
     y1: number,
     x2: number,
     y2: number,
-    out: Rect = { x: 0, y: 0, width: 0, height: 0 },
+    out: Rect = { x: 0, y: 0, w: 0, h: 0 },
 ): Rect {
     out.x = Math.min(x1, x2)
     out.y = Math.min(y1, y2)
-    out.width = Math.abs(x1 - x2)
-    out.height = Math.abs(y1 - y2)
+    out.w = Math.abs(x1 - x2)
+    out.h = Math.abs(y1 - y2)
 
     return out
 }
@@ -67,7 +67,7 @@ export function applyMatrix3(
 ): Rect {
     // TODO: warn if the matrix has a rotation element?
     const min = ZVec2(rect.x, rect.y)
-    const max = ZVec2(rect.width, rect.height)
+    const max = ZVec2(rect.w, rect.h)
     max.add(min)
 
     min.applyMatrix3(matrix)
@@ -75,30 +75,30 @@ export function applyMatrix3(
 
     out.x = min.x
     out.y = min.y
-    out.width = max.x - min.x
-    out.height = max.y - min.y
+    out.w = max.x - min.x
+    out.h = max.y - min.y
 
     return out
 }
 
-export const area = (size: Size) => size.width * size.height
-export const longerSide = (size: Size) => Math.max(size.width, size.height)
+export const area = (size: Size) => size.w * size.h
+export const longerSide = (size: Size) => Math.max(size.w, size.h)
 
 export const containsPoint = (
     rect: Readonly<Rect>,
     { x, y }: Readonly<GVec2>,
 ) =>
     x >= rect.x &&
-    x < rect.x + rect.width &&
+    x < rect.x + rect.w &&
     y >= rect.y &&
-    y < rect.y + rect.height
+    y < rect.y + rect.h
 
 export const intersects = (a: Readonly<Rect>, b: Readonly<Rect>) =>
     !(
-        a.x + a.width - 1 < b.x ||
-        b.x + b.width - 1 < a.x ||
-        a.y + a.height - 1 < b.y ||
-        b.y + b.height - 1 < a.y
+        a.x + a.w - 1 < b.x ||
+        b.x + b.w - 1 < a.x ||
+        a.y + a.h - 1 < b.y ||
+        b.y + b.h - 1 < a.y
     )
 
 /** Determine which side o  f a rect the point lies on, as a vector  */
@@ -109,13 +109,13 @@ export function side(
 ) {
     if (p.x < r.x) {
         out.x = -1
-    } else if (p.x >= r.x + r.width) {
+    } else if (p.x >= r.x + r.w) {
         out.x = 1
     }
 
     if (p.y < r.y) {
         out.y = -1
-    } else if (p.y >= r.y + r.height) {
+    } else if (p.y >= r.y + r.h) {
         out.y = 1
     }
 
@@ -134,8 +134,8 @@ export function wrap(r: Readonly<Rect>, p: GVec2) {
     do {
         oldX = p.x
         oldY = p.y
-        p.x = (p.x + r.width) % r.width
-        p.y = (p.y + r.height) % r.height
+        p.x = (p.x + r.w) % r.w
+        p.y = (p.y + r.h) % r.h
     } while (oldX !== p.x || oldY !== p.y)
 
     p.x += r.x
@@ -144,8 +144,8 @@ export function wrap(r: Readonly<Rect>, p: GVec2) {
 
 /** Clamp the given point to fit within the rect. Mutates the point */
 export function clamp(r: Readonly<Rect>, p: GVec2) {
-    p.x = scalarClamp(p.x, r.x, r.x + r.width - 1)
-    p.y = scalarClamp(p.y, r.y, r.y + r.height - 1)
+    p.x = scalarClamp(p.x, r.x, r.x + r.w - 1)
+    p.y = scalarClamp(p.y, r.y, r.y + r.h - 1)
 
     return p
 }
@@ -154,8 +154,8 @@ export function clamp(r: Readonly<Rect>, p: GVec2) {
 export function expandToInclude(r: Rect, { x, y }: Readonly<GVec2>) {
     r.x = Math.min(r.x, x)
     r.y = Math.min(r.y, y)
-    r.width = Math.max(r.width, x - r.x)
-    r.height = Math.max(r.height, y - r.y)
+    r.w = Math.max(r.w, x - r.x)
+    r.h = Math.max(r.h, y - r.y)
 
     return r
 }
