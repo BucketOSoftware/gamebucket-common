@@ -120,10 +120,10 @@ export default class Input<Intent extends string> {
         doc.addEventListener('focusout', this.handleDocFocusChange)
         doc.addEventListener('visibilitychange', this.handleDocFocusChange)
 
-        element.addEventListener('mousedown', this.handleMouseButton)
+        element.addEventListener('pointerdown', this.handleMouseButton)
         // we want to know if the user releases the button outside of the canvas
-        doc.addEventListener('mouseup', this.handleMouseButton)
-        doc.addEventListener('mousemove', this.handleMouseMove)
+        doc.addEventListener('pointerup', this.handleMouseButton)
+        doc.addEventListener('pointermove', this.handleMouseMove)
         element.addEventListener('contextmenu', this.handleMouseContext)
         element.addEventListener('wheel', this.handleMouseWheel, passive)
 
@@ -324,7 +324,7 @@ export default class Input<Intent extends string> {
         lastFrameActiveIntents: Set<Intent>,
         gamepad?: Gamepad,
     ) {
-        const SINGLE_AXIS_DEADZONE = 0.001
+        const SINGLE_AXIS_DEADZONE = 0.01
 
         const { mapping, intentions } = this
 
