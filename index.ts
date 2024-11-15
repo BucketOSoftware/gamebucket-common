@@ -4,6 +4,7 @@ export * from './threez'
 export * as grid from './grid'
 export * as rect from './rect'
 export * as machine from './machine'
+export * as heightmap from './heightmap'
 export * from './browser'
 export * from './overrides'
 
