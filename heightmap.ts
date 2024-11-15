@@ -13,16 +13,23 @@ export interface Heightmap extends Size {
     scale?: number
 }
 
-export function heightAt(map: Heightmap, normalizedPosition: GVec<2>) {
-    const max = (1 << (map.cells.BYTES_PER_ELEMENT * 8)) - 1
-    const { x, y } = normalizedPosition
+export function idx(map: Heightmap, { x, y }: GVec<2>) {
     invariant(x >= 0 && x < 1)
     invariant(y >= 0 && y < 1)
+    return grid.toIdx(Math.round(x * map.w), Math.round(y * map.h), map.w) * 4
+}
 
-    const heightmapIndex =
-        grid.toIdx(Math.round(x * map.w), Math.round(y * map.h), map.w) * 4
+export function heightAt(map: Heightmap, normalizedPosition: GVec<2>) {
+    const max = (1 << (map.cells.BYTES_PER_ELEMENT * 8)) - 1
+    // const { x, y } = normalizedPosition
 
-    return mapRange(map.cells[heightmapIndex], 0, max, 0, map.scale || 1)
+    return mapRange(
+        map.cells[idx(map, normalizedPosition)],
+        0,
+        max,
+        0,
+        map.scale || 1,
+    )
 }
 
 /**
