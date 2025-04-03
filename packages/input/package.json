@@ -10,6 +10,11 @@
         "game"
     ],
     "author": "Alex Michaud",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/BucketOSoftware/gamebucket-common.git"
+    },
+    "homepage": "https://github.com/BucketOSoftware/gamebucket-common",
     "license": "MPL-2.0",
     "type": "module",
     "files": [
@@ -40,7 +45,11 @@
         "headings": {
             "readme": false
         },
-        "sort": ["static-first", "visibility", "source-order"],
+        "sort": [
+            "static-first",
+            "visibility",
+            "source-order"
+        ],
         "excludeInternal": true
     },
     "devDependencies": {
