@@ -1,0 +1,34 @@
+{
+    "name": "@gamebucket/capture",
+    "version": "0.0.1",
+    "description": "Capture and save video from an HTML Canvas element",
+    "keywords": [],
+    "author": "Alex Michaud",
+    "license": "MPL-2.0",
+    "main": "./dist/index.js",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup"
+    },
+    "tsup": {
+        "entry": [
+            "./index.ts"
+        ],
+        "format": [
+            "cjs",
+            "esm"
+        ],
+        "platform": "browser",
+        "dts": true,
+        "sourcemap": true,
+        "clean": true
+    },
+    "devDependencies": {
+        "tsup": "^8.4.0",
+        "typescript": "^5.8.2"
+    },
+    "dependencies": {
+        "@thi.ng/dl-asset": "^2.3.107"
+    }
+}

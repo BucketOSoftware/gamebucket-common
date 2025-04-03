@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "module": "ESNext",
+        "target": "ES6",
+        "lib": ["ES2019", "DOM"],
+        "sourceMap": true,
+
+        "verbatimModuleSyntax": true,
+        "moduleResolution": "bundler",
+
+        "strict": true
+    }
+}
