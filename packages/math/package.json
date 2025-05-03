@@ -36,6 +36,9 @@
     "devDependencies": {
         "@types/d3-ease": "^3.0.2",
         "@types/three": "^0.175.0",
+        "tsup": "^8.4.0",
+        "typedoc": "^0.28.1",
+        "typescript": "^5.8.2",
         "type-fest": "^4.38.0",
         "vitest": "^3.1.1"
     }
