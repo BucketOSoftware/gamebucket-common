@@ -109,7 +109,6 @@ export function neighbors(
 
 /** Determines whether `tile` is a valid tile coordinate within the given `grid` */
 export function inBounds(grid: Size, tile: SVec<2>) {
-    // let { w: width, h: height } = grid
     let width = grid.w
     let height = grid.h ?? Infinity
     let { x, y } = tile

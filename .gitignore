@@ -2,4 +2,5 @@
 node_modules
 unused/
 packages/**/dist/
+packages/**/docs/
 gamebucket-*.tgz

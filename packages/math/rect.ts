@@ -6,8 +6,7 @@
 
 import invariant from 'tiny-invariant'
 
-import { rangeSide, clamp as scalarClamp } from './index.js'
-import { type SVec } from './geometry'
+import { type SVec, rangeSide, clamp as scalarClamp } from './index.js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,19 +137,19 @@ export function wrap(rect: Readonly<Rect>, point: SVec<2>) {
 }
 
 /** Clamp the given point to fit within the rect. Mutates the point */
-export function clamp(r: Readonly<Rect>, p: SVec<2>) {
-    p.x = scalarClamp(p.x, r.x, r.x + r.w - 1)
-    p.y = scalarClamp(p.y, r.y, r.y + r.h - 1)
+export function clamp(rect: Readonly<Rect>, point: SVec<2>) {
+    point.x = scalarClamp(point.x, rect.x, rect.x + rect.w - 1)
+    point.y = scalarClamp(point.y, rect.y, rect.y + rect.h - 1)
 
-    return p
+    return point
 }
 
 /** Size up a rectangle to encompass the point, if necessary */
-export function expand(r: Rect, { x, y }: Readonly<SVec<2>>) {
-    r.x = Math.min(r.x, x)
-    r.y = Math.min(r.y, y)
-    r.w = Math.max(r.w, x - r.x)
-    r.h = Math.max(r.h, y - r.y)
+export function expand(rect: Rect, { x, y }: Readonly<SVec<2>>) {
+    rect.x = Math.min(rect.x, x)
+    rect.y = Math.min(rect.y, y)
+    rect.w = Math.max(rect.w, x - rect.x)
+    rect.h = Math.max(rect.h, y - rect.y)
 
-    return r
+    return rect
 }

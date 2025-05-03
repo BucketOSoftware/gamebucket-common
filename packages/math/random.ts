@@ -20,6 +20,14 @@ export function choice<T>(choices: ArrayLike<T>, rand = Math.random): T {
 }
 
 /**
+ * Create a random number generator from an arbitrary string. A given string
+ * will always yield the same sequence of random numbers.
+ */
+export function seededGenerator(seed: string) {
+    return sfc32(...cyrb128(seed))
+}
+
+/**
  * Create a random number generator from a 4-number seed.
  * Via {@link https://stackoverflow.com/a/47593316}
  */
