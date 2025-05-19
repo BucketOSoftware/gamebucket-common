@@ -53,7 +53,7 @@
         "excludeInternal": true
     },
     "devDependencies": {
-        "tsup": "^8.4.0",
+        "tsup": "^8.5.0",
         "typedoc": "^0.28.3",
         "typescript": "^5.8.3"
     },
