@@ -600,6 +600,10 @@ export default class Input<Intent extends string = string> {
     private mouseWheelAccumulator: Vector<3> = { x: 0, y: 0, z: 0 }
 
     private handleMouseButton = (e: MouseEvent) => {
+        if (!(e.type === 'mouseup' || e.target === this.attachedElement)) {
+            return
+        }
+
         this.lastInteraction = e.timeStamp
         const { allDeviceButtonDownAt, recentPresses } = this
 
@@ -617,8 +621,6 @@ export default class Input<Intent extends string = string> {
                 delete allDeviceButtonDownAt[code]
             }
         }
-
-        invariant(e.type === 'mouseup' || e.target === this.attachedElement)
 
         // There may not have been a move event before this
         this.handleMouseMove(e)
