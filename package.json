@@ -12,7 +12,7 @@
         "tabWidth": 4
     },
     "devDependencies": {
-        "@tsconfig/recommended": "^1.0.8"
+        "@tsconfig/recommended": "^1.0.10"
     },
     "workspaces": [
         "packages/capture",
