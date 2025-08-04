@@ -35,7 +35,7 @@ export type AxisInputCode = [negative: InputCode, positive: InputCode]
 
 type CodeToIntent<Intent extends string> = [
     code: InputCode | Readonly<AxisInputCode>,
-    intent: Intent
+    intent: Intent,
 ]
 
 /**
@@ -141,8 +141,8 @@ export default class Input<Intent extends string = string> {
 
         const passive = { passive: true }
 
-        doc.addEventListener('keydown', this.handleKeyDown)
-        doc.addEventListener('keyup', this.handleKeyUp)
+        doc.body.addEventListener('keydown', this.handleKeyDown)
+        doc.body.addEventListener('keyup', this.handleKeyUp)
 
         doc.addEventListener('focusin', this.handleDocFocusChange)
         doc.addEventListener('focusout', this.handleDocFocusChange)
@@ -158,7 +158,7 @@ export default class Input<Intent extends string = string> {
         win.addEventListener('gamepadconnected', this.handleGamepadConnected)
         win.addEventListener(
             'gamepaddisconnected',
-            this.handleGamepadDisconnected
+            this.handleGamepadDisconnected,
         )
     }
 
@@ -188,7 +188,7 @@ export default class Input<Intent extends string = string> {
         win.removeEventListener('gamepadconnected', this.handleGamepadConnected)
         win.removeEventListener(
             'gamepaddisconnected',
-            this.handleGamepadDisconnected
+            this.handleGamepadDisconnected,
         )
         this.attachedElement = undefined
     }
@@ -243,7 +243,7 @@ export default class Input<Intent extends string = string> {
             const record = intentions[intent]
             invariant(
                 !!record.degree === (record.start !== undefined),
-                'Input state is out of sync'
+                'Input state is out of sync',
             )
 
             if (intentions[intent].degree) {
@@ -330,7 +330,7 @@ export default class Input<Intent extends string = string> {
         intent: Intent,
         now: number = performance.now(),
         minimumDuration = 0,
-        player = 0
+        player = 0,
     ): number {
         const duration = now - (this.intentions[intent]?.start ?? Infinity)
         return duration < minimumDuration ? 0 : duration
@@ -340,7 +340,7 @@ export default class Input<Intent extends string = string> {
     getValue(intent: Intent, player = 0): number {
         invariant(
             !!this.intentions[intent]?.degree ===
-                !!this.intentions[intent]?.start
+                !!this.intentions[intent]?.start,
         )
 
         return this.intentions[intent]?.degree || 0
@@ -349,7 +349,7 @@ export default class Input<Intent extends string = string> {
     private mapInputsToIntents(
         t: number,
         lastFrameActiveIntents: Set<Intent>,
-        gamepad?: Gamepad
+        gamepad?: Gamepad,
     ) {
         const { mapping, intentions } = this
 
@@ -373,7 +373,7 @@ export default class Input<Intent extends string = string> {
                         typeof pos === 'string' &&
                         neg[0] !== '@' &&
                         pos[0] !== '@',
-                    "Input code pairs can't map to an axis code"
+                    "Input code pairs can't map to an axis code",
                 )
 
                 const { start: negStart = -Infinity, degree: negDegree } =
@@ -468,7 +468,7 @@ export default class Input<Intent extends string = string> {
 
     private getStatusByCode(
         output: { start: number | undefined; degree: number },
-        code: InputCode
+        code: InputCode,
     ) {
         output.start = this.allDeviceButtonDownAt[code]
         output.degree =
@@ -487,7 +487,7 @@ export default class Input<Intent extends string = string> {
             this.mapping.map(([_, intent]) => [
                 intent,
                 { start: undefined, degree: 0, recent: false },
-            ])
+            ]),
         ) as Input<Intent>['intentions']
 
         this.recentPresses = {}
@@ -559,7 +559,7 @@ export default class Input<Intent extends string = string> {
             'Gamepad disconnected from index %d: %s. Switching to %d',
             ev.gamepad.index,
             ev.gamepad.id,
-            this.gamepadIndex
+            this.gamepadIndex,
         )
     }
 
@@ -574,12 +574,12 @@ export default class Input<Intent extends string = string> {
             ev.gamepad.index,
             ev.gamepad.id,
             ev.gamepad.buttons.length,
-            ev.gamepad.axes.length
+            ev.gamepad.axes.length,
         )
 
         if (this.gamepadIndex !== -1) {
             console.warn(
-                "TODO: Adding another gamepad; this use case isn't well-tested"
+                "TODO: Adding another gamepad; this use case isn't well-tested",
             )
         }
 
