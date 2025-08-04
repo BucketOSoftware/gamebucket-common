@@ -54,7 +54,7 @@
     },
     "devDependencies": {
         "tsup": "^8.4.0",
-        "typedoc": "^0.28.7",
+        "typedoc": "^0.28.9",
         "typescript": "^5.8.3"
     },
     "dependencies": {
