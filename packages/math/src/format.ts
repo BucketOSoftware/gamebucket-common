@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import type { Quaternion, Euler } from 'three'
+import { Quaternion, Euler } from 'three'
 
 import * as round from './round.js'
 import type { SVec2, SVec3, SQuat } from './geometry.js'
@@ -34,11 +34,9 @@ export function formatVec3({ x, y, z }: Readonly<SVec3>, places = 3) {
     )
 }
 
-const formatRotationTempQ = new Quaternion()
-const formatRotationTempEu = new Euler()
 export function formatRotation(quaternion: Readonly<SQuat>, places = 1) {
-    const { x, y, z } = formatRotationTempEu.setFromQuaternion(
-        formatRotationTempQ.copy(quaternion as Quaternion)
+    const { x, y, z } = new Euler().setFromQuaternion(
+        new Quaternion().copy(quaternion as Quaternion)
     )
     return (
         '{' +
