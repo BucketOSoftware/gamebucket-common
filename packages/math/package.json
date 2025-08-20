@@ -13,7 +13,8 @@
         "./dist/"
     ],
     "scripts": {
-        "build": "tsup",
+        "build": "tsup && typedoc src/index.ts",
+        "dev": "tsup --watch --format esm",
         "check-types": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest"
@@ -34,7 +35,7 @@
     },
     "tsup": {
         "entry": [
-            "./index.ts"
+            "src/index.ts"
         ],
         "format": [
             "cjs",
