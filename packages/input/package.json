@@ -25,6 +25,7 @@
     ],
     "scripts": {
         "build": "tsup && typedoc ./index.ts",
+        "check-types": "tsc --noEmit",
         "prepublishOnly": "npm run build"
     },
     "dependencies": {
