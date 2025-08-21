@@ -10,6 +10,10 @@ import { type SVec } from './geometry'
 import { clamp as scalarClamp } from './index'
 import { type Rect, type Size } from './rect'
 
+/**
+ * An attempt at differentiating an index into a grid array from other numbers.
+ * Uses TypeScript trickery.
+ */
 export type GridIndex = Tagged<number, 'GridIndex'>
 
 /**

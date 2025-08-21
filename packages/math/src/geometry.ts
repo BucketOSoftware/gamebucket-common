@@ -4,7 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import type { Object3D } from 'three/src/core/Object3D.js'
 import { Vector2 } from 'three/src/math/Vector2.js'
 import { Vector3 } from 'three/src/math/Vector3.js'
 

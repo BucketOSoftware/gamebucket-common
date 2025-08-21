@@ -4,7 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { Quaternion, Euler } from 'three'
+import { Quaternion } from 'three/src/math/Quaternion.js'
+import { Euler } from 'three/src/math/Euler.js'
 
 import * as round from './round.js'
 import type { SVec2, SVec3, SQuat } from './geometry.js'

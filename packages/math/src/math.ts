@@ -35,8 +35,6 @@ const vr_a = 12.9898,
 /**
  * Apparently a classic algorithm. Given two numbers, return a unique hash, and quickly.
  *
- * @remarks
- * This is not tested for
  * @param x Input 1
  * @param y Input 2
  * @returns A hash based on the inputs
