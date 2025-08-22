@@ -65,6 +65,11 @@ export default class Input<Intent extends string = string> {
     /** Wheel movement since last call to {@link readDevices} */
     mouseWheelDelta: Vector<3> = { x: 0, y: 0, z: 0 }
 
+    /**
+     * Resolves when the user has interacted with the page via keyboard or pointer.
+     */
+    readonly firstInteraction: Promise<void>
+
     // -----
     // Settings
     // -----
@@ -121,6 +126,29 @@ export default class Input<Intent extends string = string> {
         this.mapping = mapping
         this.resetState()
         this.lastRead = this.lastInteraction = performance.now()
+        this.firstInteraction = new Promise((resolve) => {
+            this.resolveFirstInteraction = resolve
+        })
+
+        // TODO: figure out the timing on this. It seems like we don't need to
+        // wait for .attach, since it's possible the user has interacted with
+        // the page earlier.
+        document.addEventListener('keyup', this.handleFirstInteraction)
+        document.addEventListener('pointerup', this.handleFirstInteraction)
+    }
+
+    // @ts-expect-error: yes it is assigned in the constructor, basically
+    protected resolveFirstInteraction: () => void
+
+    protected handleFirstInteraction = (ev: unknown) => {
+        if (this.resolveFirstInteraction) {
+            document.removeEventListener('keyup', this.handleFirstInteraction)
+            document.removeEventListener(
+                'pointerup',
+                this.handleFirstInteraction
+            )
+            this.resolveFirstInteraction()
+        }
     }
 
     /**
