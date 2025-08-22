@@ -507,10 +507,50 @@ export default class Input<Intent extends string = string> {
     private handleKeyDown = (e: KeyboardEvent) => {
         this.lastInteraction = e.timeStamp
 
-        // TODO: might want to handle this another way. What if we want to bind keys that have modifiers, etc.
-        const modifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey
-        if (e.repeat) {
-            return
+        // FIXME: for certain key combinations with modifiers, seemingly browser
+        // keyboard shortcuts, we don't get a keyup event for the key if it's
+        // released before the modifier. e.g.:
+        //   1. command is pressed, keydown is sent
+        //   2. R key is pressed, keydown is sent (and default prevented because it's bound)
+        //   3. R key is released -- keyup is NOT sent
+        //   4. command is released -- keyup is sent
+        //
+        // Current hacky workaround: key combos involving meta (for mac) and
+        // ctrl (for win/lin) keys can't be used as inputs; these modifiers and
+        // keys pressed while those modifiers are held just won't be tracked.
+        // Not ideal, but it's understandable that browsers don't seem to want
+        // you to disable their hotkeys.
+        // TODO: can we skip this for Electron, etc.?
+
+        switch (e.code as KeyCode) {
+            case 'ControlLeft':
+            case 'ControlRight':
+            case 'MetaLeft':
+            case 'MetaRight':
+            // Safari won't let you prevent the page reload hotkey (good for them!)
+            // so let's hackily implement that across the board
+            case 'KeyR':
+                return
+            // Deveoper tools
+            case 'KeyI':
+                if (e.metaKey || e.ctrlKey) {
+                    return
+                }
+                break
+        }
+
+        e.preventDefault()
+
+        if (e.metaKey || e.ctrlKey) return
+        if (e.repeat) return
+
+        // Prevent default browser functionality for bound keys, but not others
+        // TODO: not very efficient I guess
+
+        for (let [code] of this.mapping) {
+            if (Array.isArray(code) ? code.includes(e.code) : code === e.code) {
+                e.preventDefault()
+            }
         }
 
         invariant(isKeyCode(e.code), 'Unexpected key code')
@@ -525,21 +565,13 @@ export default class Input<Intent extends string = string> {
         }
 
         this.allDeviceButtonDownAt[e.code] ??= e.timeStamp
-
         this.recentPresses[e.code] = true
-
-        // TODO: only prevent default if this key maps to something (?)
-        // we probably don't want to block stuff like reloading the page, right
-        // e.preventDefault()
     }
 
     private handleKeyUp = (e: KeyboardEvent) => {
         this.lastInteraction = e.timeStamp
-
         invariant(isKeyCode(e.code), 'Not a valid key code??')
         delete this.allDeviceButtonDownAt[e.code]
-
-        // Do we need to prevent default?
     }
 
     // ---------
