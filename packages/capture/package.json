@@ -29,6 +29,6 @@
         "typescript": "^5.9.2"
     },
     "dependencies": {
-        "@thi.ng/dl-asset": "^2.3.115"
+        "@thi.ng/dl-asset": "^2.3.121"
     }
 }
